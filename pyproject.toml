@@ -1,5 +1,5 @@
 [project]
-name = "argdown-hirp"
+name = "argdown-hirpo"
 version = "0.1.0"
 description = "Generating preference pairs via HIR for Argdown tasks"
 readme = "README.md"

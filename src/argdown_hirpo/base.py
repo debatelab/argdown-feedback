@@ -52,8 +52,8 @@ class Solution(ABC):
 class Evaluation:
     """
     Evaluation of a solution
-    
-    Every solution is valid or invalid. -- Which can mean different things 
+
+    Every solution is valid or invalid. -- Which can mean different things
     depending on the problem, and the criteria used to evaluate it.
 
     The ability to generate *valid* solutions -- in which ever way validity
@@ -185,7 +185,7 @@ class VirtuePreferencePairGenerator(HIRAbstractGenerator):
 
 class FailureTypePreferencePairGenerator(HIRAbstractGenerator):
     """
-    Generates preference pairs from failure type differences 
+    Generates preference pairs from failure type differences
     between candidate solutions.
     """
 
@@ -221,16 +221,16 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         self.solution_generator = solution_generator
         self.judge = judge
         self.feedback_generator = feedback_generator
-        self.virtue_preference_pair_generator = (
-            virtue_preference_pair_generator
-        )
+        self.virtue_preference_pair_generator = virtue_preference_pair_generator
         self.failure_type_preference_pair_generator = (
             failure_type_preference_pair_generator
         )
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    def validity_vs_virtue_router(self, mean_syntactic_validity: float) -> tuple[bool, bool]:
+    def validity_vs_virtue_router(
+        self, mean_syntactic_validity: float
+    ) -> tuple[bool, bool]:
         do_virtue_hirp = random.random() < mean_syntactic_validity
         do_validity_hirp = not do_virtue_hirp
         return do_validity_hirp, do_virtue_hirp
@@ -245,7 +245,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
     ) -> list[ChatPreferencePair]:
         """
         Builds two preference pairs based on syntactic differences
-        between candidate_solutions, varies the instruction in 
+        between candidate_solutions, varies the instruction in
         accordance with HIR.
         """
         pairs: list[ChatPreferencePair] = []
@@ -254,9 +254,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid
         )
         top_invalid_solution = next(
-            cs
-            for cs, e in zip(candidate_solutions, evaluations)
-            if not e.is_valid
+            cs for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid
         )
 
         pairs.append(
@@ -346,90 +344,111 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             return pairs
 
         for cs, e in zip(candidate_solutions, evaluations):
-            if not e.is_valid:
-                feedbacks = await self.feedback_generator.arun(problem, cs, e)
-                revisions: list[Sequence[Solution]] = []
-                revision_evaluations: list[Sequence[Evaluation]] = []
-                for feedback in feedbacks:
-                    candidate_revisions = await self.solution_generator.arun(
-                        problem, original_solution=cs, feedback=feedback
-                    )
-                    revision_evals = await self.judge.arun(
+            if e.is_valid:
+                continue
+            feedbacks = await self.feedback_generator.arun(problem, cs, e)
+            revisions: list[Sequence[Solution]] = []
+            revision_evaluations: list[Sequence[Evaluation]] = []
+            for feedback in feedbacks:
+                candidate_revisions = await self.solution_generator.arun(
+                    problem, original_solution=cs, feedback=feedback
+                )
+                revision_evals = await self.judge.arun(
+                    problem,
+                    candidate_revisions,
+                    original_solution=cs,
+                    feedback=feedback,
+                )
+                revisions.append(candidate_revisions)
+                revision_evaluations.append(revision_evals)
+
+                # run revision-specific HIRP to generate solution preference pairs
+
+                if not any(re.is_valid for re in revision_evals):
+                    if self.failure_type_preference_pair_generator is not None:
+                        pairs.extend(
+                            await self.failure_type_preference_pair_generator.arun(
+                                problem, candidate_solutions, evaluations
+                            )
+                        )
+                    continue
+
+                pairs.extend(
+                    await self.build_solution_pref_pair(
                         problem,
                         candidate_revisions,
+                        revision_evals,
                         original_solution=cs,
                         feedback=feedback,
                     )
-                    revisions.append(candidate_revisions)
-                    revision_evaluations.append(revision_evals)
+                )
 
-                    if not any(e.is_valid for e in revision_evals):
-                        continue
+            # generate feedback preference pair
 
-                    pairs.extend(
-                        await self.build_solution_pref_pair(
-                            problem,
-                            candidate_revisions,
-                            revision_evals,
-                            original_solution=cs,
-                            feedback=feedback,
-                        )
-                    )
-                # get most and least successful feedback by counting valid revisions
-                n_valid_revisions = [
-                    sum(e.is_valid for e in re) for re in revision_evaluations
+            # get most and least successful feedback by counting valid revisions
+            n_valid_revisions = [
+                sum(e.is_valid for e in re) for re in revision_evaluations
+            ]
+            if n_valid_revisions and max(n_valid_revisions) > min(n_valid_revisions):
+                most_successful_feedback = feedbacks[
+                    n_valid_revisions.index(max(n_valid_revisions))
                 ]
-                if n_valid_revisions and max(n_valid_revisions) > min(
-                    n_valid_revisions
-                ):
-                    most_successful_feedback = feedbacks[
-                        n_valid_revisions.index(max(n_valid_revisions))
-                    ]
-                    least_successful_feedback = feedbacks[
-                        n_valid_revisions.index(min(n_valid_revisions))
-                    ]
-                    pairs.append(
-                        ChatPreferencePair(
-                            chosen=[
-                                ChatMessage(
-                                    role="user", content=problem.instruct_prompt()
-                                ),
-                                ChatMessage(role="assistant", content=str(cs)),
-                                ChatMessage(
-                                    role="user", content=most_successful_feedback.prompt
-                                ),
-                                ChatMessage(
-                                    role="assistant",
-                                    content=most_successful_feedback.feedback,
-                                ),
-                            ],
-                            rejected=[
-                                ChatMessage(
-                                    role="user", content=problem.instruct_prompt()
-                                ),
-                                ChatMessage(role="assistant", content=str(cs)),
-                                ChatMessage(
-                                    role="user", content=most_successful_feedback.prompt
-                                ),
-                                ChatMessage(
-                                    role="assistant",
-                                    content=least_successful_feedback.feedback,
-                                ),
-                            ],
-                        )
+                least_successful_feedback = feedbacks[
+                    n_valid_revisions.index(min(n_valid_revisions))
+                ]
+                pairs.append(
+                    ChatPreferencePair(
+                        chosen=[
+                            ChatMessage(role="user", content=problem.instruct_prompt()),
+                            ChatMessage(role="assistant", content=str(cs)),
+                            ChatMessage(
+                                role="user", content=most_successful_feedback.prompt
+                            ),
+                            ChatMessage(
+                                role="assistant",
+                                content=most_successful_feedback.feedback,
+                            ),
+                        ],
+                        rejected=[
+                            ChatMessage(role="user", content=problem.instruct_prompt()),
+                            ChatMessage(role="assistant", content=str(cs)),
+                            ChatMessage(
+                                role="user", content=most_successful_feedback.prompt
+                            ),
+                            ChatMessage(
+                                role="assistant",
+                                content=least_successful_feedback.feedback,
+                            ),
+                        ],
                     )
+                )
 
         return pairs
 
+    def self_critique_router(self, evaluations: Sequence[Evaluation]) -> tuple[bool, bool]:
+        """router for main workflow"""
+        do_self_critique = not any(e.is_valid for e in evaluations)
+        return do_self_critique, not do_self_critique
+
     async def arun(self, inputs) -> list[ChatPreferencePair]:
+        """main workflow logic"""
         problem = await self.problem_generator.arun(inputs)
         candidate_solutions = await self.solution_generator.arun(problem)
         evaluations = await self.judge.arun(problem, candidate_solutions)
 
-        if any(e.is_valid for e in evaluations):
-            return await self.build_solution_pref_pair(problem, candidate_solutions, evaluations)
+        pairs: list[ChatPreferencePair] = []
 
-        pairs = await self.run_self_critique(problem, candidate_solutions, evaluations)
+        do_self_critique, skip_self_critique = self.self_critique_router(evaluations)
+
+        if do_self_critique:
+            pairs = await self.run_self_critique(
+                problem, candidate_solutions, evaluations
+            )
+
+        if skip_self_critique:
+            pairs = await self.build_solution_pref_pair(
+                problem, candidate_solutions, evaluations
+            )
 
         if not pairs and self.failure_type_preference_pair_generator is not None:
             pairs = await self.failure_type_preference_pair_generator.arun(

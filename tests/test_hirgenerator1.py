@@ -1,10 +1,9 @@
 import pprint
-import random
 from typing import Sequence
 import pytest
 import dataclasses
 
-from argdown_hirp.base import (
+from argdown_hirpo.base import (
     Problem,
     Solution,
     Evaluation,
@@ -450,6 +449,11 @@ async def test_valid_after_magic():
 
 @pytest.mark.asyncio
 async def test_correct_after_magic():
+    """
+    if every initial solution is valid (whatever its virtue),
+    we don't do self-criqitque.
+    """
+
     hirp_gen = hirp_factory(CorrectAfterMagicGen)
     pairs = await hirp_gen.arun(1)
     pprint.pprint(pairs)
