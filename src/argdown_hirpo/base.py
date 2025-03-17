@@ -7,6 +7,9 @@ import random
 from statistics import mean
 from typing import Any, Sequence, TypedDict
 
+from openai import AsyncOpenAI, OpenAI
+import tenacity
+
 logger = logging.getLogger(__name__)
 
 
@@ -25,7 +28,7 @@ class ChatPreferencePair(TypedDict):
 
 
 class Problem(ABC):
-    """A problem."""
+    """Abstract base class representing a problem."""
 
     @abstractmethod
     def instruct_prompt(
@@ -37,11 +40,11 @@ class Problem(ABC):
     def revise_prompt(
         self, ask_for_invalid=False, hints: list[str] | None = None
     ) -> str:
-        """Instruction to revise earlier mentioned problem."""
+        """Instruction to revise earlier mentioned solution of the problem."""
 
 
 class Solution(ABC):
-    """A solution."""
+    """Abstract base class representing a solution."""
 
     @abstractmethod
     def __str__(self) -> str:
@@ -57,12 +60,12 @@ class Evaluation:
     depending on the problem, and the criteria used to evaluate it.
 
     The ability to generate *valid* solutions -- in which ever way validity
-    is interpreted -- is the primary skill HIRP seeks to instill in LLMs.
+    is interpreted -- is the primary skill HIRPO seeks to instill in LLMs.
 
     On top of marking a solution as valid or invalid, the evaluation may
     contain additional information about the solution, or evaluation artifacts.
     Such additional information, artifacts or metrics may be used by the
-    feedback generator or by the quality preference pair generator.
+    feedback generator or by the virtue preference pair generator.
     """
 
     is_valid: bool
@@ -120,6 +123,40 @@ class HIRAbstractGenerator(ABC):
         pass
 
 
+class HIRAbstractGeneratorLLM(ABC):
+
+    def __init__(self, *args, **kwargs):
+        inference_base_url = kwargs.get("inference_base_url", None)
+        model_id = kwargs.get("model_id", None)
+        if inference_base_url and model_id:
+            self.model_id = model_id
+            self.client = AsyncOpenAI(
+                api_key="EMPTY",
+                base_url=inference_base_url,
+            )
+            models = OpenAI(api_key="EMPTY", base_url=inference_base_url).models.list()
+            if self.model_id not in [d.id for d in models.data]:
+                logging.getLogger(__name__).warning(
+                    f"Model {self.model_id} not found in OpenAI API. Model served: {models}. Will proceed with first of these models."
+                )
+                self.model_id = next(models.data[0].id)
+
+    @tenacity.retry(
+        wait=tenacity.wait_random_exponential(min=1, max=60),
+        stop=tenacity.stop_after_attempt(6),
+    )
+    async def _generate(self, messages, **gen_kwargs):
+        stream = False
+        completion = await self.client.chat.completions.create(
+            model=self.model_id,
+            messages=messages,
+            stream=stream,
+            **gen_kwargs,
+        )
+        answers = [choice.text for choice in completion.choices]
+        return answers
+
+
 class ProblemGenerator(HIRAbstractGenerator):
     """Generates a problem."""
 
@@ -128,7 +165,7 @@ class ProblemGenerator(HIRAbstractGenerator):
         pass
 
 
-class SolutionGenerator(HIRAbstractGenerator):
+class SolutionGenerator(HIRAbstractGeneratorLLM):
     """Generates solutions."""
 
     @abstractmethod
@@ -155,7 +192,7 @@ class Judge(HIRAbstractGenerator):
         pass
 
 
-class FeedbackGenerator(HIRAbstractGenerator):
+class FeedbackGenerator(HIRAbstractGeneratorLLM):
     """Generates feedback."""
 
     @abstractmethod
@@ -175,8 +212,8 @@ class VirtuePreferencePairGenerator(HIRAbstractGenerator):
     async def arun(
         self,
         problem,
-        candidate_solutions,
-        evaluations,
+        candidate_solutions: Sequence[Solution],
+        evaluations: Sequence[Evaluation],
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> list[ChatPreferencePair]:
