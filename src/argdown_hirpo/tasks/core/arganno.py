@@ -45,21 +45,21 @@ class AnnotationProblem(Problem):
     def instruct_prompt(
         self, ask_for_invalid=False, hints: list[str] | None = None
     ) -> str:
-        prompt = dedent(f"""
+        prompt = dedent("""
             Assignment: Apply a given annotation scheme to a source text.
                         
             Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
 
             #+BEGIN_QUOTE                        
-            {self.sources}
+            {sources}
             #+END_QUOTE
 
             Annotate the source text above according to the following schema:
 
-            {ANNOTATION_SCHEME}
+            {annotation_scheme}
 
             Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way. Only reply with the annotated text.
-        """).strip()
+        """).strip().format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
 
         if ask_for_invalid:
             prompt += dedent("""\n\n
@@ -177,146 +177,146 @@ class AnnotationSolutionGenerator(SolutionGenerator):
 
         return annotations
 
-    class AnnotationJudge(Judge):
-        """Judge for the annotation task."""
+class AnnotationJudge(Judge):
+    """Judge for the annotation task."""
 
-        def _evaluate_annotation(
-            self, problem: AnnotationProblem, annotation: Annotation
-        ) -> Evaluation:
-            is_valid = True
-            eval_data = {
-                "nested_propositions": "",
-                "missing_id": "",
-                "duplicate_id": "",
-                "invalid_support_ids": "",
-                "invalid_attack_ids": "",
-                "unknown_attributes": "",
-            }
-            multi_valued_attributes = {"*": {"supports", "attacks"}}
-            soup = BeautifulSoup(
-                annotation.annotated_source_text,
-                "html.parser",
-                multi_valued_attributes=multi_valued_attributes,
+    def _evaluate_annotation(
+        self, problem: AnnotationProblem, annotation: Annotation
+    ) -> Evaluation:
+        is_valid = True
+        eval_data = {
+            "nested_propositions": "",
+            "missing_id": "",
+            "duplicate_id": "",
+            "invalid_support_ids": "",
+            "invalid_attack_ids": "",
+            "unknown_attributes": "",
+        }
+        multi_valued_attributes = {"*": {"supports", "attacks"}}
+        soup = BeautifulSoup(
+            annotation.annotated_source_text,
+            "html.parser",
+            multi_valued_attributes=multi_valued_attributes,
+        )
+
+        # Source text must not be altered (except for annotations and white space)
+        lines_o = " ".join(problem.sources.split()).splitlines(keepends=True)
+        lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
+        lines_o = [line for line in lines_o if line.strip()]
+        lines_a = [line for line in lines_a if line.strip()]
+
+        diff = list(unified_diff(lines_o, lines_a, n=0))
+        if diff:
+            is_valid = False
+            eval_data["altered_source_text"] = (
+                "Source text was altered. Diff:\n" + "".join(diff)
             )
 
-            # Source text must not be altered (except for annotations and white space)
-            lines_o = " ".join(problem.sources.split()).splitlines(keepends=True)
-            lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
-            lines_o = [line for line in lines_o if line.strip()]
-            lines_a = [line for line in lines_a if line.strip()]
-
-            diff = list(unified_diff(lines_o, lines_a, n=0))
-            if diff:
+        # No nested proposition annotations
+        for proposition in soup.find_all("proposition"):
+            if proposition.find_all("proposition"):  # type: ignore
                 is_valid = False
-                eval_data["altered_source_text"] = (
-                    "Source text was altered. Diff:\n" + "".join(diff)
+                eval_data["nested_propositions"] = (
+                    f"Nested annotations in proposition '{shorten(str(proposition), 256)}'"
                 )
+                break
 
-            # No nested proposition annotations
-            for proposition in soup.find_all("proposition"):
-                if proposition.find_all("proposition"):  # type: ignore
+        # Every proposition must have an id
+        for proposition in soup.find_all("proposition"):
+            if not proposition.get("id"):  # type: ignore
+                is_valid = False
+                eval_data["missing_id"] = (
+                    f"Missing id in proposition '{shorten(str(proposition), 64)}'"
+                )
+                break
+
+        # Every proposition must have a unique id
+        ids = [
+            proposition.get("id")  # type: ignore
+            for proposition in soup.find_all("proposition")
+        ]  # type: ignore
+        duplicates = {id for id in ids if ids.count(id) > 1}
+        if duplicates:
+            is_valid = False
+            eval_data["duplicate_id"] = f"Duplicate ids: {duplicates}"
+
+        # Every "supports" reference must be a valid id
+        for proposition in soup.find_all("proposition"):
+            for support in proposition.get("supports", []):  # type: ignore
+                if support not in ids:
                     is_valid = False
-                    eval_data["nested_propositions"] = (
-                        f"Nested annotations in proposition '{shorten(str(proposition), 256)}'"
+                    eval_data["invalid_support_ids"] = (
+                        f"Supported proposition with id '{support}' in proposition '{shorten(str(proposition), 64)}' does not exist"
                     )
                     break
 
-            # Every proposition must have an id
-            for proposition in soup.find_all("proposition"):
-                if not proposition.get("id"):  # type: ignore
+        # Every "attacks" reference must be a valid id
+        for proposition in soup.find_all("proposition"):
+            for attack in proposition.get("attacks", []):  # type: ignore
+                if attack not in ids:
                     is_valid = False
-                    eval_data["missing_id"] = (
-                        f"Missing id in proposition '{shorten(str(proposition), 64)}'"
+                    eval_data["invalid_attack_ids"] = (
+                        f"Attacked proposition with id '{attack}' in proposition '{shorten(str(proposition), 64)}' does not exist"
                     )
                     break
 
-            # Every proposition must have a unique id
-            ids = [
-                proposition.get("id")  # type: ignore
-                for proposition in soup.find_all("proposition")
-            ]  # type: ignore
-            duplicates = {id for id in ids if ids.count(id) > 1}
-            if duplicates:
-                is_valid = False
-                eval_data["duplicate_id"] = f"Duplicate ids: {duplicates}"
-
-            # Every "supports" reference must be a valid id
-            for proposition in soup.find_all("proposition"):
-                for support in proposition.get("supports", "").split():  # type: ignore
-                    if support not in ids:
-                        is_valid = False
-                        eval_data["invalid_support_ids"] = (
-                            f"Supported proposition with id '{support}' in proposition '{shorten(str(proposition), 64)}' does not exist"
-                        )
-                        break
-
-            # Every "attacks" reference must be a valid id
-            for proposition in soup.find_all("proposition"):
-                for attack in proposition.get("attacks", "").split():  # type: ignore
-                    if attack not in ids:
-                        is_valid = False
-                        eval_data["invalid_attack_ids"] = (
-                            f"Attacked proposition with id '{attack}' in proposition '{shorten(str(proposition), 64)}' does not exist"
-                        )
-                        break
-
-            # No unknown attributes
-            for proposition in soup.find_all("proposition"):
-                for attr in proposition.attrs:  # type: ignore
-                    if attr not in {
-                        "id",
-                        "supports",
-                        "attacks",
-                        "argument_label",
-                        "ref_reco_label",
-                    }:
-                        is_valid = False
-                        eval_data["unknown_attributes"] = (
-                            f"Unknown attribute '{attr}' in proposition '{shorten(str(proposition), 64)}'"
-                        )
-                        break
-
-            # No unknown elements
-            for element in soup.find_all():
-                if element.name not in {"proposition"}:  # type: ignore
+        # No unknown attributes
+        for proposition in soup.find_all("proposition"):
+            for attr in proposition.attrs:  # type: ignore
+                if attr not in {
+                    "id",
+                    "supports",
+                    "attacks",
+                    "argument_label",
+                    "ref_reco_label",
+                }:
                     is_valid = False
-                    eval_data["unknown_elements"] = (
-                        f"Unknown element '{element.name}' at '{shorten(str(element), 64)}'"  # type: ignore
+                    eval_data["unknown_attributes"] = (
+                        f"Unknown attribute '{attr}' in proposition '{shorten(str(proposition), 64)}'"
                     )
+                    break
 
-            return Evaluation(
-                is_valid=is_valid,
-                artifacts={
-                    "eval_metrics": eval_data,
-                    "soup": soup,
-                },
-            )
-
-        async def arun(
-            self,
-            problem: Problem,
-            solutions: Sequence[Solution],
-            original_solution: Solution | None = None,
-            feedback: Feedback | None = None,
-        ) -> Sequence[Evaluation]:
-            assert isinstance(problem, AnnotationProblem), (
-                "Problem must be an AnnotationProblem"
-            )
-            assert (
-                isinstance(original_solution, Annotation) or original_solution is None
-            )
-            assert feedback or original_solution is None, (
-                "Feedback is required for evaluating revised solutions"
-            )
-
-            evaluations = []
-            for solution in solutions:
-                assert isinstance(solution, Annotation), (
-                    "All solutions must be Annotations"
+        # No unknown elements
+        for element in soup.find_all():
+            if element.name not in {"proposition"}:  # type: ignore
+                is_valid = False
+                eval_data["unknown_elements"] = (
+                    f"Unknown element '{element.name}' at '{shorten(str(element), 64)}'"  # type: ignore
                 )
-                evaluations.append(self._evaluate_annotation(problem, solution))
 
-            return evaluations
+        return Evaluation(
+            is_valid=is_valid,
+            artifacts={
+                "eval_metrics": eval_data,
+                "soup": soup,
+            },
+        )
+
+    async def arun(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> Sequence[Evaluation]:
+        assert isinstance(problem, AnnotationProblem), (
+            "Problem must be an AnnotationProblem"
+        )
+        assert (
+            isinstance(original_solution, Annotation) or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+
+        evaluations = []
+        for solution in solutions:
+            assert isinstance(solution, Annotation), (
+                "All solutions must be Annotations"
+            )
+            evaluations.append(self._evaluate_annotation(problem, solution))
+
+        return evaluations
 
 
 class AnnotationFeedbackGenerator(FeedbackGenerator):
@@ -345,18 +345,18 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
             for k, v in evaluation.artifacts.get("eval_metrics", {}).items()
             if v
         )
-        prompt = dedent(f"""
+        prompt = dedent("""
             Assignment: Give feedback and provide instructions for how to improve a given annotation.
 
             You will be shown an argumentative annotation problem, a student's preliminary solution, and its evaluation. Based on this information, provide feedback to the student and instructions for how to improve the solution.
 
                                                 
             ## Problem Statement
-            {problem.instruct_prompt()}
+            {problem}
 
             
             ## Student's Solution
-            {str(solution)}
+            {solution}
 
             
             ## Evaluation
@@ -366,7 +366,7 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
 
             
             Given this information, provide feedback to the student and clear instructions for how to improve the solution.
-        """)
+        """).format(problem=problem.instruct_prompt(), solution=str(solution), evaluation_issues=evaluation_issues)
 
         answers = await self._generate(
             messages=[

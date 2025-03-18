@@ -258,11 +258,12 @@ class NumberVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
     async def arun(
         self,
         problem: NumberProblem,
-        candidate_solutions: list[NumberSolution],
-        evaluations: list[Evaluation],
+        candidate_solutions: Sequence[Solution],
+        evaluations: Sequence[Evaluation],
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> list[ChatPreferencePair]:
+        assert all(isinstance(cs, NumberSolution) for cs in candidate_solutions)
         pairs = []
         top_correct_solution = next(
             (

@@ -153,7 +153,7 @@ class HIRAbstractGeneratorLLM(ABC):
             stream=stream,
             **gen_kwargs,
         )
-        answers = [choice.text for choice in completion.choices]
+        answers = [choice.message.content for choice in completion.choices]
         return answers
 
 
