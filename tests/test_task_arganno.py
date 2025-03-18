@@ -3,7 +3,7 @@ import pytest
 import textwrap
 import warnings
 
-from argdown_hirpo.base import HIRPreferencePairGenerator
+from argdown_hirpo.base import Feedback, HIRPreferencePairGenerator
 from argdown_hirpo.tasks.core.arganno import(
     Annotation,
     AnnotationProblem,
@@ -61,29 +61,39 @@ def source_texts() -> list[str]:
 def valid_annotations1() -> list[Annotation]:
     return [
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         We should stop eating meat.
                         
         Animals suffer. Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" supports="1">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" attacks="">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> <proposition id="3" supports="1 2">Animal farming causes climate change.</proposition>
+        ```
         """)),
     ]
 
@@ -92,46 +102,122 @@ def valid_annotations1() -> list[Annotation]:
 def invalid_annotations1() -> list[Annotation]:
     return [
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```
+        <proposition id="1">We should stop eating meat.</proposition>
+                        
+        <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
+        """)),
+        Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
+        <proposition id="1">We should stop eating meat.</proposition>
+                        
+        <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
+        """)),
+        Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         You should stop eating meat.
                         
         Animals suffer. Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should <proposition id="1a">stop eating meat.</proposition></proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition>We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="1">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" supports="3">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" attacks="3">Animals suffer.</proposition> Animal farming causes climate change.
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> <proposition id="3" from="1 2">Animal farming causes climate change.</proposition>
+        ```
         """)),
         Annotation(annotated_source_text=textwrap.dedent("""
+        ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <claim id="2">Animals suffer.</claim> Animal farming causes climate change.
+        ```
         """)),
     ]
+
+@pytest.fixture
+def feedback1() -> Feedback:
+    return Feedback(
+        prompt="Please provide feedback.",
+        feedback=textwrap.dedent("""
+        **Feedback:**
+        1. The solution provided does not follow the required annotation scheme. Specifically, \
+        it uses an unknown element 'claim' which is not part of the specified XML elements.
+        2. There's a lack of argumentative structure in the annotations, failing to connect \
+        propositions with each other or clarify their roles within the argument.
+        3. No explicit claims have been identified and properly tagged as premises or conclusions.
+                                 
+        **Instructions for Improvement:**
+        1. **Understand the Task:** Before proceeding, ensure you comprehend the given XML schema \
+        and the purpose of annotating the source text according to it. Familiarize yourself with \
+        the elements such as `<proposition>` and their attributes like `id`, `supports`, and `attacks`.
+        2. **Annotate Key Claims:** Identify the central claims within the text that support or \
+        refute each other. Use the `<proposition>` element to annotate these claims, assigning them \
+        unique IDs for reference.
+        3. **Clarify Relationships:** Determine which propositions are premises (supporting reasons) \
+        and which ones are conclusions (conclusions). Use attributes like `supports` and `attacks` \
+        to indicate how different propositions relate to each other in terms of support or attack.
+        4. **Correct Unknown Elements:** When annotating, stick strictly to the allowed elements and \
+        attributes provided by the schema. The `<proposition>` element is the only one you should \
+        use for marking argumentative components.
+        5. **Example of Corrected Annotation:** Here's a simplified example of how a part of the \
+        source text might be annotated correctly:
+                                 
+        ```
+        <proposition id=\"1\" ref_reco_label=\"A\">We should stop eating meat.</proposition>\
+        <proposition id=\"2\" supports=\"1\">Animals suffer. Animal farming causes climate change.</proposition>
+        ```
+        
+        6. **Thoroughly Review the Text:** Analyze the text to find explicit claims and implicit premises \
+        that could be used as support or counterarguments for other propositions.
+        7. **Use External Resources If Necessary:** If you're struggling to understand parts of the argument, \
+        consult external resources like a detailed summary or an explanation of the argument's key points \
+        provided in your assignment materials.
+        8. **Double-Check Your Work:** After completing the annotations, review them carefully to ensure they \
+        accurately reflect the argumentative structure and relationships within the text.
+                                 
+        By following these steps and adhering strictly to the annotation scheme, you should be able to create\
+        a valid and informative annotation of the source text that represents its argumentative content \
+        effectively.
+        """),
+    )
 
 def hirp_factory(model_kwargs, vpp_gen=AnnotationSupportsPreferencePairGenerator):
     return HIRPreferencePairGenerator(
@@ -178,6 +264,7 @@ async def test_annotation_solution_generator(source_texts, model_kwargs):
         print(sol)
         assert isinstance(sol, Annotation)
 
+
 @pytest.mark.asyncio
 async def test_annotation_judge_valid(valid_annotations1, source_texts):
     source_text = source_texts[0]
@@ -197,7 +284,7 @@ async def test_annotation_judge_valid(valid_annotations1, source_texts):
 
 
 @pytest.mark.asyncio
-async def test_annotation_judgeinvalid(invalid_annotations1, source_texts):
+async def test_annotation_judge_invalid(invalid_annotations1, source_texts):
     source_text = source_texts[0]
     pg = AnnotationProblemGenerator()
     problem = await pg.arun(source_text)
@@ -212,3 +299,48 @@ async def test_annotation_judgeinvalid(invalid_annotations1, source_texts):
         assert any(v for _, v in ev.artifacts["eval_metrics"].items())
         assert ev.artifacts["soup"]
 
+
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
+@pytest.mark.asyncio
+async def test_feedback_generator(invalid_annotations1, source_texts, model_kwargs):
+
+    source_text = source_texts[0]
+    pg = AnnotationProblemGenerator()
+    problem = await pg.arun(source_text)
+
+    judge = AnnotationJudge()
+    evaluations = await judge.arun(problem, invalid_annotations1)
+
+    fg = AnnotationFeedbackGenerator(n_feedbacks=1, **model_kwargs)
+    for annotation, evaluation in zip(invalid_annotations1, evaluations):
+        feedbacks = await fg.arun(problem, annotation, evaluation)
+        assert len(feedbacks) == 1
+        feedback = feedbacks[0]
+        assert isinstance(feedback, Feedback)
+        assert problem.instruct_prompt() in feedback.prompt
+        assert str(annotation) in feedback.prompt
+        print(feedback)
+
+
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
+@pytest.mark.asyncio
+async def test_revised_solution_generator(invalid_annotations1, source_texts, model_kwargs):
+    source_text = source_texts[0]
+    pg = AnnotationProblemGenerator()
+    problem = await pg.arun(source_text)
+    annotation = invalid_annotations1[-1]
+
+    judge = AnnotationJudge()
+    evaluations = await judge.arun(problem, [annotation])
+    evaluation = evaluations[0]
+
+    fg = AnnotationFeedbackGenerator(n_feedbacks=1, **model_kwargs)
+    feedbacks = await fg.arun(problem, annotation, evaluation)
+    feedback = feedbacks[0]
+
+    sg = AnnotationSolutionGenerator(n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
+    revised_annotations = await sg.arun(problem=problem, original_solution=annotation, feedback=feedback)
+    assert len(revised_annotations) == 1
+    revised_annotation = revised_annotations[0]
+    assert isinstance(revised_annotation, Annotation)
+    print(revised_annotation)

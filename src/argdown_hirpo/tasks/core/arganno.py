@@ -50,15 +50,17 @@ class AnnotationProblem(Problem):
                         
             Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
 
-            #+BEGIN_QUOTE                        
+            ::: {{.source_text}}              
             {sources}
-            #+END_QUOTE
+            :::
 
             Annotate the source text above according to the following schema:
 
             {annotation_scheme}
 
-            Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way. Only reply with the annotated text.
+            Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way.
+                        
+            Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
         """).strip().format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
 
         if ask_for_invalid:
@@ -167,12 +169,12 @@ class AnnotationSolutionGenerator(SolutionGenerator):
 
         annotations = []
 
+        # postprocess: extract fenced code block
         for answer in answers:
-            answer = answer.strip("\n ")
-            if answer.startswith("#+BEGIN_QUOTE"):
-                answer = answer[: len("#+BEGIN_QUOTE")].strip("\n ")
-            if answer.endswith("#+END_QUOTE"):
-                answer = answer[: len("#+END_QUOTE")].strip("\n ")
+            if answer.count("```xml") == 1:
+                if answer.split("```xml")[1].count("\n```") == 1:
+                    answer = answer.split("```xml")[1].split("\n```")[0]
+                    answer = "```xml" + answer + "\n```"
             annotations.append(Annotation(annotated_source_text=answer))
 
         return annotations
@@ -185,6 +187,7 @@ class AnnotationJudge(Judge):
     ) -> Evaluation:
         is_valid = True
         eval_data = {
+            "fenced_code_block": "",
             "nested_propositions": "",
             "missing_id": "",
             "duplicate_id": "",
@@ -192,9 +195,24 @@ class AnnotationJudge(Judge):
             "invalid_attack_ids": "",
             "unknown_attributes": "",
         }
+
+        ast = annotation.annotated_source_text.strip("\n ")
+        if ast.startswith("```xml") and ast.endswith("```"):
+            ast = "\n".join(ast.splitlines()[1:-1])
+        else: # no fenced code block
+            is_valid = False
+            error_msg = "Failed to extract single fenced annotation block:"
+            if ast.count("```xml") == 0:
+                error_msg += " No fenced code block starting with '```xml'."
+            if ast.count("```xml") > 1:
+                error_msg += " More than one fenced code block starting with '```xml'."
+            if "```\n" not in ast:
+                error_msg += " No closing '```'."
+            eval_data["fenced_code_block"] = error_msg
+
         multi_valued_attributes = {"*": {"supports", "attacks"}}
         soup = BeautifulSoup(
-            annotation.annotated_source_text,
+            ast,
             "html.parser",
             multi_valued_attributes=multi_valued_attributes,
         )
