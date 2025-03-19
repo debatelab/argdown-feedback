@@ -525,7 +525,7 @@ class AnnotationNoAttacksPreferencePairGenerator(AnnotationVirtuePreferencePairG
             len(proposition.get("attacks", []))
             for proposition in propositions
         )
-        return 1/attacks
+        return 1/(1+attacks)
 
 class AnnotationCoveragePreferencePairGenerator(AnnotationVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations

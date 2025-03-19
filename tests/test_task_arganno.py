@@ -344,3 +344,97 @@ async def test_revised_solution_generator(invalid_annotations1, source_texts, mo
     revised_annotation = revised_annotations[0]
     assert isinstance(revised_annotation, Annotation)
     print(revised_annotation)
+
+
+@pytest.mark.asyncio
+class TestAnnotationPreferencePairGenerators:
+
+    async def test_annotation_scope_preference_pair_generator(self):
+        judge = AnnotationJudge()
+        ppg = AnnotationScopePreferencePairGenerator()
+        
+        problem = AnnotationProblem(sources="A B C")
+        anno01 = '```xml\nA B C\n```'
+        anno02 = '```xml\nA <proposition id="1">B</proposition> C\n```'
+        anno03 = '```xml\nA <proposition id="1">B</proposition> <proposition id="2">C</proposition>\n```'
+        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        evaluations = await judge.arun(problem, candidate_solutions)
+        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
+
+        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
+        print(cpps)
+        assert len(cpps) == 1
+        assert anno03 in cpps[0]['chosen'][-1]["content"]
+        assert anno01 in cpps[0]['rejected'][-1]["content"]
+
+    async def test_annotation_supports_preference_pair_generator(self):
+        judge = AnnotationJudge()
+        ppg = AnnotationSupportsPreferencePairGenerator()
+        
+        problem = AnnotationProblem(sources="A B C")
+        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
+        anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        evaluations = await judge.arun(problem, candidate_solutions)
+        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
+
+        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
+        print(cpps)
+        assert len(cpps) == 1
+        assert anno02 in cpps[0]['chosen'][-1]["content"]
+        assert anno02 not in cpps[0]['rejected'][-1]["content"]
+
+    async def test_annotation_attacks_preference_pair_generator(self):
+        judge = AnnotationJudge()
+        ppg = AnnotationAttacksPreferencePairGenerator()
+        
+        problem = AnnotationProblem(sources="A B C")
+        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
+        anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        evaluations = await judge.arun(problem, candidate_solutions)
+        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
+
+        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
+        print(cpps)
+        assert len(cpps) == 1
+        assert anno03 in cpps[0]['chosen'][-1]["content"]
+        assert anno03 not in cpps[0]['rejected'][-1]["content"]
+
+    async def test_annotation_noattacks_preference_pair_generator(self):
+        judge = AnnotationJudge()
+        ppg = AnnotationNoAttacksPreferencePairGenerator()
+        
+        problem = AnnotationProblem(sources="A B C")
+        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
+        anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        evaluations = await judge.arun(problem, candidate_solutions)
+        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
+
+        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
+        print(cpps)
+        assert len(cpps) == 1
+        assert anno03 not in cpps[0]['chosen'][-1]["content"]
+        assert anno03 in cpps[0]['rejected'][-1]["content"]
+
+    async def test_annotation_coverage_preference_pair_generator(self):
+        judge = AnnotationJudge()
+        ppg = AnnotationCoveragePreferencePairGenerator()
+        
+        problem = AnnotationProblem(sources="A B C")
+        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
+        anno02 = '```xml\n<proposition id="1" supports="2">A B</proposition> <proposition id="2">C</proposition>\n```'
+        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
+        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        evaluations = await judge.arun(problem, candidate_solutions)
+        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
+
+        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
+        print(cpps)
+        assert len(cpps) == 1
+        assert anno02 in cpps[0]['chosen'][-1]["content"]
+        assert anno01 in cpps[0]['rejected'][-1]["content"]
