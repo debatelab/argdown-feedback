@@ -531,8 +531,16 @@ class MaxDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        return nx.diameter(argdown) if argdown.number_of_nodes() > 1 else 0
-
+        if argdown.number_of_nodes() == 0:
+            return 0
+        H = nx.DiGraph(argdown)
+        if nx.is_directed_acyclic_graph(H):
+            le = nx.dag_longest_path_length(H)
+            print(le)
+        else:
+            le = nx.diameter(H.to_undirected())
+            print("diameter:", le)
+        return le
 
 class MinDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
@@ -549,7 +557,16 @@ class MinDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        return (1 + nx.diameter(argdown)) ** -1 if argdown.number_of_nodes() > 1 else 0
+        if argdown.number_of_nodes() == 0:
+            return 0
+        H = nx.DiGraph(argdown)
+        if nx.is_directed_acyclic_graph(H):
+            le = nx.dag_longest_path_length(H)
+            print(le)
+        else:
+            le = nx.diameter(H.to_undirected())
+            print("diameter:", le)
+        return 1/(1+le)
 
 
 class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -567,7 +584,8 @@ class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        degree_centrality = list(nx.degree_centrality(argdown).values())
+        H = nx.DiGraph(argdown)
+        degree_centrality = list(nx.degree_centrality(H).values())
         return (
             sum(degree_centrality) / len(degree_centrality) if degree_centrality else 0
         )
@@ -588,7 +606,8 @@ class MaxInDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        in_degrees = list(dict(argdown.in_degree()).values())
+        H = nx.DiGraph(argdown)
+        in_degrees = list(dict(H.in_degree()).values())
         return max(in_degrees) if in_degrees else 0
 
 
@@ -607,7 +626,8 @@ class MaxOutDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        out_degrees = list(dict(argdown.out_degree()).values())
+        H = nx.DiGraph(argdown)
+        out_degrees = list(dict(H.out_degree()).values())
         return max(out_degrees) if out_degrees else 0
 
 
@@ -626,10 +646,11 @@ class MinLeafsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        leafs = [n for n in argdown.nodes if argdown.out_degree(n) == 0]
+        H = nx.DiGraph(argdown)
+        leafs = [n for n in H.nodes if H.in_degree(n) == 0]
         return (
-            1 - len(leafs) / argdown.number_of_nodes()
-            if argdown.number_of_nodes()
+            1 - len(leafs) / H.number_of_nodes()
+            if H.number_of_nodes()
             else 0
         )
 
@@ -654,7 +675,7 @@ class ShortLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         ll = [len(a.label) if a.label else 0 for a in arguments] + [
             len(c.label) if c.label else 0 for c in claims
         ]
-        return sum(ll) / len(ll) if ll else 0
+        return (sum(ll) / len(ll))**-1 if ll else 0
 
 
 class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -703,8 +724,8 @@ class ShortClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         claims: list[Proposition] = argdown.propositions
-        ll = [len(c.label) if c.label else 0 for c in claims]
-        return 1 / (1 + sum(ll) / len(ll)) if ll else 0
+        ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
+        return (sum(ll) / len(ll))**-1 if ll else 0
 
 
 class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -723,7 +744,7 @@ class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         claims: list[Proposition] = argdown.propositions
-        ll = [len(c.label) if c.label else 0 for c in claims]
+        ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
         return sum(ll) / len(ll) if ll else 0
 
 
@@ -744,14 +765,14 @@ class ArgumentClaimSizePreferencePairGenerator(ArgMapVirtuePreferencePairGenerat
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
-        cls = [len(c.label) if c.label else 0 for c in claims]
+        cls = [len(c.texts[0]) if c.texts else 0 for c in claims]
 
         if not cls or not arguments:
             return 0
 
         mean_cl = sum(cls) / len(cls)
         good_args = [
-            a for a in arguments if a.label and 2 * mean_cl < len(a.label) < 3 * mean_cl
+            a for a in arguments if a.gists and 2 * mean_cl < len(a.gists[0]) < 3 * mean_cl
         ]
 
         return len(good_args) / len(arguments)

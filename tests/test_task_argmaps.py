@@ -289,25 +289,340 @@ class TestArgMapPreferencePairGenerators:
     def judge(self) -> ArgMapJudge:
         return ArgMapJudge()
 
-    async def test_connectedness_preference_pair_generator(self, problem, judge):
-        ppg = ConnectednessPreferencePairGenerator()
+    @pytest.mark.parametrize("PPG,chosen,rejected", [
+        (
+            ConnectednessPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
 
-        am_c = textwrap.dedent("""
-        ```argdown
-        [No meat]: We should not eat meat.
-            + <Suffering>: Animals suffer.
-            + <Farming>: Farming causes cliamte change.
-        ```
-        """)
-        am_r = textwrap.dedent("""
-        ```argdown
-        [No meat]: We should not eat meat.
+            <Suffering>: Animals suffer.
 
-        <Suffering>: Animals suffer.
+            <Farming>: Farming causes cliamte change.                                             
+            ```
+            """
+        ),
+        (
+            MaxArgsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+            ```
+            """
+        ),
+        (
+            BalancePreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                - <Farming>: Farming alleviates climate change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes climate change.
+            ```
+            """
+        ),
+        (
+            MaxSupportsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+            ```
+            """
+        ),
+        (
+            MaxAttacksPreferencePairGenerator,
+            """
+            ```argdown
+            [Meat]: We may eat meat.
+                - <Suffering>: Animals suffer.
+                - <Farming>: Farming causes climate change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes climate change.
+            ```
+            """
+        ),
+        (
+            MaxDiameterPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                    + <Farming>: Farming causes cliamte change.
+                        + <Carbon Cycle>: Farming changes the carbon cycle.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+                + <Carbon Cycle>: Farming changes the carbon cycle.
+            ```
+            """
+        ),
+        (
+            MaxDiameterPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                    + [No meat]
+                    + <Farming>: Farming causes cliamte change.
+                        + <Carbon Cycle>: Farming changes the carbon cycle.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                    + [No meat]
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """
+        ),
+        (
+            MinDiameterPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                    + <Farming>: Farming causes cliamte change.
+                        + <Carbon Cycle>: Farming changes the carbon cycle.
+            ```
+            """
+        ),
+        (
+            DensityPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+                    +> <Suffering>
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
 
-        <Farming>: Farming causes cliamte change.                                             
-        ```
-        """)
+            <Farming>: Farming causes cliamte change.
+            ```
+            """
+        ),
+        (
+            MaxInDegreePreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                    + <Farming>: Farming causes cliamte change.
+            ```
+            """
+        ),
+        (
+            MaxOutDegreePreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                +> <Eggs>: Eggs ok.
+                +> <Milk>: Milk ok.
+            ```
+            """,
+            """
+            ```argdown"
+            [No meat]: We should not eat meat.
+                +> <Eggs>: Eggs ok.
+                    +> <Milk>: Milk ok.
+            ```
+            """    
+        ),
+        (
+            MinLeafsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                    + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """
+        ),
+        (
+            ShortLabelsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+                + <Farming>: Farming causes cliamte change.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat ever]: We should not eat meat.
+                + <Suffering badly>: Animals suffer.
+                + <Farming so stupid>: Farming causes climate change.
+            ```
+            """
+        ),
+        (
+            DiverseLabelsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <No meat now>: Animals suffer.
+            ```
+            """
+        ),
+        (
+            ShortClaimsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+            
+            [Suffering]: Animals suffer.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat, neither from mammals not from fish.
+            
+            [Suffering]: Animals, both mammals and fish, suffer.
+            ```
+            """,
+        ),
+        (
+            LongClaimsPreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat, neither from mammals not from fish.
+                + <Suffering>: Animals suffer.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer.
+            ```
+            """            
+        ),
+        (
+            ArgumentClaimSizePreferencePairGenerator,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer really badly. That is why we should not eat meat.
+                + <Farming>: Farming causes climate change. Especially the carbon cycle is affected.
+            ```
+            """,
+            """
+            ```argdown
+            [No meat]: We should not eat meat.
+                + <Suffering>: Animals suffer really badly.
+                + <Farming>: Farming causes climate change. Especially the carbon cycle is affected. That is why we should not eat meat. We must not do so at all.
+            ```
+            """,
+        ),
+        (
+            IndependentWordingPreferencePairGenerator,
+            """
+            ```argdown
+            [A]: It is wrong to consume meat.
+                + <B>: Animals are sentient beings.
+                + <C>: Farming changes the carbon cycle.                                             
+            ```
+            """,
+            """
+            ```argdown
+            [A]: We should not eat meat.
+                + <B>: Animals suffer.
+                + <C>: Farming causes cliamte change.                                             
+            ```
+            """
+        ),
+        (
+            SourceTextProximityPreferencePairGenerator,
+            """
+            ```argdown
+            [A]: We should not eat meat.
+                + <B>: Animals suffer.
+                + <C>: Farming causes cliamte change.                                             
+            ```
+            """,
+            """
+            ```argdown
+            [A]: It is wrong to consume meat.
+                + <B>: Animals are sentient beings.
+                + <C>: Farming changes the carbon cycle.                                             
+            ```
+            """
+        )
+    ])
+    async def test_connectedness_preference_pair_generator(self, problem, judge, PPG, chosen, rejected):
+        ppg = PPG()
+
+        am_c = textwrap.dedent(chosen)
+        am_r = textwrap.dedent(rejected)
 
         candidate_solutions = [
             ArgumentMap(argdown_snippet=am_c),
@@ -322,75 +637,3 @@ class TestArgMapPreferencePairGenerators:
         assert len(cpps) == 1
         assert am_c in cpps[0]['chosen'][-1]["content"]
         assert am_r in cpps[0]['rejected'][-1]["content"]
-
-    async def test_annotation_supports_preference_pair_generator(self):
-        judge = AnnotationJudge()
-        ppg = AnnotationSupportsPreferencePairGenerator()
-        
-        problem = AnnotationProblem(sources="A B C")
-        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
-        anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
-        evaluations = await judge.arun(problem, candidate_solutions)
-        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
-
-        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
-        print(cpps)
-        assert len(cpps) == 1
-        assert anno02 in cpps[0]['chosen'][-1]["content"]
-        assert anno02 not in cpps[0]['rejected'][-1]["content"]
-
-    async def test_annotation_attacks_preference_pair_generator(self):
-        judge = AnnotationJudge()
-        ppg = AnnotationAttacksPreferencePairGenerator()
-        
-        problem = AnnotationProblem(sources="A B C")
-        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
-        anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
-        evaluations = await judge.arun(problem, candidate_solutions)
-        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
-
-        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
-        print(cpps)
-        assert len(cpps) == 1
-        assert anno03 in cpps[0]['chosen'][-1]["content"]
-        assert anno03 not in cpps[0]['rejected'][-1]["content"]
-
-    async def test_annotation_noattacks_preference_pair_generator(self):
-        judge = AnnotationJudge()
-        ppg = AnnotationNoAttacksPreferencePairGenerator()
-        
-        problem = AnnotationProblem(sources="A B C")
-        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
-        anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
-        evaluations = await judge.arun(problem, candidate_solutions)
-        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
-
-        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
-        print(cpps)
-        assert len(cpps) == 1
-        assert anno03 not in cpps[0]['chosen'][-1]["content"]
-        assert anno03 in cpps[0]['rejected'][-1]["content"]
-
-    async def test_annotation_coverage_preference_pair_generator(self):
-        judge = AnnotationJudge()
-        ppg = AnnotationCoveragePreferencePairGenerator()
-        
-        problem = AnnotationProblem(sources="A B C")
-        anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
-        anno02 = '```xml\n<proposition id="1" supports="2">A B</proposition> <proposition id="2">C</proposition>\n```'
-        anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
-        evaluations = await judge.arun(problem, candidate_solutions)
-        assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
-
-        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
-        print(cpps)
-        assert len(cpps) == 1
-        assert anno02 in cpps[0]['chosen'][-1]["content"]
-        assert anno01 in cpps[0]['rejected'][-1]["content"]
