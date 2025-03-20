@@ -154,6 +154,7 @@ class HIRAbstractGeneratorLLM(ABC):
             **gen_kwargs,
         )
         answers = [choice.message.content for choice in completion.choices]
+        answers = [a for a in answers if a is not None]
         return answers
 
 

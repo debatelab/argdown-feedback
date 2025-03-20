@@ -402,8 +402,7 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
 
 
 class AnnotationVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid annotations
-    with more annotated proposition elements."""
+    """Generate virtue-preference pairs for the annotation task."""
 
     hints: list[str] = []
 
@@ -434,7 +433,7 @@ class AnnotationVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
 
         pairs: list[ChatPreferencePair] = []
 
-        # rank valid annotations according to the number of identified proposition elements
+        # rank valid annotations according to the _score function
         valid_annotations = list(zip(candidate_solutions, evaluations))
         valid_annotations.sort(
             key=lambda x: self._score(x[0], x[1]), reverse=True

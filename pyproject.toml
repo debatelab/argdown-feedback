@@ -12,6 +12,7 @@ dependencies = [
     "openai>=1.66.3",
     "pyargdown",
     "tenacity>=9.0.0",
+    "textdistance>=4.6.3",
 ]
 
 [build-system]
