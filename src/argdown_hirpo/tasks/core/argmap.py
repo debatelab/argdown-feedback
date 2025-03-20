@@ -3,7 +3,7 @@ from typing import Sequence
 from abc import abstractmethod
 import dataclasses
 import random
-from textwrap import dedent
+from textwrap import dedent, shorten
 import textdistance
 
 import networkx as nx  # type: ignore
@@ -190,7 +190,9 @@ class ArgMapJudge(Judge):
         is_valid = True
         eval_data = {
             "fenced_code_block": "",
-            "invalid_argown_syntax": "",
+            "invalid_argdown_syntax": "",
+            "missing_labels": "",
+            "duplicate_labels": "",
             "premise_conclusion_structures": "",
         }
 
@@ -215,9 +217,33 @@ class ArgMapJudge(Judge):
         except Exception as e:
             argdown = None
             is_valid = False
-            eval_data["invalid_argown_syntax"] = f"Failed to parse argdown: {str(e)}"
+            eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
 
         if argdown:
+            incomplete_claims: list[str] = []
+            for claim in argdown.propositions:
+                assert isinstance(claim, Proposition)
+                if claim.label is None or "UNNAMED_PROPOSITION" in claim.label:
+                    if not claim.texts or not claim.texts[0]:
+                        incomplete_claims.append("Empty claim")
+                    else:
+                        incomplete_claims.append(shorten(claim.texts[0], width=40))
+            if incomplete_claims:
+                is_valid = False
+                eval_data["missing_claim_labels"] = (
+                    f"Missing labels for nodes: {', '.join(incomplete_claims)}"
+                )
+
+            labels = [a.label for a in argdown.arguments if a.label] + [
+                c.label for c in argdown.propositions if c.label
+            ]
+            duplicates = set([l for l in labels if labels.count(l) > 1])
+            if duplicates:
+                is_valid = False
+                eval_data["duplicate_labels"] = (
+                    f"Duplicate labels: {', '.join(duplicates)}"
+                )
+
             for argument in argdown.arguments:
                 assert isinstance(argument, Argument)
                 if argument.pcs:
@@ -363,7 +389,8 @@ class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         valid_argmaps = [
             (solution, evaluation)
             for solution, evaluation in valid_argmaps
-            if evaluation.is_valid and evaluation.artifacts["argdown"].number_of_nodes() > 1
+            if evaluation.is_valid
+            and evaluation.artifacts["argdown"].number_of_nodes() > 1
         ]
 
         if len(valid_argmaps) < 2:
@@ -541,7 +568,6 @@ class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         return (
             sum(degree_centrality) / len(degree_centrality) if degree_centrality else 0
         )
-
 
 
 class MaxInDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
