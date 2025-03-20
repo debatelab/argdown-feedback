@@ -234,14 +234,17 @@ class ArgMapJudge(Judge):
                     f"Missing labels for nodes: {', '.join(incomplete_claims)}"
                 )
 
-            labels = [a.label for a in argdown.arguments if a.label] + [
-                c.label for c in argdown.propositions if c.label
-            ]
-            duplicates = set([l for l in labels if labels.count(l) > 1])
-            if duplicates:
+            duplicate_labels: list[str] = []
+            for claim in argdown.propositions:
+                if len(claim.texts)>1 and claim.label:
+                    duplicate_labels.append(claim.label)
+            for argument in argdown.arguments:
+                if len(argument.gists)>1 and argument.label:
+                    duplicate_labels.append(argument.label)
+            if duplicate_labels:
                 is_valid = False
                 eval_data["duplicate_labels"] = (
-                    f"Duplicate labels: {', '.join(duplicates)}"
+                    f"Duplicate labels: {', '.join(duplicate_labels)}"
                 )
 
             for argument in argdown.arguments:

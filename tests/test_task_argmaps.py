@@ -87,15 +87,15 @@ def invalid_argmaps() -> list[ArgumentMap]:
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```
         [No meat]: We should stop eating meat.
-        <+ <Suffering>: Animals suffer.
-        <+ <Climate change>: Animal farming causes climate change.
+            <+ <Suffering>: Animals suffer.
+            <+ <Climate change>: Animal farming causes climate change.
         ```
         """)),
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```argdown
         [No meat]: We should stop eating meat.
-        <+ <Suffering>: Animals suffer.
-        <+ <Climate change>: Animal farming causes climate change.
+            <+ <Suffering>: Animals suffer.
+            <+ <Climate change>: Animal farming causes climate change.
         """)),
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```argdown
@@ -107,28 +107,28 @@ def invalid_argmaps() -> list[ArgumentMap]:
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```argdown
         We should stop eating meat.
-        <+ <Suffering>: Animals suffer.
-        <+ <Climate change>: Animal farming causes climate change.
+            <+ <Suffering>: Animals suffer.
+            <+ <Climate change>: Animal farming causes climate change.
         ```
         """)),
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```argdown
         [No meat]: We should stop eating meat.
-        <+ Animals suffer.
-        <+ <Climate change>: Animal farming causes climate change.
+            <+ Animals suffer.
+            <+ <Climate change>: Animal farming causes climate change.
         ```
         """)),
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```argdown
         [No meat]: We should stop eating meat.
-        <+ <Suffering>: Animals suffer.
-        <+ <Suffering>: Animal farming causes climate change.
+            <+ <Suffering>: Animals suffer.
+            <+ <Suffering>: Animal farming causes climate change.
         ```
         """)),
         ArgumentMap(argdown_snippet=textwrap.dedent("""
         ```argdown
         [No meat]: We should stop eating meat.
-        <+ <Climate change>: Animal farming causes climate change.
+            <+ <Climate change>: Animal farming causes climate change.
 
         <Suffering>: Animals suffer.
 
@@ -223,76 +223,105 @@ async def test_argmap_judge_invalid(invalid_argmaps, source_texts):
         argdown = ev.artifacts.get("argdown")
         if argdown:
             print(argdown.propositions)
+            print(argdown.arguments)
         assert not ev.is_valid
         assert any(v for _, v in ev.artifacts["eval_metrics"].items())
 
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 @pytest.mark.asyncio
-async def test_feedback_generator(invalid_annotations1, source_texts, model_kwargs):
+async def test_feedback_generator(invalid_argmaps, source_texts, model_kwargs):
 
     source_text = source_texts[0]
-    pg = AnnotationProblemGenerator()
+    pg = ArgMapProblemGenerator()
     problem = await pg.arun(source_text)
 
-    judge = AnnotationJudge()
-    evaluations = await judge.arun(problem, invalid_annotations1)
+    judge = ArgMapJudge()
+    evaluations = await judge.arun(problem, invalid_argmaps)
 
-    fg = AnnotationFeedbackGenerator(n_feedbacks=1, **model_kwargs)
-    for annotation, evaluation in zip(invalid_annotations1, evaluations):
-        feedbacks = await fg.arun(problem, annotation, evaluation)
+    fg = ArgMapFeedbackGenerator(n_feedbacks=1, **model_kwargs)
+    for argmap, evaluation in zip(invalid_argmaps, evaluations):
+        feedbacks = await fg.arun(problem, argmap, evaluation)
         assert len(feedbacks) == 1
         feedback = feedbacks[0]
         assert isinstance(feedback, Feedback)
         assert problem.instruct_prompt() in feedback.prompt
-        assert str(annotation) in feedback.prompt
+        assert str(argmap) in feedback.prompt
         print(feedback)
 
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 @pytest.mark.asyncio
-async def test_revised_solution_generator(invalid_annotations1, source_texts, model_kwargs):
+async def test_revised_solution_generator(invalid_argmaps, source_texts, model_kwargs):
     source_text = source_texts[0]
-    pg = AnnotationProblemGenerator()
+    pg = ArgMapProblemGenerator()
     problem = await pg.arun(source_text)
-    annotation = invalid_annotations1[-1]
+    argmap = invalid_argmaps[-1]
 
-    judge = AnnotationJudge()
-    evaluations = await judge.arun(problem, [annotation])
+    judge = ArgMapJudge()
+    evaluations = await judge.arun(problem, [argmap])
     evaluation = evaluations[0]
 
-    fg = AnnotationFeedbackGenerator(n_feedbacks=1, **model_kwargs)
-    feedbacks = await fg.arun(problem, annotation, evaluation)
+    fg = ArgMapFeedbackGenerator(n_feedbacks=1, **model_kwargs)
+    feedbacks = await fg.arun(problem, argmap, evaluation)
     feedback = feedbacks[0]
 
-    sg = AnnotationSolutionGenerator(n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
-    revised_annotations = await sg.arun(problem=problem, original_solution=annotation, feedback=feedback)
-    assert len(revised_annotations) == 1
-    revised_annotation = revised_annotations[0]
-    assert isinstance(revised_annotation, Annotation)
-    print(revised_annotation)
+    sg = ArgMapSolutionGenerator(n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
+    revised_argmaps = await sg.arun(problem=problem, original_solution=argmap, feedback=feedback)
+    assert len(revised_argmaps) == 1
+    revised_argmap = revised_argmaps[0]
+    print(revised_argmap)
+    assert isinstance(revised_argmap, ArgumentMap)
 
 
 @pytest.mark.asyncio
-class TestAnnotationPreferencePairGenerators:
+class TestArgMapPreferencePairGenerators:
 
-    async def test_annotation_scope_preference_pair_generator(self):
-        judge = AnnotationJudge()
-        ppg = AnnotationScopePreferencePairGenerator()
-        
-        problem = AnnotationProblem(sources="A B C")
-        anno01 = '```xml\nA B C\n```'
-        anno02 = '```xml\nA <proposition id="1">B</proposition> C\n```'
-        anno03 = '```xml\nA <proposition id="1">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+    @pytest.fixture
+    def problem(self) -> ArgMapProblem:
+        return ArgMapProblem(sources=textwrap.dedent("""
+        We should not eat meat.
+        Animals suffer.
+        Farming causes cliamte change.                                             
+        """))
+
+    @pytest.fixture
+    def judge(self) -> ArgMapJudge:
+        return ArgMapJudge()
+
+    async def test_connectedness_preference_pair_generator(self, problem, judge):
+        ppg = ConnectednessPreferencePairGenerator()
+
+        am_c = textwrap.dedent("""
+        ```argdown
+        [No meat]: We should not eat meat.
+            + <Suffering>: Animals suffer.
+            + <Farming>: Farming causes cliamte change.
+        ```
+        """)
+        am_r = textwrap.dedent("""
+        ```argdown
+        [No meat]: We should not eat meat.
+
+        <Suffering>: Animals suffer.
+
+        <Farming>: Farming causes cliamte change.                                             
+        ```
+        """)
+
+        candidate_solutions = [
+            ArgumentMap(argdown_snippet=am_c),
+            ArgumentMap(argdown_snippet=am_r),
+        ]
         evaluations = await judge.arun(problem, candidate_solutions)
+        print(evaluations)
         assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
 
         cpps = await ppg.arun(problem, candidate_solutions, evaluations)
         print(cpps)
         assert len(cpps) == 1
-        assert anno03 in cpps[0]['chosen'][-1]["content"]
-        assert anno01 in cpps[0]['rejected'][-1]["content"]
+        assert am_c in cpps[0]['chosen'][-1]["content"]
+        assert am_r in cpps[0]['rejected'][-1]["content"]
 
     async def test_annotation_supports_preference_pair_generator(self):
         judge = AnnotationJudge()
