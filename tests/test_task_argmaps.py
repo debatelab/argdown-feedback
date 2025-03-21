@@ -3,7 +3,7 @@ import pytest
 import textwrap
 import warnings
 
-from argdown_hirpo.base import Feedback
+from argdown_hirpo.base import Evaluation, Feedback
 from argdown_hirpo.tasks.core.argmap import (
     ArgumentMap,
     ArgMapProblem,
@@ -194,9 +194,21 @@ async def test_annotation_problem_generator(source_texts):
 
     assert source_texts[0] in problem.instruct_prompt()
     assert source_texts[0] in problem.instruct_prompt(ask_for_invalid=True)
+    assert "super cool hint" in problem.instruct_prompt(hints=["super cool hint"])
 
     assert "!WARNING" in problem.instruct_prompt(ask_for_invalid=True)
     assert "!WARNING" in problem.revise_prompt(ask_for_invalid=True)
+
+    inv_prompt = problem.instruct_prompt(ask_for_invalid=True, evaluation=Evaluation(is_valid=False, artifacts={}, metrics={"level": "AAA"}))
+    assert "!WARNING" in inv_prompt
+    assert "level" in inv_prompt
+    assert "AAA" in inv_prompt
+
+    inv_prompt = problem.revise_prompt(ask_for_invalid=True, evaluation=Evaluation(is_valid=False, artifacts={}, metrics={"level": "AAA"}))
+    assert "!WARNING" in inv_prompt
+    assert "level" in inv_prompt
+    assert "AAA" in inv_prompt
+
 
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")
@@ -228,7 +240,7 @@ async def test_argmap_judge_valid(valid_argmaps, source_texts):
         print(f"## ArgMap {i + 1}")
         print(ev)
         assert ev.is_valid
-        assert not any(v for _, v in ev.artifacts["eval_metrics"].items())
+        assert not any(v for _, v in ev.metrics.items())
         assert ev.artifacts["argdown"]
 
 
@@ -249,7 +261,7 @@ async def test_argmap_judge_invalid(invalid_argmaps, source_texts):
             print(argdown.propositions)
             print(argdown.arguments)
         assert not ev.is_valid
-        assert any(v for _, v in ev.artifacts["eval_metrics"].items())
+        assert any(v for _, v in ev.metrics.items())
 
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")

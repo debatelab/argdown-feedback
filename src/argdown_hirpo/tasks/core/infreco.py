@@ -11,6 +11,7 @@ from pyargdown import (
     ArgdownEdge,
     ArgdownMultiDiGraph,
     Argument,
+    Conclusion,
     Proposition,
     Valence,
     parse_argdown,
@@ -31,14 +32,14 @@ from argdown_hirpo.base import (
 )
 
 
-class ArgMapProblem(Problem):
-    """Task: Map the arguments in a text as an informal argdown argument map."""
+class InfRecoProblem(Problem):
+    """Task: Reconstruct the main argument as a premise conclusion structure, no formalization, no dialectics."""
 
     def __init__(self, sources: str | list[str]):
         if isinstance(sources, list):
             sources = "\n\n-----\n\n".join(sources)
-        # remove leading and trailing whitespace
-        sources = sources.strip()
+        # remove leading and trailing whitespace and newlines
+        sources = sources.strip("\n ")
         self.sources = sources
 
     def instruct_prompt(
@@ -49,22 +50,35 @@ class ArgMapProblem(Problem):
     ) -> str:
         prompt = (
             dedent("""
-            Assignment: Reconstruct a source text's argumentation as an informal Argdown argument map.
+            Assignment: Reconstruct a source text's main argument in standard form.
                         
-            Analyse the argumentation in the following source text by creating an Argdown argument map.
+            Identify the main argument in the following source text and reconstruct it as premise-conclusion structure using Argdown.
 
             ::: {{.source_text}}              
             {sources}
             :::
 
-            In particular, I ask you to
+            Note in particular:
 
-            - explicitly label all nodes in the argument map;
-            - use square/angled brackets for labels to distinguish arguments/claims;
-            - indicate suppport and attack relations between nodes in accordance with Argdown syntax conventions;
-            - do not include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
+            - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
+              ending with '```'. Just include a single Argdown codeblock in your answer.                                            
+            - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
+              conclusion, and possible intemediate conclusions).
+            - For each conclusion in the argument, provide information about which previously introduced premises or 
+              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {from: ['1','3']} --`,
+              where the list items refer to the respective premise or conclusion labels.
+            - You may, but are in no way required to add additional information about which inference rules or argumentation
+              schemes are applied in each sub-argument.
+            - In addition, at the beginning of your Argdown code block, provide a succinct label (title) for the argument and 
+              summarize its gist in line with Argdown syntax conventions. 
+                   
+            Carefully consider the following DON'Ts:
 
-            Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
+            - Do NOT include any other analyses (maps or arguments) in your Argdown snippet besides the reconstruction of the main argument.
+            - Do NOT add any inline dialectical relations in the premise conclusion structure.
+            - Do NOT add any yaml inline data besides the required inference information.
+            - Do NOT add any formalization of the argument's propositions (premises or conclusions) in your Argdown code.
+
         """)
             .strip()
             .format(sources=self.sources)
@@ -77,7 +91,7 @@ class ArgMapProblem(Problem):
             prompt += (
               "\n\n"
               "> [!WARNING]\n"
-              "> For didactic purposes, I want you to make mistakes in your answer.\n"
+              "> For didactic purposes, I want you to make mistakes in your answer, violating the above instructions.\n"
             )
 
             if evaluation:
@@ -96,7 +110,7 @@ class ArgMapProblem(Problem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = "Revise your previously submitted argument map given the above evaluation and feedback."
+        prompt = "Revise your previously submitted argument reconstruction given the above evaluation and feedback."
 
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)
@@ -119,8 +133,8 @@ class ArgMapProblem(Problem):
 
 
 @dataclasses.dataclass
-class ArgumentMap(Solution):
-    """Solution to the argument mapping problem: an argdown snippet."""
+class InformalReco(Solution):
+    """Solution to the argument analysis problem: an argdown snippet."""
 
     argdown_snippet: str
 
@@ -128,18 +142,18 @@ class ArgumentMap(Solution):
         return self.argdown_snippet
 
 
-class ArgMapProblemGenerator(ProblemGenerator):
+class InfRecoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
-            return ArgMapProblem(inputs)
+            return InfRecoProblem(inputs)
         raise ValueError(
-            "Inputs to an argument mapping problem must be a string or a list of strings"
+            "Inputs to an argument recinstruction problem must be a string or a list of strings"
         )
 
 
-class ArgMapSolutionGenerator(SolutionGenerator):
+class InfRecoSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_solutions = kwargs.get("n_solutions", 10)
@@ -148,11 +162,11 @@ class ArgMapSolutionGenerator(SolutionGenerator):
 
     async def arun(
         self,
-        problem: ArgMapProblem,
+        problem: InfRecoProblem,
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
-    ) -> Sequence[ArgumentMap]:
-        assert isinstance(original_solution, ArgumentMap) or original_solution is None
+    ) -> Sequence[InformalReco]:
+        assert isinstance(original_solution, InformalReco) or original_solution is None
         assert feedback or original_solution is None, (
             "Feedback is required for revised solutions"
         )
@@ -191,7 +205,7 @@ class ArgMapSolutionGenerator(SolutionGenerator):
             temperature=self.temperature,
         )
 
-        argmaps: list[ArgumentMap] = []
+        recos: list[InformalReco] = []
 
         # postprocess: extract fenced code block
         for answer in answers:
@@ -199,27 +213,30 @@ class ArgMapSolutionGenerator(SolutionGenerator):
                 if answer.split("```argdown")[1].count("\n```") == 1:
                     answer = answer.split("```argdown")[1].split("\n```")[0]
                     answer = "```argdown" + answer + "\n```"
-            argmaps.append(ArgumentMap(argdown_snippet=answer))
+            recos.append(InformalReco(argdown_snippet=answer))
 
-        return argmaps
+        return recos
 
 
-class ArgMapJudge(Judge):
-    """Judge for the argument mapping task."""
+class InfRecoJudge(Judge):
+    """Judge for the informal argument reconstruction task."""
 
     def _evaluate_argmap(
-        self, problem: ArgMapProblem, argmap: ArgumentMap
+        self, problem: InfRecoProblem, reco: InformalReco
     ) -> Evaluation:
         is_valid = True
         eval_data = {
             "fenced_code_block": "",
             "invalid_argdown_syntax": "",
-            "missing_labels": "",
-            "duplicate_labels": "",
-            "premise_conclusion_structures": "",
+            "no_unique_argument": "",
+            "illformed_argument": "",  # starts with conclusion / ends with premise
+            "missing_label_gist": "",
+            "missing_inference_info": "",
+            "unknown_proposition_references": "",  # in inference info
+            "disallowed_material": "", # more propositions, inline dialectical relations, yaml inline data
         }
 
-        ads = argmap.argdown_snippet.strip("\n ")
+        ads = reco.argdown_snippet.strip("\n ")
         if ads.startswith("```argdown") and ads.endswith("```"):
             ads = "\n".join(ads.splitlines()[1:-1])
         else:  # no fenced code block
@@ -243,41 +260,48 @@ class ArgMapJudge(Judge):
             eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
 
         if argdown:
-            incomplete_claims: list[str] = []
-            for claim in argdown.propositions:
-                assert isinstance(claim, Proposition)
-                if claim.label is None or "UNNAMED_PROPOSITION" in claim.label:
-                    if not claim.texts or not claim.texts[0]:
-                        incomplete_claims.append("Empty claim")
-                    else:
-                        incomplete_claims.append(shorten(claim.texts[0], width=40))
-            if incomplete_claims:
+            argument: Argument | None = None
+            if len(argdown.arguments) == 0:
                 is_valid = False
-                eval_data["missing_claim_labels"] = (
-                    f"Missing labels for nodes: {', '.join(incomplete_claims)}"
-                )
-
-            duplicate_labels: list[str] = []
-            for claim in argdown.propositions:
-                if len(claim.texts) > 1 and claim.label:
-                    duplicate_labels.append(claim.label)
-            for argument in argdown.arguments:
-                if len(argument.gists) > 1 and argument.label:
-                    duplicate_labels.append(argument.label)
-            if duplicate_labels:
+                eval_data["no_unique_argument"] = "No argument in the argdown snippet."
+            elif len(argdown.arguments) > 1:
                 is_valid = False
-                eval_data["duplicate_labels"] = (
-                    f"Duplicate labels: {', '.join(duplicate_labels)}"
-                )
+                eval_data["no_unique_argument"] = "More than one argument in argdown snippet."
+            else:
+                argument = argdown.arguments[0]
 
-            for argument in argdown.arguments:
-                assert isinstance(argument, Argument)
-                if argument.pcs:
+            if argument:
+                if not argument.pcs:
                     is_valid = False
-                    eval_data["premise_conclusion_structures"] = (
-                        f"Found detailed reconstruction of individual argument <{argument.label}> as premise-conclusion-structures."
+                    eval_data["illformed_argument"] = (
+                        "Argument lacks premise conclusion structure, i.e., is not reconstructed in standard form."
                     )
-                    break
+
+                if argument.pcs:
+                    msg = []
+                    if isinstance(argument.pcs[0], Conclusion):
+                        msg.append("Argument starts with a conclusion, not a premise.")
+                    if not isinstance(argument.pcs[-1], Conclusion):
+                        msg.append("Argument does not end with a conclusion.")
+                    if len(argument.gists) > 1:
+                        msg.append("More than one gist for the argument.")
+                    if msg:
+                        is_valid = False
+                        eval_data["illformed_argument"] = " ".join(msg)
+                    del msg
+
+
+                msg = []
+                if argument.label and "UNNAMED_ARGUMENT" in argument.label:
+                    msg.append("Argument lacks a label / title.")
+                if not argument.gists:
+                    msg.append("Argument lacks a gist / summary.")
+                if msg:
+                    is_valid = False
+                    eval_data["missing_label_gist"] = " ".join(msg)
+
+
+        # ...
 
         return Evaluation(
             is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
@@ -326,9 +350,7 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
         )
 
         evaluation_issues = "\n".join(
-            f"- **{k}**: {v}"
-            for k, v in evaluation.metrics.items()
-            if v
+            f"- **{k}**: {v}" for k, v in evaluation.metrics.items() if v
         )
         prompt = dedent("""
             Assignment: Give feedback and provide instructions for how to improve a given argument map.
@@ -448,6 +470,10 @@ class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         )
 
         return pairs
+
+
+# Irrelevance for final concl
+# Unused Props
 
 
 class ConnectednessPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):

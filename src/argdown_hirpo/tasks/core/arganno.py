@@ -43,7 +43,7 @@ class AnnotationProblem(Problem):
         self.sources = sources
 
     def instruct_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation: Evaluation | None = None
     ) -> str:
         prompt = dedent("""
             Assignment: Apply a given annotation scheme to a source text.
@@ -63,32 +63,48 @@ class AnnotationProblem(Problem):
             Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
         """).strip().format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
 
-        if ask_for_invalid:
-            prompt += dedent("""\n\n
-            > [!WARNING]
-            > For didactic purposes, I want you to make mistakes in your answer.
-            """)
-
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)
+
+        if ask_for_invalid:
+            prompt += (
+              "\n\n"
+              "> [!WARNING]\n"
+              "> For didactic purposes, I want you to make mistakes in your answer.\n"
+            )
+
+            if evaluation:
+                metrics = {k: v for k, v in evaluation.metrics.items() if v}
+                if metrics:
+                    prompt += "> Expected errors:\n"
+                    for k, v in metrics.items():
+                        prompt += f"> - {k}: {v}\n"
 
         return prompt
 
     def revise_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation: Evaluation | None = None
     ) -> str:
         prompt = (
             "Revise your previous annotation given the above evaluation and feedback."
         )
 
-        if ask_for_invalid:
-            prompt += dedent("""\n\n
-            > [!WARNING]
-            > For didactic purposes, I still want you to make mistakes in your revised answer.
-            """)
-
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)
+
+        if ask_for_invalid:
+            prompt += (
+              "\n\n"
+              "> [!WARNING]\n"
+              "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
+            )
+
+            if evaluation:
+                metrics = {k: v for k, v in evaluation.metrics.items() if v}
+                if metrics:
+                    prompt += "> Expected errors:\n"
+                    for k, v in metrics.items():
+                        prompt += f"> - {k}: {v}\n"
 
         return prompt
 
@@ -305,9 +321,9 @@ class AnnotationJudge(Judge):
         return Evaluation(
             is_valid=is_valid,
             artifacts={
-                "eval_metrics": eval_data,
                 "soup": soup,
             },
+            metrics=eval_data,
         )
 
     async def arun(
@@ -360,7 +376,7 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
 
         evaluation_issues = "\n".join(
             f"- **{k}**: {v}"
-            for k, v in evaluation.artifacts.get("eval_metrics", {}).items()
+            for k, v in evaluation.metrics.items()
             if v
         )
         prompt = dedent("""

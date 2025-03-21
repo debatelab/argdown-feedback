@@ -32,13 +32,13 @@ class Problem(ABC):
 
     @abstractmethod
     def instruct_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation = None
     ) -> str:
         """Cast the problem as a problem statement, including an instruction to solve it."""
 
     @abstractmethod
     def revise_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation = None
     ) -> str:
         """Instruction to revise earlier mentioned solution of the problem."""
 
@@ -70,6 +70,7 @@ class Evaluation:
 
     is_valid: bool
     artifacts: dict[str, Any]
+    metrics: dict[str, Any]
 
 
 @dataclasses.dataclass
