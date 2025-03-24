@@ -3,19 +3,18 @@ from typing import Sequence
 from abc import abstractmethod
 import dataclasses
 import random
-from textwrap import dedent, shorten
+from textwrap import dedent
 import textdistance
 
-import networkx as nx  # type: ignore
 from pyargdown import (
-    ArgdownEdge,
     ArgdownMultiDiGraph,
     Argument,
     Conclusion,
+    DialecticalType,
     Proposition,
-    Valence,
     parse_argdown,
 )
+from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.base import (
     Problem,
@@ -65,7 +64,7 @@ class InfRecoProblem(Problem):
             - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
               conclusion, and possible intemediate conclusions).
             - For each conclusion in the argument, provide information about which previously introduced premises or 
-              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {from: ['1','3']} --`,
+              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
               where the list items refer to the respective premise or conclusion labels.
             - You may, but are in no way required to add additional information about which inference rules or argumentation
               schemes are applied in each sub-argument.
@@ -221,7 +220,7 @@ class InfRecoSolutionGenerator(SolutionGenerator):
 class InfRecoJudge(Judge):
     """Judge for the informal argument reconstruction task."""
 
-    def _evaluate_argmap(
+    def _evaluate_infreco(
         self, problem: InfRecoProblem, reco: InformalReco
     ) -> Evaluation:
         is_valid = True
@@ -285,6 +284,10 @@ class InfRecoJudge(Judge):
                         msg.append("Argument does not end with a conclusion.")
                     if len(argument.gists) > 1:
                         msg.append("More than one gist for the argument.")
+                    pcs_labels = [p.label for p in argument.pcs]
+                    for label in pcs_labels:
+                        if pcs_labels.count(label) > 1:
+                            msg.append(f"Duplicate label '{label}' in the argument's standard form.")
                     if msg:
                         is_valid = False
                         eval_data["illformed_argument"] = " ".join(msg)
@@ -292,16 +295,79 @@ class InfRecoJudge(Judge):
 
 
                 msg = []
-                if argument.label and "UNNAMED_ARGUMENT" in argument.label:
+                if ArgdownParser.is_unlabeled(argument):
                     msg.append("Argument lacks a label / title.")
                 if not argument.gists:
                     msg.append("Argument lacks a gist / summary.")
                 if msg:
                     is_valid = False
                     eval_data["missing_label_gist"] = " ".join(msg)
+                del msg
 
+            if argument and argument.pcs:
+                msg = []
+                for c in argument.pcs:
+                    if isinstance(c, Conclusion):
+                        inf_data = c.inference_data
+                        if not inf_data:
+                            msg.append(f"Conclusion {c.label} lacks yaml inference information.")
+                        else:
+                            from_list = inf_data.get("from")
+                            if from_list is None:
+                                msg.append(f"Conclusion {c.label} inference information lacks 'from' key.")
+                            elif not isinstance(from_list, list):
+                                msg.append(f"Conclusion {c.label} inference information 'from' value is not a list.")
+                            elif len(from_list) == 0:
+                                msg.append(f"Conclusion {c.label} inference information 'from' value is empty.")
+                if msg:
+                    is_valid = False
+                    eval_data["missing_inference_info"] = " ".join(msg)
+                del msg
 
-        # ...
+            if argument and argument.pcs:
+                msg = []
+                for enum, c in enumerate(argument.pcs):
+                    if isinstance(c, Conclusion):
+                        inf_data = c.inference_data
+                        from_list = inf_data.get("from", [])
+                        if isinstance(from_list, list):
+                            for ref in from_list:
+                                if str(ref) not in [p.label for p in argument.pcs[:enum]]:
+                                    msg.append(
+                                        f"Item '{ref}' in inference information of conclusion {c.label} does "
+                                        "not refer to a previously introduced premise or conclusion."
+                                    )
+                if msg:
+                    is_valid = False
+                    eval_data["unknown_proposition_references"] = " ".join(msg)
+                del msg
+
+            msg = []
+            if argument and argument.pcs:
+                if len(argdown.propositions) > len(argument.pcs):
+                    msg.append(
+                        "Argdown snippet contains propositions other than the ones in the argument."
+                    )
+            else: 
+                if len(argdown.propositions) > 0:
+                    msg.append(
+                        "Argdown snippet contains propositions outside the argument."
+                    )
+            if any(
+                set(d.dialectics) != {DialecticalType.GROUNDED}
+                for d in argdown.dialectical_relations
+            ):
+                msg.append(
+                    "Argdown snippet defines dialectical relations."
+                )
+            if any(prop.data for prop in argdown.propositions):
+                msg.append("Some propositions contain yaml inline data.")
+            if any(arg.data for arg in argdown.arguments):
+                msg.append("Some arguments contain yaml inline data.")
+            if msg:
+                is_valid = False
+                eval_data["disallowed_material"] = " ".join(msg)
+            del msg
 
         return Evaluation(
             is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
@@ -314,23 +380,23 @@ class InfRecoJudge(Judge):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(original_solution, ArgumentMap) or original_solution is None
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(original_solution, InformalReco) or original_solution is None
         assert feedback or original_solution is None, (
             "Feedback is required for evaluating revised solutions"
         )
 
         evaluations = []
         for solution in solutions:
-            assert isinstance(solution, ArgumentMap), (
-                "All solutions must be ArgumentMaps"
+            assert isinstance(solution, InformalReco), (
+                "All solutions must be InformalReco objects"
             )
-            evaluations.append(self._evaluate_argmap(problem, solution))
+            evaluations.append(self._evaluate_infreco(problem, solution))
 
         return evaluations
 
 
-class ArgMapFeedbackGenerator(FeedbackGenerator):
+class InfRecoFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_solutions", 5)
@@ -343,8 +409,8 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
         solution: Solution,
         evaluation: Evaluation,
     ) -> list[Feedback]:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(solution, InformalReco), "Solution must be an InformalReco"
         assert not evaluation.is_valid, (
             "Can only generate feedback for invalid solutions"
         )
@@ -353,9 +419,9 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
             f"- **{k}**: {v}" for k, v in evaluation.metrics.items() if v
         )
         prompt = dedent("""
-            Assignment: Give feedback and provide instructions for how to improve a given argument map.
+            Assignment: Give feedback and provide instructions for how to improve a given argument reconstruction.
 
-            You will be shown an argument mapping problem, a student's preliminary solution, and its evaluation. Based on this information, provide feedback to the student and instructions for how to improve the solution.
+            You will be shown an argument analysis problem, a student's preliminary solution, and its evaluation. Based on this information, provide feedback to the student and instructions for how to improve the solution.
 
                                                 
             ## Problem Statement
@@ -394,16 +460,16 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the argument mapping task."""
+class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the informal argument reconstruction task."""
 
     hints: list[str] = []
 
     @abstractmethod
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: InfRecoProblem,
+        reco: InformalReco,
         evaluation: Evaluation,
     ) -> float:
         pass
@@ -416,13 +482,13 @@ class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> list[ChatPreferencePair]:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert all(isinstance(s, ArgumentMap) for s in candidate_solutions), (
-            "All solutions must be ArgumentMaps"
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert all(isinstance(s, InformalReco) for s in candidate_solutions), (
+            "All solutions must be InformalReco objects"
         )
         assert original_solution is None or isinstance(
-            original_solution, ArgumentMap
-        ), "Original solution must be an ArgumentMap"
+            original_solution, InformalReco
+        ), "Original solution must be an InformalReco"
         assert len(candidate_solutions) == len(evaluations), (
             "Number of solutions must match number of evaluations"
         )
@@ -430,39 +496,38 @@ class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         pairs: list[ChatPreferencePair] = []
 
         # rank valid argmaps according to the _score function
-        valid_argmaps: list[tuple[ArgumentMap, Evaluation]] = list(
+        valid_recos: list[tuple[InformalReco, Evaluation]] = list(
             zip(candidate_solutions, evaluations)  # type: ignore
         )
-        valid_argmaps.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
-        valid_argmaps = [
+        valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
+        valid_recos = [
             (solution, evaluation)
-            for solution, evaluation in valid_argmaps
+            for solution, evaluation in valid_recos
             if evaluation.is_valid
-            and evaluation.artifacts["argdown"].number_of_nodes() > 1
         ]
 
-        if len(valid_argmaps) < 2:
+        if len(valid_recos) < 2:
             return pairs
-        top_score = self._score(problem, *valid_argmaps[0])
-        if top_score == self._score(problem, *valid_argmaps[-1]):
+        top_score = self._score(problem, *valid_recos[0])
+        if top_score == self._score(problem, *valid_recos[-1]):
             return pairs
 
-        top_argmap, _ = valid_argmaps[0]
-        weaker_argmap = random.choice(
-            [s for s, e in valid_argmaps if self._score(problem, s, e) < top_score]
+        top_reco, _ = valid_recos[0]
+        weaker_reco = random.choice(
+            [s for s, e in valid_recos if self._score(problem, s, e) < top_score]
         )
 
         pairs.append(
             ChatPreferencePair(
                 chosen=ProblemSolutionChat(
                     problem=problem,
-                    solution=top_argmap,
+                    solution=top_reco,
                     feedback=feedback,
                     original_solution=original_solution,
                 ).as_chat(hints=self.hints),
                 rejected=ProblemSolutionChat(
                     problem=problem,
-                    solution=weaker_argmap,
+                    solution=weaker_reco,
                     feedback=feedback,
                     original_solution=original_solution,
                 ).as_chat(hints=self.hints),
@@ -472,411 +537,186 @@ class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         return pairs
 
 
-# Irrelevance for final concl
-# Unused Props
 
-
-class ConnectednessPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with smaller number of weakly conncted components."""
+class NoUnusedPropsPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
+    with fewer unused premises or conclusions."""
 
     hints = [
-        "In your map, only include arguments and claims that are dialectically connected (at least indirectly)."
+        "In your argument reconstruction, make sure that every premise and every intermediate conclusion is "
+        "(explicitly) used in a subsequent inference. (Every unused premise or conclusion counts as a mistake.)"
     ]
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: InfRecoProblem,
+        reco: InformalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        if argdown.number_of_nodes() == 0:
-            return 0
-        return len(list(nx.weakly_connected_components(argdown))) ** -1
+        argument = argdown.arguments[0]
+        used_labels = set()
+        for c in argument.pcs:
+            if isinstance(c, Conclusion):
+                used_labels.update(c.inference_data.get("from", []))
+        number_unused_props = sum(1 for p in argument.pcs[:-1] if p.label not in used_labels)
+
+        return (number_unused_props + 1) ** -1
 
 
-class MaxArgsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger number of arguments."""
-
-    hints = ["Include as many arguments as possible in your map."]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        return len(argdown.arguments)
-
-
-class BalancePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with more balanced number of support and attack relations."""
-
-    hints = ["Try to balance the number of support and attack relations in your map."]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        drs: list[ArgdownEdge] = argdown.dialectical_relations
-        n_supp = sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
-        n_att = sum(1 for dr in drs if dr.valence == Valence.ATTACK)
-        if n_supp + n_att == 0:
-            return 0
-        return 1 - abs(n_supp - n_att) / (n_supp + n_att)
-
-
-class MaxSupportsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger number of support relations."""
-
-    hints = ["Include as many support relations as possible in your map."]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        drs: list[ArgdownEdge] = argdown.dialectical_relations
-        return sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
-
-
-class MaxAttacksPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger number of attack relations."""
-
-    hints = ["Include as many attack relations as possible in your map."]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        drs: list[ArgdownEdge] = argdown.dialectical_relations
-        return sum(1 for dr in drs if dr.valence == Valence.ATTACK)
-
-
-class MaxDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger depth of the argument map."""
-
-    hints = ["Try to create a 'deep' argument map with long chains of argumentation."]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        if argdown.number_of_nodes() == 0:
-            return 0
-        H = nx.DiGraph(argdown)
-        if nx.is_directed_acyclic_graph(H):
-            le = nx.dag_longest_path_length(H)
-            print(le)
-        else:
-            le = nx.diameter(H.to_undirected())
-            print("diameter:", le)
-        return le
-
-
-class MinDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with smaller depth of the argument map."""
+class ManyIntermediateConclusionsPreferencePairGenerator(
+    InfRecoVirtuePreferencePairGenerator
+):
+    """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
+    with more intermediate conclusions."""
 
     hints = [
-        "Try to create a 'shallow' argument map, where arguments and claims are directly related to the central claim(s)."
+        "In your argument reconstruction, try to include as many sub-arguments as possible. "
+        "I.e., reconstruct the argument with many intermediate steps. That is what counts here."
     ]
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: InfRecoProblem,
+        reco: InformalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        if argdown.number_of_nodes() == 0:
-            return 0
-        H = nx.DiGraph(argdown)
-        if nx.is_directed_acyclic_graph(H):
-            le = nx.dag_longest_path_length(H)
-            print(le)
-        else:
-            le = nx.diameter(H.to_undirected())
-            print("diameter:", le)
-        return 1 / (1 + le)
-
-
-class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger average degree of the argument map."""
-
-    hints = [
-        "Try to create a dense argument map with many dialectical relations between the identified arguments and claims."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        H = nx.DiGraph(argdown)
-        degree_centrality = list(nx.degree_centrality(H).values())
-        return (
-            sum(degree_centrality) / len(degree_centrality) if degree_centrality else 0
+        argument = argdown.arguments[0]
+        number_intermediate_conclusions = sum(
+            1 for p in argument.pcs[:-1] if isinstance(p, Conclusion)
         )
 
+        return number_intermediate_conclusions
 
-class MaxInDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger maximum in degree of a node in the argument map."""
+
+class FewIntermediateConclusionsPreferencePairGenerator(
+    InfRecoVirtuePreferencePairGenerator
+):
+    """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
+    with fewer intermediate conclusions."""
 
     hints = [
-        "Try to create an argument map with a 'central' argument (or claim) that is supported or attacked by many other nodes."
+        "In your argument reconstruction, try to minimize the number of intermediate conclusions. "
+        "I.e., reconstruct the argument with as few sub-arguments as possible. That is what counts here."
     ]
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: InfRecoProblem,
+        reco: InformalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        H = nx.DiGraph(argdown)
-        in_degrees = list(dict(H.in_degree()).values())
-        return max(in_degrees) if in_degrees else 0
+        argument = argdown.arguments[0]
+        number_intermediate_conclusions = sum(
+            1 for p in argument.pcs[:-1] if isinstance(p, Conclusion)
+        )
+
+        return (number_intermediate_conclusions + 1) ** -1
 
 
-class MaxOutDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with larger maximum out degree of a node in the argument map."""
-
-    hints = [
-        "Try to create an argument map with a 'central' argument (or claim) which supports or attacks many other nodes."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        H = nx.DiGraph(argdown)
-        out_degrees = list(dict(H.out_degree()).values())
-        return max(out_degrees) if out_degrees else 0
-
-
-class MinLeafsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with smaller number of leaf nodes in the argument map."""
-
-    hints = [
-        "Try to create an argument map with a small _ratio_ of leaf nodes, i.e., of arguments and claims that are not supported or attacked by any other node."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        H = nx.DiGraph(argdown)
-        leafs = [n for n in H.nodes if H.in_degree(n) == 0]
-        return 1 - len(leafs) / H.number_of_nodes() if H.number_of_nodes() else 0
-
-
-class ShortLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with short labels."""
-
-    hints = [
-        "It's really important that your labels (for claims and arguments) are, on average, SHORT."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        arguments: list[Argument] = argdown.arguments
-        claims: list[Proposition] = argdown.propositions
-        ll = [len(a.label) if a.label else 0 for a in arguments] + [
-            len(c.label) if c.label else 0 for c in claims
-        ]
-        return (sum(ll) / len(ll)) ** -1 if ll else 0
-
-
-class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with diverse labels."""
-
-    hints = [
-        "What really matters here is the diversity of your labels -- no two labels (of any argument or claim) should be alike."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        arguments: list[Argument] = argdown.arguments
-        claims: list[Proposition] = argdown.propositions
-        labels = [a.label for a in arguments] + [c.label for c in claims]
-        lds = []
-        for i in range(len(labels)):
-            for j in range(i + 1, len(labels)):
-                l1 = labels[i]
-                l1 = l1 if l1 else ""
-                l2 = labels[j]
-                l2 = l2 if l2 else ""
-                lds.append(textdistance.levenshtein.normalized_distance(l1, l2))
-
-        return min(lds) if lds else 0
-
-
-class ShortClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with succinct claims."""
-
-    hints = [
-        "Make sure that your claims are, on average, short and succinct. That's what counts at this point."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        claims: list[Proposition] = argdown.propositions
-        ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
-        return (sum(ll) / len(ll)) ** -1 if ll else 0
-
-
-class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with verbose claims."""
-
-    hints = [
-        "Make sure that your claims are, on average, long and verbose. That's what counts at this point."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        claims: list[Proposition] = argdown.propositions
-        ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
-        return sum(ll) / len(ll) if ll else 0
-
-
-class ArgumentClaimSizePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
-    with arguments being on average 2-3 times as longs as claims."""
-
-    hints = [
-        "Make sure that your arguments' gists are neither too short nor too long; more specifically, they should be 2-3 times as long as the average claim in your map."
-    ]
-
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        arguments: list[Argument] = argdown.arguments
-        claims: list[Proposition] = argdown.propositions
-        cls = [len(c.texts[0]) if c.texts else 0 for c in claims]
-
-        if not cls or not arguments:
-            return 0
-
-        mean_cl = sum(cls) / len(cls)
-        good_args = [
-            a
-            for a in arguments
-            if a.gists and 2 * mean_cl < len(a.gists[0]) < 3 * mean_cl
-        ]
-
-        return len(good_args) / len(arguments)
-
-
-class IndependentWordingPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
+class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with independent wording of arguments and claims."""
 
     hints = [
-        "Make sure that you render the arguments and claims *in your own words*, and independently from the formulations in the source text. This is crucial at this step."
+        "Make sure that you render the argument's premises and conclusion(s) *in your own words*, "
+        "and independently from the formulations in the source text. This is crucial at this step."
     ]
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: InfRecoProblem,
+        reco: InformalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        arguments: list[Argument] = argdown.arguments
-        claims: list[Proposition] = argdown.propositions
+        propositions: list[Proposition] = argdown.propositions
 
         dlds: list[float] = []
-        for a in arguments:
-            for g in a.gists:
-                dlds.append(
-                    textdistance.damerau_levenshtein.normalized_distance(
-                        problem.sources, g
-                    )
-                )
-        for c in claims:
-            for t in c.texts:
+        for p in propositions:
+            for t in p.texts:
                 dlds.append(
                     textdistance.damerau_levenshtein.normalized_distance(
                         problem.sources, t
                     )
                 )
 
-        return sum(dlds) / len(dlds) if dlds else 0
+        return round(sum(dlds) / len(dlds), 1) if dlds else 0
 
 
-class SourceTextProximityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
+class SourceTextProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco task, prefering valid argument recos
     that stick closely to the source text."""
 
     hints = [
-        "Make sure that your argument map stays maximally faithful to and mimics closely the original source text!"
+        "Make sure that your argument reconstruction stays maximally faithful to and mimics closely the original source text!"
     ]
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: InfRecoProblem,
+        reco: InformalReco,
         evaluation: Evaluation,
     ) -> float:
-        return textdistance.damerau_levenshtein.normalized_similarity(
-            problem.sources, argmap.argdown_snippet
+        return round(
+                textdistance.damerau_levenshtein.normalized_similarity(
+                problem.sources, reco.argdown_snippet
+            ),
+            1
         )
+
+
+class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
+    with succinct and simple propositions."""
+
+    hints = [
+        "Make sure that you keep each of the argument's premises and conclusion(s) simple and succinct. "
+        "Short sentences are crucial at this step. (Number of premises and conclusions is not important.)"
+    ]
+
+    def _score(
+        self,
+        problem: InfRecoProblem,
+        reco: InformalReco,
+        evaluation: Evaluation,
+    ) -> float:
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        propositions: list[Proposition] = argdown.propositions
+
+        lengths: list[float] = []
+        for p in propositions:
+            for t in p.texts:
+                lengths.append(len(t))
+
+        return round(sum(lengths) / len(lengths), -1) ** -1 if lengths else 0
+    
+
+class VerbosityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
+    with elaborate and verbose propositions."""
+
+    hints = [
+        "Render the argument's premises and conclusion(s) in an elaborate and verbose way. "
+        "Long sentences are strongly preferred at this step. (Number of premises and conclusions is not important.)"
+    ]
+
+    def _score(
+        self,
+        problem: InfRecoProblem,
+        reco: InformalReco,
+        evaluation: Evaluation,
+    ) -> float:
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        propositions: list[Proposition] = argdown.propositions
+
+        lengths: list[float] = []
+        for p in propositions:
+            for t in p.texts:
+                lengths.append(len(t))
+
+        return round(sum(lengths) / len(lengths), -1) if lengths else 0
+
+
