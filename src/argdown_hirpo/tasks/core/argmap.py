@@ -15,6 +15,7 @@ from pyargdown import (
     Valence,
     parse_argdown,
 )
+from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.base import (
     Problem,
@@ -246,7 +247,7 @@ class ArgMapJudge(Judge):
             incomplete_claims: list[str] = []
             for claim in argdown.propositions:
                 assert isinstance(claim, Proposition)
-                if claim.label is None or "UNNAMED_PROPOSITION" in claim.label:
+                if ArgdownParser.is_unlabeled(claim):
                     if not claim.texts or not claim.texts[0]:
                         incomplete_claims.append("Empty claim")
                     else:
@@ -695,7 +696,7 @@ class ShortLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         ll = [len(a.label) if a.label else 0 for a in arguments] + [
             len(c.label) if c.label else 0 for c in claims
         ]
-        return (sum(ll) / len(ll)) ** -1 if ll else 0
+        return (round(sum(ll),-1) / len(ll)) ** -1 if ll else 0
 
 
 class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -725,7 +726,7 @@ class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
                 l2 = l2 if l2 else ""
                 lds.append(textdistance.levenshtein.normalized_distance(l1, l2))
 
-        return min(lds) if lds else 0
+        return round(min(lds),2) if lds else 0
 
 
 class ShortClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -745,7 +746,7 @@ class ShortClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
-        return (sum(ll) / len(ll)) ** -1 if ll else 0
+        return round(sum(ll) / len(ll),-1) ** -1 if ll else 0
 
 
 class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -765,7 +766,7 @@ class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
-        return sum(ll) / len(ll) if ll else 0
+        return round(sum(ll) / len(ll),-1) if ll else 0
 
 
 class ArgumentClaimSizePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -834,7 +835,7 @@ class IndependentWordingPreferencePairGenerator(ArgMapVirtuePreferencePairGenera
                     )
                 )
 
-        return sum(dlds) / len(dlds) if dlds else 0
+        return round(sum(dlds) / len(dlds),1) if dlds else 0
 
 
 class SourceTextProximityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
@@ -851,6 +852,9 @@ class SourceTextProximityPreferencePairGenerator(ArgMapVirtuePreferencePairGener
         argmap: ArgumentMap,
         evaluation: Evaluation,
     ) -> float:
-        return textdistance.damerau_levenshtein.normalized_similarity(
-            problem.sources, argmap.argdown_snippet
+        return round(
+            textdistance.damerau_levenshtein.normalized_similarity(
+                problem.sources, argmap.argdown_snippet
+            ),
+            1
         )

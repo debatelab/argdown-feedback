@@ -1,7 +1,5 @@
-from openai import OpenAI
 import pytest
 import textwrap
-import warnings
 
 from argdown_hirpo.base import Evaluation, Feedback
 from argdown_hirpo.tasks.core.argmap import (
@@ -30,12 +28,9 @@ from argdown_hirpo.tasks.core.argmap import (
     IndependentWordingPreferencePairGenerator,
     SourceTextProximityPreferencePairGenerator,
 )
+from tests.hirpo_tester import HirpoTester
 
-
-MODEL_KWARGS = {
-    "inference_base_url": "http://localhost:8000/v1",
-    "model_id": "debatelabkit/llama-3.1-argunaut-1-8b-spin-gguf/llama-3.1-argunaut-1-8b-spin-q4_k_m.gguf",
-}
+from .util import llm_available, MODEL_KWARGS
 
 
 @pytest.fixture
@@ -43,26 +38,34 @@ def model_kwargs():
     return MODEL_KWARGS
 
 
-def llm_available() -> bool:
-    base_url = MODEL_KWARGS["inference_base_url"]
-    model_id = MODEL_KWARGS["model_id"]
-    try:
-        models = OpenAI(api_key="EMPTY", base_url=base_url).models.list()
-        avail = model_id in [model.id for model in models.data]
-        if not avail:
-            warnings.warn(
-                UserWarning(
-                    f"Model {model_id} not available at local inference server {base_url} (available models are: {[model.id for model in models.data]})"
-                )
-            )
-        return avail
-    except Exception as e:
-        warnings.warn(
-            UserWarning(
-                f"Could not connect to local inference server {base_url} (Error: {e})"
-            )
-        )
-        return False
+@pytest.fixture
+def problem_class():
+    return ArgMapProblem
+
+
+@pytest.fixture
+def problem_generator_class():
+    return ArgMapProblemGenerator
+
+
+@pytest.fixture
+def solution_class():
+    return ArgumentMap
+
+
+@pytest.fixture
+def solution_generator_class():
+    return ArgMapSolutionGenerator
+
+
+@pytest.fixture
+def judge_class():
+    return ArgMapJudge
+
+
+@pytest.fixture
+def feedback_generator_class():
+    return ArgMapFeedbackGenerator
 
 
 @pytest.fixture
@@ -184,133 +187,108 @@ def test_avail(model_kwargs):
 
 
 @pytest.mark.asyncio
-async def test_annotation_problem_generator(source_texts):
-    pg = ArgMapProblemGenerator()
-    problem = await pg.arun(source_texts)
-    assert isinstance(problem, ArgMapProblem)
-
-    print(problem.instruct_prompt())
-    print(problem.revise_prompt())
-
-    assert source_texts[0] in problem.instruct_prompt()
-    assert source_texts[0] in problem.instruct_prompt(ask_for_invalid=True)
-    assert "super cool hint" in problem.instruct_prompt(hints=["super cool hint"])
-
-    assert "!WARNING" in problem.instruct_prompt(ask_for_invalid=True)
-    assert "!WARNING" in problem.revise_prompt(ask_for_invalid=True)
-
-    inv_prompt = problem.instruct_prompt(ask_for_invalid=True, evaluation=Evaluation(is_valid=False, artifacts={}, metrics={"level": "AAA"}))
-    assert "!WARNING" in inv_prompt
-    assert "level" in inv_prompt
-    assert "AAA" in inv_prompt
-
-    inv_prompt = problem.revise_prompt(ask_for_invalid=True, evaluation=Evaluation(is_valid=False, artifacts={}, metrics={"level": "AAA"}))
-    assert "!WARNING" in inv_prompt
-    assert "level" in inv_prompt
-    assert "AAA" in inv_prompt
-
-
-
-@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
-@pytest.mark.asyncio
-async def test_argmap_solution_generator(source_texts, model_kwargs):
-    pg = ArgMapProblemGenerator()
-    sg = ArgMapSolutionGenerator(
-        n_solutions=1, **model_kwargs
-    )  # lmstudio server does not support param n
-    problem = await pg.arun(source_texts)
-    solutions = await sg.arun(problem)
-    assert len(solutions) == 1
-    for i, sol in enumerate(solutions):
-        print(f"## Argmap {i + 1}")
-        print(sol)
-        assert isinstance(sol, ArgumentMap)
-
-
-@pytest.mark.asyncio
-async def test_argmap_judge_valid(valid_argmaps, source_texts):
-    source_text = source_texts[0]
-    pg = ArgMapProblemGenerator()
-    problem = await pg.arun(source_text)
-
-    judge = ArgMapJudge()
-    evaluations = await judge.arun(problem, valid_argmaps)
-    assert len(evaluations) == len(valid_argmaps)
-    for i, ev in enumerate(evaluations):
-        print(f"## ArgMap {i + 1}")
-        print(ev)
-        assert ev.is_valid
-        assert not any(v for _, v in ev.metrics.items())
-        assert ev.artifacts["argdown"]
-
-
-@pytest.mark.asyncio
-async def test_argmap_judge_invalid(invalid_argmaps, source_texts):
-    source_text = source_texts[0]
-    pg = ArgMapProblemGenerator()
-    problem = await pg.arun(source_text)
-
-    judge = ArgMapJudge()
-    evaluations = await judge.arun(problem, invalid_argmaps)
-    assert len(evaluations) == len(invalid_argmaps)
-    for i, ev in enumerate(evaluations):
-        print(f"## ArgMap {i + 1}")
-        print(ev)
-        argdown = ev.artifacts.get("argdown")
-        if argdown:
-            print(argdown.propositions)
-            print(argdown.arguments)
-        assert not ev.is_valid
-        assert any(v for _, v in ev.metrics.items())
-
-
-@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
-@pytest.mark.asyncio
-async def test_feedback_generator(invalid_argmaps, source_texts, model_kwargs):
-    source_text = source_texts[0]
-    pg = ArgMapProblemGenerator()
-    problem = await pg.arun(source_text)
-
-    judge = ArgMapJudge()
-    evaluations = await judge.arun(problem, invalid_argmaps)
-
-    fg = ArgMapFeedbackGenerator(n_feedbacks=1, **model_kwargs)
-    for argmap, evaluation in zip(invalid_argmaps, evaluations):
-        feedbacks = await fg.arun(problem, argmap, evaluation)
-        assert len(feedbacks) == 1
-        feedback = feedbacks[0]
-        assert isinstance(feedback, Feedback)
-        assert problem.instruct_prompt() in feedback.prompt
-        assert str(argmap) in feedback.prompt
-        print(feedback)
-
-
-@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
-@pytest.mark.asyncio
-async def test_revised_solution_generator(invalid_argmaps, source_texts, model_kwargs):
-    source_text = source_texts[0]
-    pg = ArgMapProblemGenerator()
-    problem = await pg.arun(source_text)
-    argmap = invalid_argmaps[-1]
-
-    judge = ArgMapJudge()
-    evaluations = await judge.arun(problem, [argmap])
-    evaluation = evaluations[0]
-
-    fg = ArgMapFeedbackGenerator(n_feedbacks=1, **model_kwargs)
-    feedbacks = await fg.arun(problem, argmap, evaluation)
-    feedback = feedbacks[0]
-
-    sg = ArgMapSolutionGenerator(
-        n_solutions=1, **model_kwargs
-    )  # lmstudio server does not support param n
-    revised_argmaps = await sg.arun(
-        problem=problem, original_solution=argmap, feedback=feedback
+async def test_annotation_problem_generator(
+    problem_generator_class,
+    problem_class,
+    source_texts
+):
+    await HirpoTester.test_problem_generator(
+        problem_generator_class,
+        problem_class,
+        source_texts
     )
-    assert len(revised_argmaps) == 1
-    revised_argmap = revised_argmaps[0]
-    print(revised_argmap)
-    assert isinstance(revised_argmap, ArgumentMap)
+
+
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
+@pytest.mark.asyncio
+async def test_argmap_solution_generator(
+    problem_generator_class,
+    solution_generator_class,
+    solution_class,
+    source_texts,
+    model_kwargs
+):
+    await HirpoTester.test_solution_generator(
+        problem_generator_class,
+        solution_generator_class,
+        solution_class,
+        source_texts,
+        model_kwargs
+    )
+
+
+@pytest.mark.asyncio
+async def test_argmap_judge_valid(
+    problem_generator_class,
+    judge_class,
+    valid_argmaps,
+    source_texts
+):
+    await HirpoTester.test_judge_valid(
+        problem_generator_class,
+        judge_class,
+        valid_argmaps,
+        source_texts
+    )
+
+
+@pytest.mark.asyncio
+async def test_argmap_judge_invalid(
+    problem_generator_class,
+    judge_class,
+    invalid_argmaps,
+    source_texts
+):
+    await HirpoTester.test_judge_invalid(
+        problem_generator_class,
+        judge_class,
+        invalid_argmaps,
+        source_texts
+    )
+
+
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
+@pytest.mark.asyncio
+async def test_feedback_generator(
+    problem_generator_class,
+    judge_class,
+    feedback_generator_class,
+    invalid_argmaps,
+    source_texts,
+    model_kwargs
+):
+    await HirpoTester.test_feedback_generator(
+        problem_generator_class,
+        judge_class,
+        feedback_generator_class,
+        invalid_argmaps,
+        source_texts,
+        model_kwargs
+    )
+
+
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
+@pytest.mark.asyncio
+async def test_revised_solution_generator(
+    problem_generator_class,
+    judge_class,
+    feedback_generator_class,
+    solution_generator_class,
+    solution_class,
+    invalid_argmaps,
+    source_texts,
+    model_kwargs
+):
+    await HirpoTester.test_revised_solution_generator(
+        problem_generator_class,
+        judge_class,
+        feedback_generator_class,
+        solution_generator_class,
+        solution_class,
+        invalid_argmaps,
+        source_texts,
+        model_kwargs
+    )
 
 
 @pytest.mark.asyncio

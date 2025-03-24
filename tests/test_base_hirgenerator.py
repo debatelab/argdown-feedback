@@ -213,7 +213,7 @@ class NumberJudge(Judge):
                 is_correct = False
             artifacts = {"is_correct": is_correct}
             evaluations.append(
-                Evaluation(is_valid=is_valid, artifacts=artifacts)
+                Evaluation(is_valid=is_valid, artifacts=artifacts, metrics={})
             )
         return evaluations
 
