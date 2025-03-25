@@ -1,7 +1,7 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.base import Evaluation, Feedback, Solution
+from argdown_hirpo.base import Feedback, Solution
 from argdown_hirpo.tasks.core.infreco import (
     InformalReco,
     InfRecoProblem,

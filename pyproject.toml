@@ -9,10 +9,12 @@ authors = [
 requires-python = ">=3.11"
 dependencies = [
     "beautifulsoup4>=4.13.3",
+    "nltk>=3.9.1",
     "openai>=1.66.3",
     "pyargdown",
     "tenacity>=9.0.0",
     "textdistance>=4.6.3",
+    "z3-solver>=4.14.1.0",
 ]
 
 [build-system]
