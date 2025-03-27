@@ -71,7 +71,7 @@ class InfRecoVerifier(BaseArgdownVerifier):
         if self.argument is None or not self.argument.pcs:
             return None, None
         pcs_labels = [p.label for p in self.argument.pcs]
-        duplicates = [label for label in pcs_labels if pcs_labels.count(label) > 1]
+        duplicates = list(set([label for label in pcs_labels if pcs_labels.count(label) > 1]))
         if duplicates:
             return (
                 False,

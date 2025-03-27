@@ -202,6 +202,7 @@ def check_validity_z3(
         conclusion_formalized_nltk=conclusion_formalized_nltk,
         plchd_substitutions=plchd_substitutions,
     )
+    print(smtlib_code)
     solver = SimpleSolver()
     ast = parse_smt2_string(smtlib_code)
     solver.add(ast)

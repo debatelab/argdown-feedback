@@ -1,10 +1,7 @@
 from nltk.sem.logic import Expression  # type: ignore
 from pyargdown import (
     Argdown,
-    ArgdownMultiDiGraph,
-    Argument,
     Conclusion,
-    DialecticalType,
 )
 
 from .infreco_verifier import InfRecoVerifier
@@ -68,46 +65,48 @@ class LogRecoVerifier(InfRecoVerifier):
                     f"Inline yaml of proposition ({pr.label}) lacks {self.formalization_key} key."
                 )
 
-            if declarations and not isinstance(declarations, dict):
-                msgs.append(
-                    f"'{self.declarations_key}' of proposition ({pr.label}) is not a dict."
-                )
+            if declarations:
+                if isinstance(declarations, dict):
+                    for k, v in declarations.items():
+                        if k in all_declarations:
+                            msgs.append(
+                                f"Duplicate declaration: Variable '{k}' in the inline yaml of proposition "
+                                f"({pr.label}) has been declared before."
+                            )
+                        else:
+                            all_declarations[k] = v
+                else:
+                    msgs.append(
+                        f"'{self.declarations_key}' of proposition ({pr.label}) is not a dict."
+                    )
 
-            if formalization and isinstance(declarations, dict):
-                for k, v in declarations.items():
-                    if k in all_declarations:
-                        msgs.append(
-                            f"Duplicate declaration: Variable '{k}' in the inline yaml of proposition "
-                            f"({pr.label}) has been declared before."
-                        )
-                    else:
-                        all_declarations[k] = v
-
+            if formalization:
                 try:
                     expr = FOLParser.parse(formalization)
                 except ValueError as e:
                     expr = None
                     msgs.append(
-                        f"Formalization of proposition ({pr.label}) is not a well-formed first-order "
-                        f"logic formula. NLTK parser error: {str(e)}"
+                        f"Formalization {formalization} of proposition ({pr.label}) is not a well-formed "
+                        f"first-order logic formula. NLTK parser error: {str(e)}"
                     )
 
                 if expr:
                     all_expressions[pr.label] = expr
 
-                    for k, _ in declarations.items():
-                        if k not in [str(v) for v in expr.variables()]:
-                            msgs.append(
-                                f"Variable '{k}' declared with proposition ({pr.label}) is not used "
-                                f"in the corresponding formalization '{formalization}'."
-                            )
+                    if declarations and isinstance(declarations, dict):
+                        for k, _ in declarations.items():
+                            if k not in [str(v) for v in expr.variables()]:
+                                msgs.append(
+                                    f"Variable '{k}' declared with proposition ({pr.label}) is not used "
+                                    f"in the corresponding formalization '{formalization}'."
+                                )
 
-            for k, expr in all_expressions.items():
-                for v in expr.variables():
-                    if str(v) not in all_declarations:
-                        msgs.append(
-                            f"Variable '{v}' in formalization of proposition ({k}) is not declared anywhere."
-                        )
+        for k, expr in all_expressions.items():
+            for v in expr.variables():
+                if str(v) not in all_declarations:
+                    msgs.append(
+                        f"Variable '{v}' in formalization of proposition ({k}) is not declared anywhere."
+                    )
 
         flawed_formalizations_error = " ".join(msgs) if msgs else None
 
@@ -124,6 +123,7 @@ class LogRecoVerifier(InfRecoVerifier):
 
         if self.flawed_formalizations_error:
             return False, self.flawed_formalizations_error
+
         return True, None
     
     def is_globally_deductively_valid(self) -> tuple[bool | None, str | None]:
@@ -155,14 +155,13 @@ class LogRecoVerifier(InfRecoVerifier):
                 conclusion_formalized_nltk=expr_conclusion,
                 plchd_substitutions=[[k,v] for k,v in self.all_declarations.items()],
             )
+            if not deductively_valid:
+                return False, (
+                    "According to the provided formalizations, the argument is not deductively valid. "
+                    f"SMT2LIB program used to check validity:\n {smtcode}\n"
+                )
         except Exception as e:
-            return False, "Failed to evaluate global deductive validity with SMT2LIB/z3: {e}."
-
-        if not deductively_valid:
-            return False, (
-                "According to the provided formalizations, the argument is not deductively valid. "
-                f"SMT2LIB program used to check validity:\n {smtcode}\n"
-            )
+            return False, f"Failed to evaluate global deductive validity with SMT2LIB/z3: {e}."
 
         return True, None
 
@@ -178,7 +177,7 @@ class LogRecoVerifier(InfRecoVerifier):
         for c in self.argument.pcs:
             if isinstance(c, Conclusion):
                 expr_premises = {}
-                for label in c.inference_data.get("uses", []):
+                for label in c.inference_data.get(self.from_key, []):
                     expr = self.all_expressions.get(label)
                     if expr:
                         expr_premises[label] = expr
@@ -189,27 +188,27 @@ class LogRecoVerifier(InfRecoVerifier):
 
                 if not expr_premises or not expr_conclusion:
                     msgs.append(
-                        f"Failed to evaluate deductive validity of sub-inference to ({c.label})"
+                        f"Failed to evaluate deductive validity of sub-inference to ({c.label}) "
                         "due to missing or flawed formalizations / inference info."
                     )
-
-                try:
-                    deductively_valid, smtcode = check_validity_z3(
-                        premises_formalized_nltk=expr_premises,
-                        conclusion_formalized_nltk=expr_conclusion,
-                        plchd_substitutions=[[k,v] for k,v in self.all_declarations.items()],
-                    )
-                except Exception as e:
-                    msgs.append(
-                        f"Failed to evaluate deductive validity of sub-inference to ({c.label})"
-                        f"with SMT2LIB/z3: {e}."
-                    )
-                if not deductively_valid:
-                    msgs.append(
-                        "According to the provided formalizations and inference info, the sub-inference "
-                        f"to conclusion ({c.label}) is not deductively valid. "
-                        f"SMT2LIB program used to check validity of this subargument:\n {smtcode}\n"
-                    )
+                else:
+                    try:
+                        deductively_valid, smtcode = check_validity_z3(
+                            premises_formalized_nltk=expr_premises,
+                            conclusion_formalized_nltk=expr_conclusion,
+                            plchd_substitutions=[[k,v] for k,v in self.all_declarations.items()],
+                        )
+                        if not deductively_valid:
+                            msgs.append(
+                                "According to the provided formalizations and inference info, the sub-inference "
+                                f"to conclusion ({c.label}) is not deductively valid. "
+                                f"SMT2LIB program used to check validity of this subargument:\n {smtcode}\n"
+                            )
+                    except Exception as e:
+                        msgs.append(
+                            f"Failed to evaluate deductive validity of sub-inference to ({c.label}) "
+                            f"with SMT2LIB/z3: {e}."
+                        )
 
         if msgs:
             return False, "\n".join(msgs)
@@ -252,13 +251,13 @@ class LogRecoVerifier(InfRecoVerifier):
                     conclusion_formalized_nltk=expr_conclusion,
                     plchd_substitutions=[[k,v] for k,v in self.all_declarations.items()],
                 )
+                if not deductively_valid:
+                    msgs.append(
+                        f"According to the provided formalizations, premise ({k}) is not required to logically "
+                        f"infer the final conclusion. SMT2LIB program used to check validity:\n {smtcode}\n"
+                    )
             except Exception as e:
                 msgs.append(f"Failed to evaluate relevance of premise ({k}) with SMT2LIB/z3: {e}.")
-            if not deductively_valid:
-                msgs.append(
-                    f"According to the provided formalizations, premise ({k}) is not required to logically "
-                    f"infer the final conclusion. SMT2LIB program used to check validity:\n {smtcode}\n"
-                )
 
         return True, None
 
