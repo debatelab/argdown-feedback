@@ -8,13 +8,10 @@ import textdistance
 
 from pyargdown import (
     ArgdownMultiDiGraph,
-    Argument,
     Conclusion,
-    DialecticalType,
     Proposition,
     parse_argdown,
 )
-from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.base import (
     Problem,
@@ -29,11 +26,13 @@ from argdown_hirpo.base import (
     FeedbackGenerator,
     VirtuePreferencePairGenerator,
 )
-from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
+
+from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
+    
 
 
-class InfRecoProblem(Problem):
-    """Task: Reconstruct the main argument as a premise conclusion structure, no formalization, no dialectics."""
+class LogRecoProblem(Problem):
+    """Task: Reconstruct the main argument as deductively valid using premise conclusion structure and including formalization."""
 
     def __init__(self, sources: str | list[str]):
         if isinstance(sources, list):
@@ -50,9 +49,10 @@ class InfRecoProblem(Problem):
     ) -> str:
         prompt = (
             dedent("""
-            Assignment: Reconstruct a source text's main argument in standard form.
+            Assignment: Reconstruct a source text's main line of reasoning as a deductively valid argument in standard form.
                         
-            Identify the main argument in the following source text and reconstruct it as premise-conclusion structure using Argdown.
+            Logically reconstruct the main argument in the following source text. Formalize all the premises and conclusions.
+            Make sure the reconstructed argument is deductively valid and all premises are relevant.
 
             ::: {{.source_text}}              
             {sources}
@@ -62,24 +62,28 @@ class InfRecoProblem(Problem):
 
             - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
               ending with '```'. Just include a single Argdown codeblock in your answer.                                            
+
             - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
               conclusion, and possible intemediate conclusions).
-            - For each conclusion in the argument, provide information about which previously introduced premises or 
-              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
+
+            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
+              syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Minimal example:
+              `(1) Socrates is mortal. {{formalization: 'F(a)', declarations: {{'a': 'Socrates', 'F': 'being mortal'}} }}`.
+              Only declare variables that are used in the corresponding formalization and that have not been declared before.
+              Ensure that your formalizations are consistent with each other.
+
+            - For each inference step in the argument, provide information about which previously introduced premises or 
+              conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
               where the list items refer to the respective premise or conclusion labels.
+            
             - You may, but are in no way required to add additional information about which inference rules or argumentation
               schemes are applied in each sub-argument.
+
             - In addition, at the beginning of your Argdown code block, provide a succinct label (title) for the argument and 
               summarize its gist in line with Argdown syntax conventions. 
-                   
-            Carefully consider the following DON'Ts:
 
             - Do NOT include any other analyses (maps or arguments) in your Argdown snippet besides the reconstruction of the main argument.
-            - Do NOT add any inline dialectical relations in the premise conclusion structure.
-            - Do NOT add any yaml inline data besides the required inference information.
-            - Do NOT add any formalization of the argument's propositions (premises or conclusions) in your Argdown code.
-
-        """)
+            """)
             .strip()
             .format(sources=self.sources)
         )
@@ -89,9 +93,9 @@ class InfRecoProblem(Problem):
 
         if ask_for_invalid:
             prompt += (
-                "\n\n"
-                "> [!WARNING]\n"
-                "> For didactic purposes, I want you to make mistakes in your answer, violating the above instructions.\n"
+              "\n\n"
+              "> [!WARNING]\n"
+              "> For didactic purposes, I want you to make mistakes in your answer, violating the above instructions.\n"
             )
 
             if evaluation:
@@ -100,6 +104,7 @@ class InfRecoProblem(Problem):
                     prompt += "> Expected errors:\n"
                     for k, v in metrics.items():
                         prompt += f"> - {k}: {v}\n"
+
 
         return prompt
 
@@ -116,9 +121,9 @@ class InfRecoProblem(Problem):
 
         if ask_for_invalid:
             prompt += (
-                "\n\n"
-                "> [!WARNING]\n"
-                "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
+              "\n\n"
+              "> [!WARNING]\n"
+              "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
             )
 
             if evaluation:
@@ -132,7 +137,7 @@ class InfRecoProblem(Problem):
 
 
 @dataclasses.dataclass
-class InformalReco(Solution):
+class LogicalReco(Solution):
     """Solution to the argument analysis problem: an argdown snippet."""
 
     argdown_snippet: str
@@ -141,18 +146,18 @@ class InformalReco(Solution):
         return self.argdown_snippet
 
 
-class InfRecoProblemGenerator(ProblemGenerator):
+class LogRecoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
-            return InfRecoProblem(inputs)
+            return LogRecoProblem(inputs)
         raise ValueError(
-            "Inputs to an argument recinstruction problem must be a string or a list of strings"
+            "Inputs to an argument reconstruction problem must be a string or a list of strings"
         )
 
 
-class InfRecoSolutionGenerator(SolutionGenerator):
+class LogRecoSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_solutions = kwargs.get("n_solutions", 10)
@@ -161,11 +166,11 @@ class InfRecoSolutionGenerator(SolutionGenerator):
 
     async def arun(
         self,
-        problem: InfRecoProblem,
+        problem: LogRecoProblem,
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
-    ) -> Sequence[InformalReco]:
-        assert isinstance(original_solution, InformalReco) or original_solution is None
+    ) -> Sequence[LogicalReco]:
+        assert isinstance(original_solution, LogicalReco) or original_solution is None
         assert feedback or original_solution is None, (
             "Feedback is required for revised solutions"
         )
@@ -204,7 +209,7 @@ class InfRecoSolutionGenerator(SolutionGenerator):
             temperature=self.temperature,
         )
 
-        recos: list[InformalReco] = []
+        recos: list[LogicalReco] = []
 
         # postprocess: extract fenced code block
         for answer in answers:
@@ -212,27 +217,31 @@ class InfRecoSolutionGenerator(SolutionGenerator):
                 if answer.split("```argdown")[1].count("\n```") == 1:
                     answer = answer.split("```argdown")[1].split("\n```")[0]
                     answer = "```argdown" + answer + "\n```"
-            recos.append(InformalReco(argdown_snippet=answer))
+            recos.append(LogicalReco(argdown_snippet=answer))
 
         return recos
 
 
-class InfRecoJudge(Judge):
+class LogRecoJudge(Judge):
     """Judge for the informal argument reconstruction task."""
 
-    def _evaluate_infreco(
-        self, problem: InfRecoProblem, reco: InformalReco
+    def _evaluate_logreco(
+        self, problem: LogRecoProblem, reco: LogicalReco
     ) -> Evaluation:
         is_valid = True
         eval_data = {
             "fenced_code_block": "",
             "invalid_argdown_syntax": "",
             "no_unique_argument": "",
-            "illformed_argument": "",  # starts with conclusion / ends with premise
+            "illformed_argument": "",  # no pcs
             "missing_label_gist": "",
             "missing_inference_info": "",
             "unknown_proposition_references": "",  # in inference info
-            "disallowed_material": "",  # more propositions, inline dialectical relations, yaml inline data
+            "unused_propositions": "",  # unused propositions
+            "disallowed_material": "", # more propositions
+            "flawed_formalizations": "",  # missing, duplicate declarations etc. etc.
+            "invalid_inference": "",  # invalid inference
+            "redundant_premises": "",  # redundant premises
         }
 
         ads = reco.argdown_snippet.strip("\n ")
@@ -259,7 +268,8 @@ class InfRecoJudge(Judge):
             eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
 
         if argdown:
-            verifier = InfRecoVerifier(argdown)
+
+            verifier = LogRecoVerifier(argdown)
 
             check, msg = verifier.has_unique_argument()
             if check is False:
@@ -268,55 +278,29 @@ class InfRecoJudge(Judge):
 
             # illformed argument
             msgs = []
-
-            check, msg = verifier.has_pcs()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg if msg else "Argument lacks premise conclusion structure."
-                )
-
-            check, msg = verifier.starts_with_premise()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument does not start with a premise.")
-
-            check, msg = verifier.ends_with_conclusion()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument does not end with a conclusion.")
-
-            check, msg = verifier.has_not_multiple_gists()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument has more than one gist.")
-
-            check, msg = verifier.has_no_duplicate_pcs_labels()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg
-                    if msg
-                    else "Argument has duplicate labels in the standard form."
-                )
-
+            for veri_fn in [
+                verifier.has_pcs,
+                verifier.ends_with_conclusion,
+                verifier.has_no_duplicate_pcs_labels,
+            ]:
+                check, msg = veri_fn()
+                if check is False:
+                    is_valid = False
+                    msgs.append(msg if msg else "Argument is illformed.")
             if msgs:
                 eval_data["illformed_argument"] = " ".join(msgs)
             del msgs
 
             # missing label/gist
             msgs = []
-
-            check, msg = verifier.has_label()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument lacks a label / title.")
-
-            check, msg = verifier.has_gist()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument lacks a gist / summary.")
-
+            for veri_fn in [
+                verifier.has_label,
+                verifier.has_gist,
+            ]:
+                check, msg = veri_fn()
+                if check is False:
+                    is_valid = False
+                    msgs.append(msg if msg else "Argument lacks a label or gist.")
             if msgs:
                 eval_data["missing_label_gist"] = " ".join(msgs)
             del msgs
@@ -339,38 +323,48 @@ class InfRecoJudge(Judge):
                     else "Unknown proposition references in inference information."
                 )
 
-            # disallowed material
-            msgs = []
+            # unused propositions
+            check, msg = verifier.uses_all_props()
+            if check is False:
+                is_valid = False
+                eval_data["unused_propositions"] = (
+                    msg if msg else "Some propositions are not used in any inference."
+                )
 
+            # disallowed material
             check, msg = verifier.no_extra_propositions()
             if check is False:
                 is_valid = False
-                msgs.append(
-                    msg if msg else "Argdown snippet contains extra propositions."
-                )
+                eval_data["disallowed_material"] = msg if msg else "Argdown snippet contains extra propositions."
 
-            check, msg = verifier.only_grounded_dialectical_relations()
+            # check for syntactically correct formalizations
+            check, msg = verifier.has_flawless_formalizations()
             if check is False:
                 is_valid = False
-                msgs.append(
-                    msg if msg else "Argdown snippet defines dialectical relations."
+                eval_data["flawed_formalizations"] = (
+                    msg if msg else "Formalizations are flawed."
                 )
 
-            check, msg = verifier.no_prop_inline_data()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg if msg else "Some propositions contain yaml inline data."
-                )
-
-            check, msg = verifier.no_arg_inline_data()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Some arguments contain yaml inline data.")
-
+            # check for valid inference
+            msgs = []
+            for veri_fn in [
+                verifier.is_globally_deductively_valid,
+                verifier.is_locally_deductively_valid
+            ]:
+                check, msg = veri_fn()
+                if check is False:
+                    is_valid = False
+                    msgs.append(msg if msg else "Invalid inference.")
             if msgs:
-                eval_data["disallowed_material"] = " ".join(msgs)
-            del msgs
+                eval_data["invalid_inference"] = "\n".join(msgs)
+
+            # check for redundant premises
+            check, msg = verifier.all_premises_relevant()
+            if check is False:
+                is_valid = False
+                eval_data["redundant_premises"] = (
+                    msg if msg else "Redundant premises in the argument."
+                )
 
         return Evaluation(
             is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
@@ -383,23 +377,23 @@ class InfRecoJudge(Judge):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> Sequence[Evaluation]:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert isinstance(original_solution, InformalReco) or original_solution is None
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+        assert isinstance(original_solution, LogicalReco) or original_solution is None
         assert feedback or original_solution is None, (
             "Feedback is required for evaluating revised solutions"
         )
 
         evaluations = []
         for solution in solutions:
-            assert isinstance(solution, InformalReco), (
-                "All solutions must be InformalReco objects"
+            assert isinstance(solution, LogicalReco), (
+                "All solutions must be LogicalReco objects"
             )
-            evaluations.append(self._evaluate_infreco(problem, solution))
+            evaluations.append(self._evaluate_logreco(problem, solution))
 
         return evaluations
 
 
-class InfRecoFeedbackGenerator(FeedbackGenerator):
+class LogRecoFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_solutions", 5)
@@ -412,8 +406,8 @@ class InfRecoFeedbackGenerator(FeedbackGenerator):
         solution: Solution,
         evaluation: Evaluation,
     ) -> list[Feedback]:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert isinstance(solution, InformalReco), "Solution must be an InformalReco"
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+        assert isinstance(solution, LogicalReco), "Solution must be an LogicalReco"
         assert not evaluation.is_valid, (
             "Can only generate feedback for invalid solutions"
         )
@@ -463,7 +457,7 @@ class InfRecoFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
+class LogRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the informal argument reconstruction task."""
 
     hints: list[str] = []
@@ -471,8 +465,8 @@ class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
     @abstractmethod
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         pass
@@ -485,13 +479,13 @@ class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> list[ChatPreferencePair]:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert all(isinstance(s, InformalReco) for s in candidate_solutions), (
-            "All solutions must be InformalReco objects"
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+        assert all(isinstance(s, LogicalReco) for s in candidate_solutions), (
+            "All solutions must be LogicalReco objects"
         )
         assert original_solution is None or isinstance(
-            original_solution, InformalReco
-        ), "Original solution must be an InformalReco"
+            original_solution, LogicalReco
+        ), "Original solution must be an LogicalReco"
         assert len(candidate_solutions) == len(evaluations), (
             "Number of solutions must match number of evaluations"
         )
@@ -499,7 +493,7 @@ class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         pairs: list[ChatPreferencePair] = []
 
         # rank valid argmaps according to the _score function
-        valid_recos: list[tuple[InformalReco, Evaluation]] = list(
+        valid_recos: list[tuple[LogicalReco, Evaluation]] = list(
             zip(candidate_solutions, evaluations)  # type: ignore
         )
         valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
@@ -540,36 +534,8 @@ class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         return pairs
 
 
-class NoUnusedPropsPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
-    with fewer unused premises or conclusions."""
-
-    hints = [
-        "In your argument reconstruction, make sure that every premise and every intermediate conclusion is "
-        "(explicitly) used in a subsequent inference. (Every unused premise or conclusion counts as a mistake.)"
-    ]
-
-    def _score(
-        self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
-        evaluation: Evaluation,
-    ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
-        argument = argdown.arguments[0]
-        used_labels = set()
-        for c in argument.pcs:
-            if isinstance(c, Conclusion):
-                used_labels.update(c.inference_data.get("from", []))
-        number_unused_props = sum(
-            1 for p in argument.pcs[:-1] if p.label not in used_labels
-        )
-
-        return (number_unused_props + 1) ** -1
-
-
 class ManyIntermediateConclusionsPreferencePairGenerator(
-    InfRecoVirtuePreferencePairGenerator
+    LogRecoVirtuePreferencePairGenerator
 ):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with more intermediate conclusions."""
@@ -581,8 +547,8 @@ class ManyIntermediateConclusionsPreferencePairGenerator(
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -595,7 +561,7 @@ class ManyIntermediateConclusionsPreferencePairGenerator(
 
 
 class FewIntermediateConclusionsPreferencePairGenerator(
-    InfRecoVirtuePreferencePairGenerator
+    LogRecoVirtuePreferencePairGenerator
 ):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with fewer intermediate conclusions."""
@@ -607,8 +573,8 @@ class FewIntermediateConclusionsPreferencePairGenerator(
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -620,7 +586,7 @@ class FewIntermediateConclusionsPreferencePairGenerator(
         return (number_intermediate_conclusions + 1) ** -1
 
 
-class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class IndependentWordingPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with independent wording of arguments and claims."""
 
@@ -631,8 +597,8 @@ class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGener
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -650,7 +616,7 @@ class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGener
         return round(sum(dlds) / len(dlds), 1) if dlds else 0
 
 
-class SourceTextProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class SourceTextProximityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco task, prefering valid argument recos
     that stick closely to the source text."""
 
@@ -660,19 +626,19 @@ class SourceTextProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGene
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         return round(
-            textdistance.damerau_levenshtein.normalized_similarity(
+                textdistance.damerau_levenshtein.normalized_similarity(
                 problem.sources, reco.argdown_snippet
             ),
-            1,
+            1
         )
 
 
-class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class SimplicityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with succinct and simple propositions."""
 
@@ -683,8 +649,8 @@ class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -696,9 +662,9 @@ class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
                 lengths.append(len(t))
 
         return round(sum(lengths) / len(lengths), -1) ** -1 if lengths else 0
+    
 
-
-class VerbosityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class VerbosityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with elaborate and verbose propositions."""
 
@@ -709,8 +675,8 @@ class VerbosityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -722,3 +688,5 @@ class VerbosityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
                 lengths.append(len(t))
 
         return round(sum(lengths) / len(lengths), -1) if lengths else 0
+
+

@@ -65,10 +65,10 @@ def _SMT_preamble(
 
 
 def _SMT_program(
-    premises_formalized_nltk: dict[int, Expression],
-    conclusion_formalized_nltk: dict[int, Expression],
-    intermediary_conclusions_formalized_nltk: dict[int, Expression] | None = None,
-    inference_tree: dict[int, list[int]] | None = None,
+    premises_formalized_nltk: dict[str, Expression],
+    conclusion_formalized_nltk: dict[str, Expression],
+    intermediary_conclusions_formalized_nltk: dict[str, Expression] | None = None,
+    inference_tree: dict[str, list[str]] | None = None,
 ) -> str:
     """SMT program to test validity of inferences.
     uses propositional_variables to decide whether lower-char var is
@@ -84,36 +84,36 @@ def _SMT_program(
             and inference_tree is None
         )
 
-    formulae_z3 = {}
-    for i, e in premises_formalized_nltk.items():
-        assert i not in formulae_z3
-        formulae_z3[i] = render_expression(e, Syntax.Z3)
-    for i, e in conclusion_formalized_nltk.items():
-        assert i not in formulae_z3
-        formulae_z3[i] = render_expression(e, Syntax.Z3)
+    formulae_z3: dict[str, Expression] = {}
+    for k, e in premises_formalized_nltk.items():
+        assert k not in formulae_z3
+        formulae_z3[k] = render_expression(e, Syntax.Z3)
+    for k, e in conclusion_formalized_nltk.items():
+        assert k not in formulae_z3
+        formulae_z3[k] = render_expression(e, Syntax.Z3)
     if intermediary_conclusions_formalized_nltk:
-        for i, e in intermediary_conclusions_formalized_nltk.items():
-            assert i not in formulae_z3
-            formulae_z3[i] = render_expression(e, Syntax.Z3)
+        for k, e in intermediary_conclusions_formalized_nltk.items():
+            assert k not in formulae_z3
+            formulae_z3[k] = render_expression(e, Syntax.Z3)
 
     smtlib_lines = []
-    for i, _ in premises_formalized_nltk.items():
+    for k, _ in premises_formalized_nltk.items():
         smtlib_lines.append(
-            f"(define-fun premise{i} () Bool {formulae_z3[i]})"
+            f"(define-fun premise{k} () Bool {formulae_z3[k]})"
         )
     if intermediary_conclusions_formalized_nltk:
-        for i, _ in intermediary_conclusions_formalized_nltk.items():
+        for k, _ in intermediary_conclusions_formalized_nltk.items():
             smtlib_lines.append(
-                f"(define-fun conclusion{i} () Bool {formulae_z3[i]})"
+                f"(define-fun conclusion{k} () Bool {formulae_z3[k]})"
             )
-    for i, _ in conclusion_formalized_nltk.items():
+    for k, _ in conclusion_formalized_nltk.items():
         smtlib_lines.append(
-            f"(define-fun conclusion{i} () Bool {formulae_z3[i]})"
+            f"(define-fun conclusion{k} () Bool {formulae_z3[k]})"
         )
 
     if inference_tree is None:
         smtlib_lines.append(
-            f"(define-fun argument () Bool (=> (and {' '.join([f'premise{i}' for i in premises_formalized_nltk.keys()])}) conclusion{list(conclusion_formalized_nltk.keys())[0]}))"
+            f"(define-fun argument () Bool (=> (and {' '.join([f'premise{k}' for k in premises_formalized_nltk.keys()])}) conclusion{list(conclusion_formalized_nltk.keys())[0]}))"
         )
         smtlib_lines.append("(assert (not argument))")
         smtlib_lines.append("(check-sat)")
@@ -121,7 +121,7 @@ def _SMT_program(
         for conclusion_ref, premises_refs in inference_tree.items():
             local_premises: list[str] = []
             for ref in premises_refs:
-                if ref in [i for i in premises_formalized_nltk.keys()]:
+                if ref in [k for k in premises_formalized_nltk.keys()]:
                     local_premises.append(f"premise{ref}")
                 else:
                     local_premises.append(f"conclusion{ref}")
@@ -138,16 +138,16 @@ def _SMT_program(
 
 
 def SMT_program_local(
-    premises_formalized_nltk: dict[int, Expression],
-    intermediary_conclusions_formalized_nltk: dict[int, Expression],
-    conclusion_formalized_nltk: dict[int, Expression],
-    inference_tree: dict[int, list[int]],
+    premises_formalized_nltk: dict[str, Expression],
+    intermediary_conclusions_formalized_nltk: dict[str, Expression],
+    conclusion_formalized_nltk: dict[str, Expression],
+    inference_tree: dict[str, list[str]],
     plchd_substitutions: list[list[str]],
 ) -> str:
     """SMT program to test validity of local inferences."""
     predicate_arities = {}
     propositional_variables = []
-    for expr in premises_formalized_nltk:
+    for _, expr in premises_formalized_nltk.items():
         predicate_arities.update(get_arities(expr))
         propositional_variables.extend(get_propositional_variables(expr))
     propositional_variables = list(set(propositional_variables))
@@ -167,15 +167,15 @@ def SMT_program_local(
 
 
 def SMT_program_global(
-    premises_formalized_nltk: dict[int, Expression],
-    conclusion_formalized_nltk: dict[int, Expression],
+    premises_formalized_nltk: dict[str, Expression],
+    conclusion_formalized_nltk: dict[str, Expression],
     plchd_substitutions: list[list[str]],
 ) -> str:
     """SMT program for to test validity of global inference.
     fromm all premises to the conclusion."""
     predicate_arities = {}
     propositional_variables = []
-    for expr in premises_formalized_nltk:
+    for _, expr in premises_formalized_nltk.items():
         predicate_arities.update(get_arities(expr))
         propositional_variables.extend(get_propositional_variables(expr))
     propositional_variables = list(set(propositional_variables))
@@ -192,11 +192,11 @@ def SMT_program_global(
 
 
 def check_validity_z3(
-    premises_formalized_nltk: dict[int, Expression],
-    conclusion_formalized_nltk: dict[int, Expression],
+    premises_formalized_nltk: dict[str, Expression],
+    conclusion_formalized_nltk: dict[str, Expression],
     plchd_substitutions: list[list[str]],
-):
-    """Executes the SMT-LIB code using Z3 solver."""
+) -> tuple[bool, str]:
+    """Generates and executes SMT2-LIB code using Z3 solver."""
     smtlib_code = SMT_program_global(
         premises_formalized_nltk=premises_formalized_nltk,
         conclusion_formalized_nltk=conclusion_formalized_nltk,
@@ -206,4 +206,4 @@ def check_validity_z3(
     ast = parse_smt2_string(smtlib_code)
     solver.add(ast)
     valid = (solver.check() == unsat)
-    return valid
+    return valid, smtlib_code
