@@ -178,6 +178,9 @@ def SMT_program_global(
     for _, expr in premises_formalized_nltk.items():
         predicate_arities.update(get_arities(expr))
         propositional_variables.extend(get_propositional_variables(expr))
+    for _, expr in conclusion_formalized_nltk.items():
+        predicate_arities.update(get_arities(expr))
+        propositional_variables.extend(get_propositional_variables(expr))
     propositional_variables = list(set(propositional_variables))
     preamble = _SMT_preamble(
         plchd_substitutions=plchd_substitutions,
@@ -202,7 +205,6 @@ def check_validity_z3(
         conclusion_formalized_nltk=conclusion_formalized_nltk,
         plchd_substitutions=plchd_substitutions,
     )
-    print(smtlib_code)
     solver = SimpleSolver()
     ast = parse_smt2_string(smtlib_code)
     solver.add(ast)

@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Any, Sequence
 
 from abc import abstractmethod
 import dataclasses
@@ -28,6 +28,7 @@ from argdown_hirpo.base import (
 )
 
 from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
+from argdown_hirpo.logic.fol_to_nl import FOL2NLTranslator
     
 
 
@@ -229,6 +230,7 @@ class LogRecoJudge(Judge):
         self, problem: LogRecoProblem, reco: LogicalReco
     ) -> Evaluation:
         is_valid = True
+        artifacts: dict[str, Any] = {}
         eval_data = {
             "fenced_code_block": "",
             "invalid_argdown_syntax": "",
@@ -242,6 +244,7 @@ class LogRecoJudge(Judge):
             "flawed_formalizations": "",  # missing, duplicate declarations etc. etc.
             "invalid_inference": "",  # invalid inference
             "redundant_premises": "",  # redundant premises
+            "inconsistent_premises": "",  # inconsistent premises
         }
 
         ads = reco.argdown_snippet.strip("\n ")
@@ -267,9 +270,13 @@ class LogRecoJudge(Judge):
             is_valid = False
             eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
 
+        artifacts["argdown"] = argdown
+
         if argdown:
 
             verifier = LogRecoVerifier(argdown)
+            artifacts["all_expressions"] = verifier.all_expressions
+            artifacts["all_declarations"] = verifier.all_declarations
 
             check, msg = verifier.has_unique_argument()
             if check is False:
@@ -366,8 +373,16 @@ class LogRecoJudge(Judge):
                     msg if msg else "Redundant premises in the argument."
                 )
 
+            # check for inconsistent premises
+            check, msg = verifier.premises_consistent()
+            if check is False:
+                is_valid = False
+                eval_data["inconsistent_premises"] = (
+                    msg if msg else "Argument's premises are logically inconsistent."
+                )
+
         return Evaluation(
-            is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
+            is_valid=is_valid, artifacts=artifacts, metrics=eval_data
         )
 
     async def arun(
@@ -688,5 +703,52 @@ class VerbosityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
                 lengths.append(len(t))
 
         return round(sum(lengths) / len(lengths), -1) if lengths else 0
+
+
+
+class FormalizationsFaithfulnessPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
+    with formalizations that are similiar to the sentences being formalized."""
+
+    hints = [
+        "Reconstriuct the argument in such a way that your logico-semantic analysis (formalizations and declarations) "
+        "coheres with the actual wording of the premises and conclusion(s). In particular, formalize your argument's "
+        "premises and conclusion(s) faithfully!"
+    ]
+
+    def _score(
+        self,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
+        evaluation: Evaluation,
+    ) -> float:
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argument = argdown.arguments[0]
+        all_expressions = evaluation.artifacts["all_expressions"]
+        all_declarations = evaluation.artifacts["all_declarations"]
+
+
+        dlds: list[float] = []
+        for pr in argument.pcs:
+            expression = next(
+                expr for exprl, expr in all_expressions.items() if exprl == pr.label
+            )
+            proposition = next(
+                p for p in argdown.propositions if p.label == pr.proposition_label
+            )
+
+            text_1 = FOL2NLTranslator.translate_to_nl_sentence(
+                expression, all_declarations
+            )
+
+            for text_2 in proposition.texts:
+                dlds.append(
+                    textdistance.damerau_levenshtein.normalized_similarity(
+                        text_1, text_2
+                    )
+                )
+
+        return round(sum(dlds) / len(dlds), 1) if dlds else 0
+
 
 

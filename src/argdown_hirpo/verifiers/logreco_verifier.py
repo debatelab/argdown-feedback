@@ -1,4 +1,4 @@
-from nltk.sem.logic import Expression  # type: ignore
+from nltk.sem.logic import Expression, NegatedExpression  # type: ignore
 from pyargdown import (
     Argdown,
     Conclusion,
@@ -219,6 +219,7 @@ class LogRecoVerifier(InfRecoVerifier):
         """
         Check if the final conclusion follows from a real subset of the premises.
         """
+        print("Checking relevance of premises...")
         if self.argument is None or not self.argument.pcs:
             return None, None
 
@@ -251,13 +252,57 @@ class LogRecoVerifier(InfRecoVerifier):
                     conclusion_formalized_nltk=expr_conclusion,
                     plchd_substitutions=[[k,v] for k,v in self.all_declarations.items()],
                 )
-                if not deductively_valid:
+                
+                if deductively_valid:
                     msgs.append(
                         f"According to the provided formalizations, premise ({k}) is not required to logically "
                         f"infer the final conclusion. SMT2LIB program used to check validity:\n {smtcode}\n"
                     )
             except Exception as e:
                 msgs.append(f"Failed to evaluate relevance of premise ({k}) with SMT2LIB/z3: {e}.")
+
+        if msgs:
+            return False, "\n".join(msgs)
+
+        return True, None
+
+
+    def premises_consistent(self) -> tuple[bool | None, str | None]:
+        """
+        Check if the argument's premises are consistent.
+
+        We are effectively testing if the premises {p1...pn} entail ¬p1, which is equivalent to
+        testing if the premises are consistent.
+        """
+        if self.argument is None or not self.argument.pcs:
+            return None, None
+
+        expr_premises: dict[str, Expression] = {}
+        for pr in self.argument.pcs:
+            if not isinstance(pr, Conclusion):
+                expr = self.all_expressions.get(pr.label)
+                if expr:
+                    expr_premises[pr.label] = expr
+
+        if not expr_premises:
+            return True, None
+
+        _key = next(iter(expr_premises))
+        _concl = NegatedExpression(expr_premises[_key])
+        expr_conclusion: dict[str, Expression] = {f"{_key}_neg": _concl}
+
+        try:
+            deductively_valid, smtcode = check_validity_z3(
+                premises_formalized_nltk=expr_premises,
+                conclusion_formalized_nltk=expr_conclusion,
+                plchd_substitutions=[[k,v] for k,v in self.all_declarations.items()],
+            )
+            if deductively_valid:
+                return False, (
+                    "According to the provided formalizations, the argument's premises are NOT logically consistent."
+                )
+        except Exception as e:
+            return False, f"Failed to evaluate premises' concistency with SMT2LIB/z3: {e}."
 
         return True, None
 

@@ -15,6 +15,7 @@ from argdown_hirpo.tasks.core.logreco import (
     SourceTextProximityPreferencePairGenerator,
     SimplicityPreferencePairGenerator,
     VerbosityPreferencePairGenerator,
+    FormalizationsFaithfulnessPreferencePairGenerator,
 )
 
 from .hirpo_tester import HirpoTester
@@ -76,6 +77,44 @@ def valid_recos(solution_class) -> list[Solution]:
             ```
             """)
         ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Argument 1>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+            (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+            -- {from: ["1", "2"]} --
+            (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Argument 1>: Animals have brain.
+
+            (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+            (2) What has big brain can suffer. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "can suffer"}}
+            -- {from: ["1", "2"]} --
+            (3) Animals suffer. {formalization: "all x.(F(x) -> H(x))"}
+            (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+            -- {from: ["3", "4"]} --
+            (5) Eating animals is wrong. {formalization: "forall x.(F(x) -> J(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Argument 1>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "all x.(R(x,a))", declarations: {"R": "experiences", "a": "suffering"}}
+            -- {from: ["1"]} --
+            (3) My animal suffers. {formalization: "R(b,a)", declarations: {"b": "my animal"}}
+            ```
+            """)
+        ),
     ]
 
 
@@ -86,9 +125,10 @@ def invalid_recos(solution_class) -> list[Solution]:
             argdown_snippet=textwrap.dedent("""
             <No opening codeblock>: Some gist.
 
-            (1) Animals suffer.
-            -- {from: ["1"]} --
-            (2) Eating animals is wrong.
+            (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+            (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+            -- {from: ["1", "2"]} --
+            (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
             ```
             """)
         ),
@@ -287,6 +327,115 @@ def invalid_recos(solution_class) -> list[Solution]:
             ```
             """)
         ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Unused premise>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+            (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+            (3) Everything has brain. {formalization: "all x.(I(x))", declarations: {"I": "Has brain"}}
+            -- {from: ["1", "2"]} --
+            (4) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Logically redundant premise>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+            (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+            (3) Everything suffers. {formalization: "all x.(G(x))"}
+            -- {from: ["1", "2", "3"]} --
+            (4) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Inconsistent premises>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+            (2) Some animals don't suffer. {formalization: "exists x.(F(x) & -G(x))"}
+            -- {from: ["1", "2"]} --
+            (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Single inconsistent premise>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "p & -p", declarations: {"p": "some prop"}}
+            -- {from: ["1"]} --
+            (2) Eating animals is wrong. {formalization: "p"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Non sequitur>: Globally, see Premise 2
+
+            (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+            (2) What has big brain can suffer. {formalization: "all x.(H(x) -> H(x))", declarations: {"H": "can suffer"}}
+            -- {from: ["1", "2"]} --
+            (3) Animals suffer. {formalization: "all x.(F(x) -> H(x))"}
+            (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+            -- {from: ["3", "4"]} --
+            (5) Eating animals is wrong. {formalization: "all x.(F(x) -> J(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Non sequitur>: Locally, see C3
+
+            (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+            (2) What has big brain can suffer. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "can suffer"}}
+            -- {from: ["1", "2"]} --
+            (3) Animals suffer. {formalization: "all x.(F(x) -> G(x))"}
+            (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+            -- {from: ["3", "4"]} --
+            (5) Eating animals is wrong. {formalization: "all x.(F(x) -> J(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Flawed formalization conclusion>: 3.
+
+            (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+            (2) What has big brain can suffer. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "can suffer"}}
+            -- {from: ["1", "2"]} --
+            (3) Animals suffer. {formalization: "all x.(F(x -> H(x))"}
+            (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+            -- {from: ["3", "4"]} --
+            (5) Eating animals is wrong. {formalization: "all x.(F(x) -> J(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Flawed formalization premise>: 1.
+
+            (1) Animals have big brain. {formalization: "no x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+            (2) What has big brain can suffer. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "can suffer"}}
+            -- {from: ["1", "2"]} --
+            (3) Animals suffer. {formalization: "all x.(F(x) -> H(x))"}
+            (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+            -- {from: ["3", "4"]} --
+            (5) Eating animals is wrong. {formalization: "all x.(F(x) -> J(x))"}
+            ```
+            """)
+        ),
     ]
 
 
@@ -415,7 +564,6 @@ async def test_revised_solution_generator(
     )
 
 
-@pytest.mark.skip()
 @pytest.mark.asyncio
 class TestInfRecoPreferencePairGenerators:
 
@@ -426,23 +574,25 @@ class TestInfRecoPreferencePairGenerators:
                 ManyIntermediateConclusionsPreferencePairGenerator,
                 """
                 ```argdown
-                <Suffering>: Animals suffer.
-                
-                (1) Animals suffer.
-                -- {from: ["1"]} --
-                (2) Eating animals is wrong.
-                -- {from: ["2"]} --
-                (3) Never eat meat.
+                <Argument 1>: Animals have brain.
+
+                (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+                (2) What has big brain can suffer. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "can suffer"}}
+                -- {from: ["1", "2"]} --
+                (3) Animals suffer. {formalization: "all x.(F(x) -> H(x))"}
+                (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+                -- {from: ["3", "4"]} --
+                (5) Eating animals is wrong. {formalization: "forall x.(F(x) -> J(x))"}
                 ```
                 """,
                 """
                 ```argdown
-                <Suffering>: Animals suffer.
-                
-                (1) Animals suffer.
-                (2) Eating animals is wrong.
-                -- {from: ["2"]} --
-                (3) Never eat meat.
+                <Argument 1>: Animals suffer.
+
+                (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+                (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+                -- {from: ["1", "2"]} --
+                (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
                 ```
                 """,
             ),
@@ -450,25 +600,27 @@ class TestInfRecoPreferencePairGenerators:
                 FewIntermediateConclusionsPreferencePairGenerator,
                 """
                 ```argdown
-                <Suffering>: Animals suffer.
-                
-                (1) Animals suffer.
-                (2) Eating animals is wrong.
-                -- {from: ["2"]} --
-                (3) Never eat meat.
+                <Argument 1>: Animals suffer.
+
+                (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+                (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+                -- {from: ["1", "2"]} --
+                (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
                 ```
                 """,
                 """
                 ```argdown
-                <Suffering>: Animals suffer.
-                
-                (1) Animals suffer.
-                -- {from: ["1"]} --
-                (2) Eating animals is wrong.
-                -- {from: ["2"]} --
-                (3) Never eat meat.
+                <Argument 1>: Animals have brain.
+
+                (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
+                (2) What has big brain can suffer. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "can suffer"}}
+                -- {from: ["1", "2"]} --
+                (3) Animals suffer. {formalization: "all x.(F(x) -> H(x))"}
+                (4) Eating what can suffer is wrong. {formalization: "all x.(H(x) -> J(x))", declarations: {"J": "eating it is wrong"}}
+                -- {from: ["3", "4"]} --
+                (5) Eating animals is wrong. {formalization: "forall x.(F(x) -> J(x))"}
                 ```
-                """,
+                """
             ),
             (
                 IndependentWordingPreferencePairGenerator,
@@ -476,18 +628,18 @@ class TestInfRecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>: Animals suffer.
                 
-                (1) Sentient beings have feelings.
+                (1) Sentient beings have feelings. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) It is just wrong to eat meat.
+                (2) It is just wrong to eat meat. {formalization: "p"}
                 ```
                 """,
                 """
                 ```argdown
                 <Suffering>: Animals suffer.
 
-                (1) Animals suffer. Animal farming causes climate change.
+                (1) Animals suffer. Animal farming causes climate change. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) We should stop eating meat.
+                (2) We should stop eating meat. {formalization: "p"}
                 ```
                 """
             ),
@@ -497,18 +649,18 @@ class TestInfRecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>: Animals suffer.
 
-                (1) Animals suffer. Animal farming causes climate change.
+                (1) Animals suffer. Animal farming causes climate change. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) We should stop eating meat.
+                (2) We should stop eating meat. {formalization: "p"}
                 ```
                 """,
                 """
                 ```argdown
                 <Suffering>: Animals suffer.
                 
-                (1) Sentient beings have feelings.
+                (1) Sentient beings have feelings. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) It is just wrong to eat meat.
+                (2) It is just wrong to eat meat. {formalization: "p"}
                 ```
                 """,
             ),
@@ -518,18 +670,18 @@ class TestInfRecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>: Animals suffer.
 
-                (1) Animals suffer.
+                (1) Animals suffer. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) Stop eating meat.
+                (2) Stop eating meat. {formalization: "p"}
                 ```
                 """,
                 """
                 ```argdown
                 <Suffering>: Animals suffer.
 
-                (1) Animals suffer. Animal farming causes climate change.
+                (1) Animals suffer. Animal farming causes climate change. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) We should stop eating meat.
+                (2) We should stop eating meat. {formalization: "p"}
                 ```
                 """
             ),
@@ -539,20 +691,43 @@ class TestInfRecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>: Animals suffer.
 
-                (1) Animals suffer. Animal farming causes climate change.
+                (1) Animals suffer. Animal farming causes climate change. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) We should stop eating meat.
+                (2) We should stop eating meat. {formalization: "p"}
                 ```
                 """,
                 """
                 ```argdown
                 <Suffering>: Animals suffer.
 
-                (1) Animals suffer.
+                (1) Animals suffer. {formalization: "p or p", declarations: {"p": "p"}}
                 -- {from: ["1"]} --
-                (2) Stop eating meat.
+                (2) Stop eating meat. {formalization: "p"}
                 ```
                 """,
+            ),
+            (
+                FormalizationsFaithfulnessPreferencePairGenerator,
+                """
+                ```argdown
+                <Argument 1>: Animals suffer.
+
+                (1) Every animal is a being that can suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "animal", "G": "a being that can suffer"}}
+                (2) Whatever is a being that can suffer must not be eaten. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "something that must not be eaten"}}
+                -- {from: ["1", "2"]} --
+                (3) Every animal is a being that must not be eaten. {formalization: "all x.(F(x) -> H(x))"}
+                ```
+                """,
+                """
+                ```argdown
+                <Argument 1>: Animals suffer.
+
+                (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "animal", "G": "a being that can suffer"}}
+                (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "something that must not be eaten"}}
+                -- {from: ["1", "2"]} --
+                (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+                ```
+                """,                
             ),
         ],
     )
