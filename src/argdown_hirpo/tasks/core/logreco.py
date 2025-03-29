@@ -27,6 +27,7 @@ from argdown_hirpo.base import (
     VirtuePreferencePairGenerator,
 )
 
+from argdown_hirpo.logic.logic import get_propositional_variables
 from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
 from argdown_hirpo.logic.fol_to_nl import FOL2NLTranslator
     
@@ -711,7 +712,7 @@ class FormalizationsFaithfulnessPreferencePairGenerator(LogRecoVirtuePreferenceP
     with formalizations that are similiar to the sentences being formalized."""
 
     hints = [
-        "Reconstriuct the argument in such a way that your logico-semantic analysis (formalizations and declarations) "
+        "Reconstruct the argument in such a way that your logico-semantic analysis (formalizations and declarations) "
         "coheres with the actual wording of the premises and conclusion(s). In particular, formalize your argument's "
         "premises and conclusion(s) faithfully!"
     ]
@@ -749,6 +750,28 @@ class FormalizationsFaithfulnessPreferencePairGenerator(LogRecoVirtuePreferenceP
                 )
 
         return round(sum(dlds) / len(dlds), 1) if dlds else 0
+
+
+class PredicateLogicPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
+    with formalizations that use but predicate logic."""
+
+    hints = [
+        "Formalize the premises and conclusions in your argument reconstruction "
+        "using predicate logic. Avoid using propositional logic! No propositional variables!"
+    ]
+
+    def _score(
+        self,
+        problem: LogRecoProblem,
+        reco: LogicalReco,
+        evaluation: Evaluation,
+    ) -> float:
+        all_expressions = evaluation.artifacts["all_expressions"]
+        if not all_expressions:
+            return 0
+        n_has_prop_vars = sum(bool(get_propositional_variables(expr)) for expr in all_expressions.values())
+        return 1 - (n_has_prop_vars / len(all_expressions))
 
 
 
