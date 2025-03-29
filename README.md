@@ -46,3 +46,58 @@ flowchart LR
      chosen: s2
      rejected: s1
 ```
+
+### DAG
+
+
+```mermaid
+flowchart LR
+
+%%Top comprehensive tasks%%
+
+
+T1{{➡ArgMap+ArgAnno+LogReco}}
+
+T2{{➡ArgMap+ArgAnno}}
+T3{{➡ArgAnno+LogReco}}
+T4{{➡ArgMap+LogReco}}
+T9{{➡ArgAnno+InfReco}}
+T10{{➡ArgMap+InfReco}}
+
+T5((➡ArgMap))
+T6((➡ArgAnno))
+T7((➡LogReco))
+T8((➡InfReco))
+
+T1 --> T2 
+T1 --> T3 --> T9
+T1 --> T4 --> T10
+
+T2 --> T5
+T2 --> T6
+T3 --> T6
+T3 --> T7
+T4 --> T5
+T4 --> T7
+T9 --> T6
+T9 --> T8
+T10 --> T5
+T10 --> T8
+
+SE1[[ArgAnno➡ArgMap]]
+T2 --> SE1 --> T6
+
+SE2[[ArgMap➡ArgAnno]]
+T2 --> SE2 --> T5
+
+%%Logical reconstruction exercises%%
+
+SE3[[ArgAnno➡InfReco]]
+T8 --> SE3 --> T6
+
+
+SE4[[InfReco➡LogReco]]
+T7 --> SE4 --> T8
+
+```
+

@@ -167,6 +167,11 @@ class ProblemGenerator(HIRAbstractGenerator):
         pass
 
 
+class ProblemGeneratorLLM(HIRAbstractGeneratorLLM, ProblemGenerator):
+    """Generates a problem."""
+
+
+
 class SolutionGenerator(HIRAbstractGeneratorLLM):
     """Generates solutions."""
 

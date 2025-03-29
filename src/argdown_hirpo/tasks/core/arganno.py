@@ -198,6 +198,29 @@ class AnnotationSolutionGenerator(SolutionGenerator):
 class AnnotationJudge(Judge):
     """Judge for the annotation task."""
 
+    def parse_xml_snippet(self, annotated_source_text: str) -> tuple[BeautifulSoup, str | None]:
+
+        error_msg: str | None = None
+        ast = annotated_source_text.strip("\n ")
+        if ast.startswith("```xml") and ast.endswith("```"):
+            ast = "\n".join(ast.splitlines()[1:-1])
+        else: # no fenced code block
+            error_msg = "Failed to extract single fenced annotation block:"
+            if ast.count("```xml") == 0:
+                error_msg += " No fenced code block starting with '```xml'."
+            if ast.count("```xml") > 1:
+                error_msg += " More than one fenced code block starting with '```xml'."
+            if "```\n" not in ast:
+                error_msg += " No closing '```'."
+
+        multi_valued_attributes = {"*": {"supports", "attacks"}}
+        soup = BeautifulSoup(
+            ast,
+            "html.parser",
+            multi_valued_attributes=multi_valued_attributes,
+        )
+        return soup, error_msg
+
     def _evaluate_annotation(
         self, problem: AnnotationProblem, annotation: Annotation
     ) -> Evaluation:
@@ -212,26 +235,12 @@ class AnnotationJudge(Judge):
             "unknown_attributes": "",
         }
 
-        ast = annotation.annotated_source_text.strip("\n ")
-        if ast.startswith("```xml") and ast.endswith("```"):
-            ast = "\n".join(ast.splitlines()[1:-1])
-        else: # no fenced code block
+        # parse xml
+        soup, error_msg = self.parse_xml_snippet(annotation.annotated_source_text)
+        if error_msg:
             is_valid = False
-            error_msg = "Failed to extract single fenced annotation block:"
-            if ast.count("```xml") == 0:
-                error_msg += " No fenced code block starting with '```xml'."
-            if ast.count("```xml") > 1:
-                error_msg += " More than one fenced code block starting with '```xml'."
-            if "```\n" not in ast:
-                error_msg += " No closing '```'."
             eval_data["fenced_code_block"] = error_msg
-
-        multi_valued_attributes = {"*": {"supports", "attacks"}}
-        soup = BeautifulSoup(
-            ast,
-            "html.parser",
-            multi_valued_attributes=multi_valued_attributes,
-        )
+        del error_msg
 
         # Source text must not be altered (except for annotations and white space)
         lines_o = " ".join(problem.sources.split()).splitlines(keepends=True)

@@ -1,24 +1,32 @@
 import pytest
 
 
-from argdown_hirpo.base import Evaluation, Feedback, Problem, Solution
+from argdown_hirpo.base import Evaluation, Feedback, Problem, Solution, HIRAbstractGeneratorLLM
 
 
 class HirpoTester:
-
     @staticmethod
     async def test_problem_generator(
-        problem_generator_class, problem_class, source_texts
+        problem_generator_class,
+        problem_class,
+        source_texts,
+        model_kwargs=None,
+        keeps_source_texts=True,
     ):
-        pg = problem_generator_class()
+        pg = (
+            problem_generator_class()
+            if model_kwargs is None
+            else problem_generator_class(**model_kwargs)
+        )
         problem = await pg.arun(source_texts)
         assert isinstance(problem, problem_class)
 
         print(problem.instruct_prompt())
         print(problem.revise_prompt())
 
-        assert source_texts[0] in problem.instruct_prompt()
-        assert source_texts[0] in problem.instruct_prompt(ask_for_invalid=True)
+        if keeps_source_texts:
+            assert source_texts[0] in problem.instruct_prompt()
+            assert source_texts[0] in problem.instruct_prompt(ask_for_invalid=True)
         assert "super cool hint" in problem.instruct_prompt(hints=["super cool hint"])
 
         assert "!WARNING" in problem.instruct_prompt(ask_for_invalid=True)
@@ -50,9 +58,12 @@ class HirpoTester:
         solution_generator_class,
         solution_class,
         source_texts,
-        model_kwargs
+        model_kwargs,
     ):
-        pg = problem_generator_class()
+        if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
+            pg = problem_generator_class(**model_kwargs)
+        else:
+            pg = problem_generator_class()
         sg = solution_generator_class(
             n_solutions=1, **model_kwargs
         )  # lmstudio server does not support param n
@@ -66,13 +77,14 @@ class HirpoTester:
 
     @staticmethod
     async def test_judge_valid(
-        problem_generator_class,
-        judge_class,
-        valid_recos,
-        source_texts
+        problem_generator_class, judge_class, valid_recos, source_texts, model_kwargs = None
     ):
         source_text = source_texts[0]
-        pg = problem_generator_class()
+        if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
+            assert model_kwargs is not None, "model_kwargs must be provided for HIRAbstractGeneratorLLM"
+            pg = problem_generator_class(**model_kwargs)
+        else:
+            pg = problem_generator_class()
         problem = await pg.arun(source_text)
         judge = judge_class()
         evaluations = await judge.arun(problem, valid_recos)
@@ -88,13 +100,14 @@ class HirpoTester:
 
     @staticmethod
     async def test_judge_invalid(
-        problem_generator_class,
-        judge_class,
-        invalid_recos,
-        source_texts
+        problem_generator_class, judge_class, invalid_recos, source_texts, model_kwargs = None
     ):
         source_text = source_texts[0]
-        pg = problem_generator_class()
+        if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
+            assert model_kwargs is not None, "model_kwargs must be provided for HIRAbstractGeneratorLLM"
+            pg = problem_generator_class(**model_kwargs)
+        else:
+            pg = problem_generator_class()
         problem = await pg.arun(source_text)
         judge = judge_class()
         evaluations = await judge.arun(problem, invalid_recos)
@@ -116,10 +129,14 @@ class HirpoTester:
         feedback_generator_class,
         invalid_recos,
         source_texts,
-        model_kwargs
+        model_kwargs,
     ):
         source_text = source_texts[0]
-        pg = problem_generator_class()
+        if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
+            assert model_kwargs is not None, "model_kwargs must be provided for HIRAbstractGeneratorLLM"
+            pg = problem_generator_class(**model_kwargs)
+        else:
+            pg = problem_generator_class()
         problem = await pg.arun(source_text)
 
         judge = judge_class()
@@ -144,10 +161,14 @@ class HirpoTester:
         solution_class,
         invalid_recos,
         source_texts,
-        model_kwargs
+        model_kwargs,
     ):
         source_text = source_texts[0]
-        pg = problem_generator_class()
+        if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
+            assert model_kwargs is not None, "model_kwargs must be provided for HIRAbstractGeneratorLLM"
+            pg = problem_generator_class(**model_kwargs)
+        else:
+            pg = problem_generator_class()
         problem = await pg.arun(source_text)
         original_solution = invalid_recos[-1]
 
@@ -169,4 +190,3 @@ class HirpoTester:
         revised_solution = revised_solutions[0]
         print(revised_solution)
         assert isinstance(revised_solution, solution_class)
-
