@@ -8,13 +8,10 @@ import textdistance
 
 from pyargdown import (
     ArgdownMultiDiGraph,
-    Argument,
     Conclusion,
-    DialecticalType,
     Proposition,
     parse_argdown,
 )
-from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.base import (
     Problem,
