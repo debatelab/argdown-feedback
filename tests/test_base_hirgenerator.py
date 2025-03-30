@@ -24,7 +24,7 @@ class NumberProblem(Problem):
         self.number = number
 
     def instruct_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation: Evaluation | None = None
     ) -> str:
         prompt = f"Even: {self.number}? (y/n)"
         if ask_for_invalid:
@@ -34,7 +34,7 @@ class NumberProblem(Problem):
         return prompt
 
     def revise_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation: Evaluation | None = None
     ) -> str:
         prompt = "Revise your answer given the feedback."
         if ask_for_invalid:

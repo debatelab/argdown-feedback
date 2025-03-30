@@ -1,7 +1,6 @@
 from abc import abstractmethod
 import dataclasses
-from difflib import unified_diff
-from textwrap import dedent, shorten
+from textwrap import dedent
 from typing import Sequence
 
 from bs4 import BeautifulSoup
@@ -19,6 +18,7 @@ from argdown_hirpo.base import (
     FeedbackGenerator,
     VirtuePreferencePairGenerator,
 )
+from argdown_hirpo.verifiers.arganno_verifier import ArgAnnoVerifier
 
 ANNOTATION_SCHEME = dedent("""
     <!ELEMENT proposition   (#PC-DATA)                          -- single element marking a (sub-)sentence involved in the argumentation -->
@@ -242,90 +242,55 @@ class AnnotationJudge(Judge):
             eval_data["fenced_code_block"] = error_msg
         del error_msg
 
-        # Source text must not be altered (except for annotations and white space)
-        lines_o = " ".join(problem.sources.split()).splitlines(keepends=True)
-        lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
-        lines_o = [line for line in lines_o if line.strip()]
-        lines_a = [line for line in lines_a if line.strip()]
+        verifier = ArgAnnoVerifier(problem.sources, soup)
 
-        diff = list(unified_diff(lines_o, lines_a, n=0))
-        if diff:
+        # Source text must not be altered
+        check, error_msg = verifier.source_text_not_altered()
+        if check is False:
             is_valid = False
-            eval_data["altered_source_text"] = (
-                "Source text was altered. Diff:\n" + "".join(diff)
-            )
+            eval_data["altered_source_text"] = error_msg if error_msg else "Source text was altered"
 
         # No nested proposition annotations
-        for proposition in soup.find_all("proposition"):
-            if proposition.find_all("proposition"):  # type: ignore
-                is_valid = False
-                eval_data["nested_propositions"] = (
-                    f"Nested annotations in proposition '{shorten(str(proposition), 256)}'"
-                )
-                break
+        check, error_msg = verifier.no_nested_proposition_annotations()
+        if check is False:
+            is_valid = False
+            eval_data["nested_propositions"] = error_msg if error_msg else "Nested proposition annotations"
 
         # Every proposition must have an id
-        for proposition in soup.find_all("proposition"):
-            if not proposition.get("id"):  # type: ignore
-                is_valid = False
-                eval_data["missing_id"] = (
-                    f"Missing id in proposition '{shorten(str(proposition), 64)}'"
-                )
-                break
+        check, error_msg = verifier.every_proposition_has_id()
+        if check is False:
+            is_valid = False
+            eval_data["missing_id"] = error_msg if error_msg else "Missing id in proposition"
 
         # Every proposition must have a unique id
-        ids = [
-            proposition.get("id")  # type: ignore
-            for proposition in soup.find_all("proposition")
-        ]  # type: ignore
-        duplicates = {id for id in ids if ids.count(id) > 1}
-        if duplicates:
+        check, error_msg = verifier.every_proposition_has_unique_id()
+        if check is False:
             is_valid = False
-            eval_data["duplicate_id"] = f"Duplicate ids: {duplicates}"
+            eval_data["duplicate_id"] = error_msg if error_msg else "Duplicate ids"
 
         # Every "supports" reference must be a valid id
-        for proposition in soup.find_all("proposition"):
-            for support in proposition.get("supports", []):  # type: ignore
-                if support not in ids:
-                    is_valid = False
-                    eval_data["invalid_support_ids"] = (
-                        f"Supported proposition with id '{support}' in proposition '{shorten(str(proposition), 64)}' does not exist"
-                    )
-                    break
+        check, error_msg = verifier.every_support_reference_is_valid()
+        if check is False:
+            is_valid = False
+            eval_data["invalid_support_ids"] = error_msg if error_msg else "Invalid support ids"
 
         # Every "attacks" reference must be a valid id
-        for proposition in soup.find_all("proposition"):
-            for attack in proposition.get("attacks", []):  # type: ignore
-                if attack not in ids:
-                    is_valid = False
-                    eval_data["invalid_attack_ids"] = (
-                        f"Attacked proposition with id '{attack}' in proposition '{shorten(str(proposition), 64)}' does not exist"
-                    )
-                    break
+        check, error_msg = verifier.every_attack_reference_is_valid()
+        if check is False:
+            is_valid = False
+            eval_data["invalid_attack_ids"] = error_msg if error_msg else "Invalid attack ids"
 
         # No unknown attributes
-        for proposition in soup.find_all("proposition"):
-            for attr in proposition.attrs:  # type: ignore
-                if attr not in {
-                    "id",
-                    "supports",
-                    "attacks",
-                    "argument_label",
-                    "ref_reco_label",
-                }:
-                    is_valid = False
-                    eval_data["unknown_attributes"] = (
-                        f"Unknown attribute '{attr}' in proposition '{shorten(str(proposition), 64)}'"
-                    )
-                    break
+        check, error_msg = verifier.no_unknown_attributes()
+        if check is False:
+            is_valid = False
+            eval_data["unknown_attributes"] = error_msg if error_msg else "Unknown attributes"
 
         # No unknown elements
-        for element in soup.find_all():
-            if element.name not in {"proposition"}:  # type: ignore
-                is_valid = False
-                eval_data["unknown_elements"] = (
-                    f"Unknown element '{element.name}' at '{shorten(str(element), 64)}'"  # type: ignore
-                )
+        check, error_msg = verifier.no_unknown_elements()
+        if check is False:
+            is_valid = False
+            eval_data["unknown_elements"] = error_msg if error_msg else "Unknown elements"
 
         return Evaluation(
             is_valid=is_valid,

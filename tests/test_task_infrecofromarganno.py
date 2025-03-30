@@ -356,6 +356,7 @@ async def test_solution_generator(
     )
 
 
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 @pytest.mark.asyncio
 async def test_judge_valid(
     problem_generator_class,
@@ -373,6 +374,7 @@ async def test_judge_valid(
     )
 
 
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 @pytest.mark.asyncio
 async def test_judge_invalid(
     problem_generator_class,

@@ -267,59 +267,71 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
         )
         pairs: list[ChatPreferencePair] = []
 
-        # iterate over all pairs of candidate solutions and count the number of
-        # error types i avoids and j commits
-        failures_avoided: dict[tuple, int] = {}
-        for i in range(len(candidate_solutions)):
-            for j in range(len(candidate_solutions)):
-                fdiff = len([
-                    key for key in evaluations[i].metrics.keys()
-                    if not evaluations[i].metrics[key] and evaluations[j].metrics[key]
-                ])
-                failures_avoided[(i, j)] = fdiff
+        # count error types
+        error_counts: dict[str, int] = {}
+        for key in evaluations[0].metrics.keys():
+            error_counts[key] = len([1 for e in evaluations if e.metrics[key]])
+        # dismiss errors that are never avoided, i.e. always present
+        error_counts = {k: v for k, v in error_counts.items() if v < len(evaluations)}
 
-        # get the two solutions with the most different failure types
-        if len(failures_avoided) > 0:
-            max_pair = max(
-                failures_avoided,
-                key=lambda x: failures_avoided[x],
+        if not error_counts:
+            return pairs
+
+        # get error type that is most common
+        most_common_type, _ = max(
+            error_counts.items(),
+            key=lambda x: x[1],
+        )
+
+        # chosen solution avoids most common error
+        chosen_idx = random.choice(
+            [
+                idx
+                for idx, eval in enumerate(evaluations)
+                if not eval.metrics[most_common_type]
+            ]
+        )
+        # rejected solution commits most common error
+        rejected_idx = random.choice(
+            [
+                idx
+                for idx, eval in enumerate(evaluations)
+                if eval.metrics[most_common_type]
+            ]
+        )
+
+        # list all errors avoided by the chosen solution
+        errors_avoided = {
+            k: v for k, v in evaluations[rejected_idx].metrics.items()
+            if v and not evaluations[chosen_idx].metrics[k]
+        }
+
+        hint = (
+            self.avoid_errors_hint
+            + "\n".join(f"- {k}: {v}" for k, v in errors_avoided.items())
+        )
+
+        pairs.append(
+            ChatPreferencePair(
+                chosen=ProblemSolutionChat(
+                    problem=problem,
+                    solution=candidate_solutions[chosen_idx],
+                    feedback=feedback,
+                    original_solution=original_solution,
+                ).as_chat(hints=[hint]),
+                rejected=ProblemSolutionChat(
+                    problem=problem,
+                    solution=candidate_solutions[rejected_idx],
+                    feedback=feedback,
+                    original_solution=original_solution,
+                ).as_chat(hints=[hint]),
             )
-            if failures_avoided[max_pair] == 0:
-                return pairs
-
-            chosen_idx, rejected_idx = max_pair
-
-            errors_avoided = {
-                k: v for k, v in evaluations[rejected_idx].metrics.items()
-                if v and not evaluations[chosen_idx].metrics[k]
-            }
-
-            hint = (
-                self.avoid_errors_hint
-                + "\n".join(f"- {k}: {v}" for k, v in errors_avoided.items())
-            )
-
-            pairs.append(
-                ChatPreferencePair(
-                    chosen=ProblemSolutionChat(
-                        problem=problem,
-                        solution=candidate_solutions[chosen_idx],
-                        feedback=feedback,
-                        original_solution=original_solution,
-                    ).as_chat(hints=[hint]),
-                    rejected=ProblemSolutionChat(
-                        problem=problem,
-                        solution=candidate_solutions[rejected_idx],
-                        feedback=feedback,
-                        original_solution=original_solution,
-                    ).as_chat(hints=[hint]),
-                )
-            )
+        )
 
         return pairs
 
 
-# MAIN GENERATOR
+# MAIN GENERATORS
 ######################
 
 
@@ -574,3 +586,27 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             )
 
         return pairs
+
+
+
+class HIREvaluator(HIRAbstractGenerator):
+    def __init__(
+        self,
+        problem_generator: ProblemGenerator,
+        solution_generator: SolutionGenerator,
+        judge: Judge,
+        **kwargs,
+    ):
+        self.problem_generator = problem_generator
+        self.solution_generator = solution_generator
+        self.judge = judge
+        for k, v in kwargs.items():
+            setattr(self, k, v)
+
+    async def arun(self, inputs) -> float:
+        """evaluate inputs and returns average accuracy of the candidate solutions"""
+        problem = await self.problem_generator.arun(inputs)
+        candidate_solutions = await self.solution_generator.arun(problem)
+        evaluations = await self.judge.arun(problem, candidate_solutions)
+        accuracy = sum(int(e.is_valid) for e in evaluations) / len(evaluations)
+        return accuracy

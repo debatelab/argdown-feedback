@@ -30,6 +30,7 @@ from argdown_hirpo.base import (
     FeedbackGenerator,
     VirtuePreferencePairGenerator,
 )
+from argdown_hirpo.verifiers.argmap_verifier import ArgMapVerifier
 
 
 class ArgMapProblem(Problem):
@@ -243,42 +244,29 @@ class ArgMapJudge(Judge):
             is_valid = False
             eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
 
-        if argdown:
-            incomplete_claims: list[str] = []
-            for claim in argdown.propositions:
-                assert isinstance(claim, Proposition)
-                if ArgdownParser.is_unlabeled(claim):
-                    if not claim.texts or not claim.texts[0]:
-                        incomplete_claims.append("Empty claim")
-                    else:
-                        incomplete_claims.append(shorten(claim.texts[0], width=40))
-            if incomplete_claims:
-                is_valid = False
-                eval_data["missing_claim_labels"] = (
-                    f"Missing labels for nodes: {', '.join(incomplete_claims)}"
-                )
+        if not argdown:
+            return Evaluation(
+                is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
+            )
 
-            duplicate_labels: list[str] = []
-            for claim in argdown.propositions:
-                if len(claim.texts) > 1 and claim.label:
-                    duplicate_labels.append(claim.label)
-            for argument in argdown.arguments:
-                if len(argument.gists) > 1 and argument.label:
-                    duplicate_labels.append(argument.label)
-            if duplicate_labels:
-                is_valid = False
-                eval_data["duplicate_labels"] = (
-                    f"Duplicate labels: {', '.join(duplicate_labels)}"
-                )
+        verifier = ArgMapVerifier(argdown)
 
-            for argument in argdown.arguments:
-                assert isinstance(argument, Argument)
-                if argument.pcs:
-                    is_valid = False
-                    eval_data["premise_conclusion_structures"] = (
-                        f"Found detailed reconstruction of individual argument <{argument.label}> as premise-conclusion-structures."
-                    )
-                    break
+        check, msg = verifier.has_complete_claims()
+        if check is False:
+            is_valid = False
+            eval_data["missing_claim_labels"] = msg if msg else "Missing claim labels"
+
+        check, msg = verifier.has_no_duplicate_labels()
+        if check is False:
+            is_valid = False
+            eval_data["duplicate_labels"] = msg if msg else "Has duplicate labels"
+
+        check, msg = verifier.has_no_pcs()
+        if check is False:
+            is_valid = False
+            eval_data["premise_conclusion_structures"] = (
+                msg if msg else "Found detailed reconstruction of individual arguments as premise-conclusion-structures."
+            )
 
         return Evaluation(
             is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
