@@ -496,3 +496,51 @@ class TestInfRecoPreferencePairGenerators:
         assert len(cpps) == 1
         assert am_c in cpps[0]["chosen"][-1]["content"]
         assert am_r in cpps[0]["rejected"][-1]["content"]
+
+
+@pytest.mark.asyncio
+class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
+
+    @pytest.mark.parametrize(
+        "chosen,rejected",
+        [
+            (
+                """
+                ```argdown
+                <Argument>: With empty from list.
+
+                (1) Animals suffer.
+                -- {from: []} --
+                (2) Eating animals is wrong.
+                ```
+                """,
+                """
+                ```argdown
+                <Argument>: With empty from list.
+
+                (1) Animals suffer.
+                -- {from: []} --
+                (1) Eating animals is wrong.
+                ```
+                """,
+            ),
+        ],
+    )
+    async def test_preference_pair_generator(
+        self,
+        problem_class,
+        solution_class,
+        judge_class,
+        source_texts,
+        chosen,
+        rejected,
+    ):
+        
+        await HirpoTester.test_generic_failure_type_preference_generator(
+            problem_class,
+            solution_class,
+            judge_class,
+            source_texts,
+            chosen,
+            rejected,
+        )        

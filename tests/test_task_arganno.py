@@ -17,6 +17,7 @@ from argdown_hirpo.tasks.core.arganno import(
     AnnotationNoAttacksPreferencePairGenerator,
     AnnotationCoveragePreferencePairGenerator,
 )
+from tests.hirpo_tester import HirpoTester
 
 
 MODEL_KWARGS = {
@@ -40,6 +41,33 @@ def llm_available() -> bool:
     except Exception as e:
         warnings.warn(UserWarning(f"Could not connect to local inference server {base_url} (Error: {e})"))
         return False
+
+
+@pytest.fixture
+def problem_class():
+    return AnnotationProblem
+
+@pytest.fixture
+def problem_generator_class():
+    return AnnotationProblemGenerator
+
+@pytest.fixture
+def solution_class():
+    return Annotation
+
+@pytest.fixture
+def solution_generator_class():
+    return AnnotationSolutionGenerator
+
+@pytest.fixture
+def judge_class():
+    return AnnotationJudge
+
+@pytest.fixture
+def feedback_generator_class():
+    return AnnotationFeedbackGenerator
+
+
 
 
 @pytest.fixture
@@ -450,3 +478,47 @@ class TestAnnotationPreferencePairGenerators:
         assert len(cpps) == 1
         assert anno02 in cpps[0]['chosen'][-1]["content"]
         assert anno01 in cpps[0]['rejected'][-1]["content"]
+
+
+@pytest.mark.asyncio
+class TestArgannoFailureTypePreferencePairGenerator:
+
+    @pytest.mark.parametrize(
+        "chosen,rejected",
+        [
+            (
+                """
+                ```xml
+                <proposition id="1">We should stop eating meat.</proposition>
+                                
+                <proposition id="2">Animals suffer.</proposition> <proposition id="2" supports="1 2">Animal farming causes climate change.</proposition>
+                ```
+                """,
+                """
+                ```xml
+                <proposition id="1">We should stop eating meat.</proposition>
+                                
+                <proposition id="2">Animals suffer.</proposition> <proposition id="2" supports="1 4">Animal farming causes climate change.</proposition>
+                ```
+                """,
+            ),
+        ],
+    )
+    async def test_preference_pair_generator(
+        self,
+        problem_class,
+        solution_class,
+        judge_class,
+        source_texts,
+        chosen,
+        rejected,
+    ):
+        
+        await HirpoTester.test_generic_failure_type_preference_generator(
+            problem_class,
+            solution_class,
+            judge_class,
+            source_texts,
+            chosen,
+            rejected,
+        )        

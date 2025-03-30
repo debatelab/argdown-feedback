@@ -24,6 +24,7 @@ from argdown_hirpo.base import (
     SolutionGenerator,
     Judge,
     FeedbackGenerator,
+    FailureTypePreferencePairGenerator,
     VirtuePreferencePairGenerator,
 )
 from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
@@ -459,7 +460,7 @@ class InfRecoFeedbackGenerator(FeedbackGenerator):
 
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
-
+                        
 class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the informal argument reconstruction task."""
 

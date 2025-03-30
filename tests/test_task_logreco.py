@@ -786,3 +786,56 @@ class TestInfRecoPreferencePairGenerators:
         assert len(cpps) == 1
         assert am_c in cpps[0]["chosen"][-1]["content"]
         assert am_r in cpps[0]["rejected"][-1]["content"]
+
+
+
+@pytest.mark.asyncio
+class TestLogRecoFailureTypePreferencePairGenerator:
+
+    @pytest.mark.parametrize(
+        "chosen,rejected",
+        [
+            (
+                """
+                ```argdown
+                <Logically redundant premise>: Animals suffer.
+
+                (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+                (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+                (3) Everything suffers. {formalization: "all x.(G(x))"}
+                -- {from: ["1", "2", "3"]} --
+                (4) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+                ```
+                """,
+                """
+                ```argdown
+                <Logically redundant premise>
+
+                (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
+                (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+                (3) Everything suffers. {formalization: "all x.(G(x))"}
+                -- {from: ["1", "2", "3"]} --
+                (4) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+                ```
+                """,
+            ),
+        ],
+    )
+    async def test_preference_pair_generator(
+        self,
+        problem_class,
+        solution_class,
+        judge_class,
+        source_texts,
+        chosen,
+        rejected,
+    ):
+        
+        await HirpoTester.test_generic_failure_type_preference_generator(
+            problem_class,
+            solution_class,
+            judge_class,
+            source_texts,
+            chosen,
+            rejected,
+        )        

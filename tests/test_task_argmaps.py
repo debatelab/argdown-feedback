@@ -660,3 +660,50 @@ class TestArgMapPreferencePairGenerators:
         assert len(cpps) == 1
         assert am_c in cpps[0]["chosen"][-1]["content"]
         assert am_r in cpps[0]["rejected"][-1]["content"]
+
+
+
+@pytest.mark.asyncio
+class TestArgmapsFailureTypePreferencePairGenerator:
+
+    @pytest.mark.parametrize(
+        "chosen,rejected",
+        [
+            (
+                """
+                ```argdown
+                [No meat]: We should stop eating meat.
+                    <+ Animals suffer.
+                    <+ <Climate change>: Animal farming causes climate change.
+                ```
+                """,
+                """
+                ```argdown
+                [No meat]: We should stop eating meat.
+                    <+ Animals suffer.
+                    <+ <Climate change>: Animal farming causes climate change.
+                    <+ <Climate change>: Animal 1 farming causes climate change.
+                ```
+                """,
+            ),
+        ],
+    )
+    async def test_preference_pair_generator(
+        self,
+        problem_class,
+        solution_class,
+        judge_class,
+        source_texts,
+        chosen,
+        rejected,
+    ):
+        
+        await HirpoTester.test_generic_failure_type_preference_generator(
+            problem_class,
+            solution_class,
+            judge_class,
+            source_texts,
+            chosen,
+            rejected,
+        )        
+

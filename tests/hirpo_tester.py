@@ -1,7 +1,9 @@
+from pprint import pprint
+import textwrap
 import pytest
 
 
-from argdown_hirpo.base import Evaluation, Feedback, Problem, Solution, HIRAbstractGeneratorLLM
+from argdown_hirpo.base import Evaluation, Feedback, GenericFailureDiffPreferencePairGenerator, Problem, Solution, HIRAbstractGeneratorLLM
 
 
 class HirpoTester:
@@ -190,3 +192,35 @@ class HirpoTester:
         revised_solution = revised_solutions[0]
         print(revised_solution)
         assert isinstance(revised_solution, solution_class)
+
+    @staticmethod
+    async def test_generic_failure_type_preference_generator(
+        problem_class,
+        solution_class,
+        judge_class,
+        source_texts,
+        chosen,
+        rejected,
+    ):
+        problem = problem_class(source_texts[0])
+
+        judge = judge_class()
+        ppg = GenericFailureDiffPreferencePairGenerator()
+
+        snippet_chosen = textwrap.dedent(chosen)
+        snippet_rejected = textwrap.dedent(rejected)
+
+        candidate_solutions = [
+            solution_class(snippet_chosen),
+            solution_class(snippet_rejected),
+        ]
+        evaluations = await judge.arun(problem, candidate_solutions)
+        print(evaluations)
+
+        cpps = await ppg.arun(problem, candidate_solutions, evaluations)
+        pprint(cpps)
+        assert len(cpps) == 1
+        assert ppg.avoid_errors_hint in cpps[0]["chosen"][0]["content"]
+        assert ppg.avoid_errors_hint in cpps[0]["rejected"][0]["content"]
+        assert snippet_chosen in cpps[0]["chosen"][-1]["content"]
+        assert snippet_rejected in cpps[0]["rejected"][-1]["content"]
