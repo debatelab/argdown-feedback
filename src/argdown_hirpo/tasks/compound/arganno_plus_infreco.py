@@ -1,0 +1,574 @@
+from typing import Any, Sequence
+
+import dataclasses
+from textwrap import dedent
+from bs4 import BeautifulSoup
+from pyargdown import (
+    Conclusion,
+    parse_argdown,
+    Argument,
+)
+import textdistance
+
+from argdown_hirpo.base import (
+    Problem,
+    Solution,
+    Evaluation,
+    Feedback,
+    ProblemGenerator,
+    SolutionGenerator,
+    Judge,
+    ScoringVirtuePreferencePairGenerator,
+)
+from argdown_hirpo.tasks.core.arganno import (
+    ANNOTATION_SCHEME,
+    Annotation,
+    AnnotationJudge,
+    AnnotationProblem,
+)
+from argdown_hirpo.tasks.core.infreco import (
+    InfRecoProblem,
+    InformalReco,
+)
+from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
+
+
+# utility #
+
+def _get_props_used_in_inference(argument: Argument, pr_label: str, from_key: str="from") -> list[str]:
+    """Get all proposition labels used directly or indirectly in the inference 
+    to a conclusion with label `pr_label`."""
+
+    if argument is None or not argument.pcs:
+        return []
+
+    used_labels = set()
+    def add_parent_labels(label: str):
+        c = next((c for c in argument.pcs if isinstance(c, Conclusion) and c.label == label), None)
+        if c is None:
+            return []
+        parent_labels = c.inference_data.get(from_key, [])
+        used_labels.update(parent_labels)
+        for ref in parent_labels:
+            add_parent_labels(ref)
+
+    add_parent_labels(pr_label)    
+
+    return list(used_labels)    
+
+
+
+class ArgannoPlusInfrecoProblem(InfRecoProblem, AnnotationProblem):
+    """Task: Create coherent informal reco and arg annotation."""
+
+    def __init__(self, sources: str | list[str]):
+        if isinstance(sources, list):
+            sources = "\n\n-----\n\n".join(sources)
+        # strip html tags
+        sources = BeautifulSoup(sources, "html.parser").get_text()
+        # remove leading and trailing whitespace
+        sources = sources.strip()
+        self.sources = sources
+
+    def instruct_prompt(
+        self,
+        ask_for_invalid=False,
+        hints: list[str] | None = None,
+        evaluation: Evaluation | None = None,
+    ) -> str:
+        prompt = (
+            dedent("""
+            # Assignment: Annotate a source text and reconstruct its main argument in standard form using Argdown syntax.
+                        
+            Analyse the argumentation in the following **source text**. Create a a coherent argumentative text annotation and a corresponding informal argument reconstruction in standard form (premise-conclusion structure).
+
+            ::: {{.source_text}}              
+            {sources}
+            :::
+
+            ## Annotation Task Details                   
+                   
+            Annotate the source text above according to the following schema:
+
+            {annotation_scheme}
+
+            Add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way.
+                        
+            Enclose the annotated text in a fenced codeblock, starting with '```xml' and ending with '```'. If you provide multiple xml-codeblocks (e.g., improved versions or revisions), we will use and evaluate the last one only.
+                   
+            ## Argument Reconstruction Task Details                   
+
+            Informally analyse and reconstruct the text's main argumentation with Argdown. In particular, you should
+
+            - reconstruct *at least one argument* in standard form (including premises, final 
+              conclusion, and possible intemediate conclusions).
+            - provide, for each conclusion in an argument, information about which previously introduced premises or 
+              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
+              where the list items refer to the respective premise or conclusion labels.
+                  
+            Importantly, enclose your Argdown snippet in a fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
+
+            ## Required Coherence of Annotation and Argument Reconstruction                                                
+
+            The argument reconstruction and the annotated source text must cohere with each other. There should be one-to-many correspondence between premises/conclusion(s) and annotated text segments. Moreover, the inferential relations in the reconstructed argument should reflect the annotated support relations.
+                   
+            In particular, you should ensure that: 
+
+            - Every <proposition> element in the annotation has an `argument_label` attribute, which refers to a label of an argument in the Argdown snippet.
+            - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding argument. 
+            - Every premise and conclusion in the Argdown argument has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> elements in the annotation.
+            - If, in the annotation, one <proposition> element supports another one (via its `support` attribute), then, in the Argdown argument, the proposition corresponding to the former element is used to infer the conclusion corresponding to the latter element.
+        """)
+            .strip()
+            .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
+        )
+
+        if hints:
+            prompt += "\n\n## Hints: " + " - ".join(hints)
+
+        if ask_for_invalid:
+            prompt += (
+                "\n\n"
+                "> [!WARNING]\n"
+                "> For didactic purposes, I want you to make mistakes in your answer.\n"
+            )
+
+            if evaluation:
+                metrics = {k: v for k, v in evaluation.metrics.items() if v}
+                if metrics:
+                    prompt += "> Expected errors:\n"
+                    for k, v in metrics.items():
+                        prompt += f"> - {k}: {v}\n"
+
+        return prompt
+
+    def revise_prompt(
+        self,
+        ask_for_invalid=False,
+        hints: list[str] | None = None,
+        evaluation: Evaluation | None = None,
+    ) -> str:
+        prompt = "Revise your previously submitted annotation and argument map given the above evaluation and feedback."
+
+        if hints:
+            prompt += "\n\nHints: " + " - ".join(hints)
+
+        if ask_for_invalid:
+            prompt += (
+                "\n\n"
+                "> [!WARNING]\n"
+                "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
+            )
+
+            if evaluation:
+                metrics = {k: v for k, v in evaluation.metrics.items() if v}
+                if metrics:
+                    prompt += "> Expected errors:\n"
+                    for k, v in metrics.items():
+                        prompt += f"> - {k}: {v}\n"
+
+        return prompt
+
+
+@dataclasses.dataclass
+class ArgannoPlusInfreco(Annotation, InformalReco):
+    """
+    Solution to the ArgannoPlusInfreco problem: annotation and argdown snippet.
+    
+    Contains unparsed answer iff fenced code blocks couldn't be extracted.
+    """
+
+    annotated_source_text: str
+    argdown_snippet: str
+    unparsed_solution: str | None = None
+
+    def __str__(self):
+        if self.unparsed_solution:
+            return self.unparsed_solution
+        return self.annotated_source_text + "\n\n" + self.argdown_snippet
+
+    @classmethod
+    def from_raw_answer(
+        cls, raw_answer: str
+    ) -> "ArgannoPlusInfreco":
+        unparsed_solution = raw_answer
+        annotated_source_text = ""
+        argdown_snippet = ""
+        if "\n```xml" in unparsed_solution:
+            annotated_source_text = unparsed_solution.split("\n```xml")[-1].split("\n```")[0]
+            annotated_source_text = "```xml" + annotated_source_text + "\n```"
+        if "\n```argdown" in unparsed_solution:
+            argdown_snippet = unparsed_solution.split("\n```argdown")[-1].split("\n```")[0]
+            argdown_snippet = "```argdown" + argdown_snippet + "\n```"                
+
+        return cls(
+            annotated_source_text=annotated_source_text if annotated_source_text else unparsed_solution,
+            argdown_snippet=argdown_snippet if argdown_snippet else unparsed_solution,
+            unparsed_solution=None if annotated_source_text and argdown_snippet else unparsed_solution,
+        )
+
+class ArgannoPlusInfrecoProblemGenerator(ProblemGenerator):
+    async def arun(self, inputs) -> Problem:
+        if isinstance(inputs, str) or (
+            isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
+        ):
+            return ArgannoPlusInfrecoProblem(inputs)
+        raise ValueError(
+            "Inputs to an annotation + infreco problem must be a string or a list of strings"
+        )
+
+
+class ArgannoPlusInfrecoSolutionGenerator(SolutionGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.n_solutions = kwargs.get("n_solutions", 10)
+        self.temperature = kwargs.get("temperature", 0.5)
+        self.max_tokens = kwargs.get("max_tokens", 2048)
+
+    async def arun(
+        self,
+        problem: ArgannoPlusInfrecoProblem,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> Sequence[ArgannoPlusInfreco]:
+        assert (
+            isinstance(original_solution, ArgannoPlusInfreco)
+            or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for revised solutions"
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": problem.instruct_prompt(),
+            }
+        ]
+
+        if original_solution and feedback:
+            messages += [
+                {
+                    "role": "assistant",
+                    "content": str(original_solution),
+                },
+                {
+                    "role": "user",
+                    "content": feedback.prompt,
+                },
+                {
+                    "role": "assistant",
+                    "content": feedback.feedback,
+                },
+                {
+                    "role": "user",
+                    "content": problem.revise_prompt(),
+                },
+            ]
+
+        answers = await self._generate(
+            messages,
+            max_tokens=self.max_tokens,
+            n=self.n_solutions,
+            temperature=self.temperature,
+        )
+
+        recos: list[ArgannoPlusInfreco] = []
+
+        for answer in answers:
+            recos.append(ArgannoPlusInfreco.from_raw_answer(answer))
+
+        return recos
+
+
+class ArgannoPlusInfrecoJudge(Judge):
+    """Judge for the anno plus argument mapping task."""
+
+    def _evaluate_argmap(
+        self, problem: ArgannoPlusInfrecoProblem, reco: ArgannoPlusInfreco
+    ) -> Evaluation:
+        is_valid = True
+        artifacts: dict[str, Any] = {}
+        eval_data = {
+            "fenced_code_blocks": "",
+
+            "annotation_empty": "",
+            "annotation_nested_propositions": "",
+            "annotation_missing_id": "",
+            "annotation_duplicate_id": "",
+            "annotation_invalid_support_ids": "",
+            "annotation_invalid_attack_ids": "",
+            "annotation_unknown_attributes": "",
+
+            "argument_invalid_argdown_syntax": "",
+            "argument_missing": "",
+            "argument_illformed_argument": "",  # starts with conclusion / ends with premise
+            "argument_missing_inference_info": "",
+            "argument_unknown_proposition_references": "",  # in inference info
+
+            "elements_correspondence": "",
+            "relations_correspondence": "",
+        }
+
+        # check fenced codeblocks
+        msgs = []
+        ast = reco.annotated_source_text.strip("\n ")
+        if not (ast.startswith("```xml") and ast.endswith("```")):
+            msgs.append("Failed to extract fenced xml block with annotation.")
+            if ast.count("```xml") == 0:
+                msgs.append("No fenced code block starting with '```xml'.")
+        ads = reco.argdown_snippet.strip("\n ")
+        if not (ads.startswith("```argdown") and ads.endswith("```")):
+            msgs.append("Failed to extract fenced argdown block.")
+            if ads.count("```argdown") == 0:
+                msgs.append("No fenced code block starting with '```argdown'.")
+        if msgs:
+            is_valid = False
+            eval_data["fenced_code_blocks"] = " ".join(msgs)
+
+        # evaluate anno
+        evaluation_anno = AnnotationJudge()._evaluate_annotation(
+            problem=AnnotationProblem(problem.sources, strip_html=False),
+            annotation=Annotation(ast),
+        )
+        if evaluation_anno.is_valid is False:
+            is_valid = False
+        soup: BeautifulSoup = evaluation_anno.artifacts["soup"]
+        artifacts["soup"] = soup
+        for k, v in evaluation_anno.metrics.items():
+            if k != "fenced_code_block":
+                eval_data["annotation_" + k] = v
+        if not soup.get("proposition"):
+            is_valid = False
+            eval_data["annotation_empty"] = "No proposition elements in the annotation."
+
+        # evaluate argdown reco
+        if ads.startswith("```argdown") and ads.endswith("```"):
+            ads = "\n".join(ads.splitlines()[1:-1])
+        try:
+            argdown = parse_argdown(ads)
+        except Exception as e:
+            argdown = None
+            is_valid = False
+            eval_data["argument_invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
+
+        artifacts["argdown"] = argdown
+        if argdown is None:
+            return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
+
+        if len(argdown.arguments) == 0:
+            is_valid = False
+            eval_data["argument_missing"] = "No argument in argdown snippet."
+
+        # any illformed arguments
+        msgs = []
+        for argument_idx, argument in enumerate(argdown.arguments):
+            verifier = InfRecoVerifier(argdown, argument_idx=argument_idx)
+            check, msg = verifier.has_pcs()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' lacks premise conclusion structure: {msg}")
+            check, msg = verifier.starts_with_premise()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' does not start with a premise: {msg}")
+
+            check, msg = verifier.ends_with_conclusion()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' does not end with a conclusion: {msg}")
+
+            check, msg = verifier.has_not_multiple_gists()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' has more than one gist: {msg}")
+
+            check, msg = verifier.has_no_duplicate_pcs_labels()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' has duplicate labels in the standard form: {msg}")
+        if msgs:
+            is_valid = False
+            eval_data["argument_illformed_argument"] = " ".join(msgs)
+        del msgs
+
+        # any missing inference info
+        msgs = []
+        for argument_idx, argument in enumerate(argdown.arguments):
+            verifier = InfRecoVerifier(argdown, argument_idx=argument_idx)
+            check, msg = verifier.has_inference_data()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' lacks inference information: {msg}")
+        if msgs:
+            is_valid = False
+            eval_data["argument_missing_inference_info"] = " ".join(msgs)
+
+        # any unknown proposition references
+        msgs = []
+        for argument_idx, argument in enumerate(argdown.arguments):
+            verifier = InfRecoVerifier(argdown, argument_idx=argument_idx)
+            check, msg = verifier.prop_refs_exist()
+            if check is False:
+                msgs.append(f"Argument '{argument.label}' has unknown proposition references: {msg}")
+        if msgs:
+            is_valid = False
+            eval_data["argument_unknown_proposition_references"] = " ".join(msgs)
+        del msgs
+
+        # check 1:1 correspondence between annotation and argument elements
+        msgs = []
+        all_argument_labels = [arg.label for arg in argdown.arguments if arg.label]
+        all_annotation_ids = [
+            a.get("id") for a in soup.find_all("proposition") if a.get("id")  # type: ignore
+        ]
+        argument_label_map: dict[str,str] = {}
+        refreco_map: dict[str,str] = {}
+        for a in soup.find_all("proposition"):
+            a_label = a.get("argument_label")  # type: ignore
+            a_id = a.get("id")  # type: ignore
+            a_ref_reco = a.get("ref_reco_label")  # type: ignore
+            if a_label not in all_argument_labels:
+                msgs.append(
+                    f"Illegal 'argument_label' reference of proposition element with id={a_id}: "
+                    f"No argument with label '{a_label}' in the Argdown snippet."
+                )
+                continue
+            argument_label_map[str(a_id)] = str(a_label)
+            refreco_map[str(a_id)] = str(a_ref_reco)
+            argument = next(arg for arg in argdown.arguments if arg.label == a_label)
+            if not argument.pcs or not any(a_ref_reco == pr.label for pr in argument.pcs):
+                msgs.append(
+                    f"Illegal 'ref_reco_label' reference of proposition element with id={a_id}: "
+                    f"No premise or conclusion with label '{a_ref_reco}' in argument '{a_label}'."
+                )            
+
+        for argument in argdown.arguments:
+            for pr in argument.pcs:
+                proposition = next(prop for prop in argdown.propositions if prop.label == pr.proposition_label)
+                id_refs = proposition.data.get("annotation_ids")
+                if id_refs is None:
+                    msgs.append(
+                        f"Missing 'annotation_ids' attribute in proposition '{pr.label}' "
+                        f"of argument '{argument.label}'."
+                    )
+                    continue
+                for id_ref in id_refs:
+                    if id_ref not in all_annotation_ids:
+                        msgs.append(
+                            f"Illegal 'annotation_ids' reference in proposition '{pr.label}' of argument '{argument.label}': "
+                            f"No proposition element with id='{id_ref}' in the annotation."
+                        )
+                        continue
+                    if argument_label_map.get(id_ref) != argument.label:
+                        msgs.append(
+                            f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
+                            f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
+                            f"with id={id_ref} in the annotation has a different argument_label"
+                            f"{': '+argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
+                        )
+                    if refreco_map.get(id_ref) != pr.label:
+                        msgs.append(
+                            f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
+                            f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
+                            f"with id={id_ref} in the annotation has a different ref_reco_label"
+                            f"{': '+refreco_map[id_ref] if id_ref in refreco_map else ''}."
+                        )   
+        if msgs:
+            is_valid = False
+            eval_data["elements_correspondence"] = " - ".join(msgs)
+        del msgs
+
+        # check support relations correspondence
+        msgs = []
+        annotated_support_relations: list[dict] = []
+        for a in soup.find_all("proposition"):
+            from_id = a.get("id")  # type: ignore
+            for support in a.get("supports", []):  # type: ignore
+                if support in all_annotation_ids:
+                    annotated_support_relations.append(
+                        {
+                            "from_id": str(from_id),
+                            "to_id": str(support),
+                        }
+                    )
+
+        for ar in annotated_support_relations:
+            arglabel_from = argument_label_map.get(ar["from_id"])
+            arglabel_to = argument_label_map.get(ar["to_id"])
+            if arglabel_from is None or arglabel_to is None:
+                msgs.append(
+                    f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
+                    f"matched by any relation in the argument map (illegal argument_labels)."
+                )
+                continue
+            if arglabel_from != arglabel_to:
+                msgs.append(
+                    f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to support each other, but "
+                    f"are not assigned to one and the same argument (different argument_labels)."
+                )
+                continue
+            argument = next(arg for arg in argdown.arguments if arg.label == arglabel_from)
+            if ar["from_id"] not in _get_props_used_in_inference(argument, ar["to_id"]):
+                msgs.append(
+                    f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
+                    f"matched by the inferential relations in the argument '{argument.label}'."
+                )
+
+        if msgs:
+            is_valid = False
+            eval_data["relations_correspondence"] = " - ".join(msgs)            
+
+        return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
+
+    async def arun(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> Sequence[Evaluation]:
+        assert isinstance(problem, ArgannoPlusInfrecoProblem), "Problem must be an ArgannoPlusInfrecoProblem"
+        assert isinstance(original_solution, ArgannoPlusInfreco) or original_solution is None
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+
+        evaluations = []
+        for solution in solutions:
+            assert isinstance(solution, ArgannoPlusInfreco), (
+                "All solutions must be ArgannoPlusInfreco"
+            )
+            evaluations.append(self._evaluate_argmap(problem, solution))
+
+        return evaluations
+
+
+class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the argument reco task, prefering valid solutions
+    where the source text's annotated propositions are textually similiar to the node texts in the argument map."""
+
+    hints = [
+        "Make sure that your argument reconstruction stays faithful to and mimics closely "
+        "the annotation of the source text. In particular, try to use supporting propositions from the annotation "
+        "as premises / intermediate conclusions in your argument reconstruction!"
+    ]
+
+    def _score(
+        self,
+        problem: Problem,
+        reco: Solution,
+        evaluation: Evaluation,
+    ) -> float:
+        assert isinstance(problem, ArgannoPlusInfrecoProblem)
+        assert isinstance(reco, InformalReco)
+
+        soup = evaluation.artifacts["soup"]
+        anno_props = soup.find_all("proposition")
+        supporting_props = [
+            ap
+            for ap in anno_props
+            if ap.get("supports")  # type: ignore
+        ]
+        list_anno_props = "\n".join([ap.text for ap in supporting_props])
+
+        return round(
+            textdistance.damerau_levenshtein.normalized_similarity(
+                list_anno_props, reco.argdown_snippet
+            ),
+            1,
+        )

@@ -15,7 +15,7 @@ class InfRecoVerifier(BaseArgdownVerifier):
     InfRecoVerifier is a specialized verifier for informal reconstructions.
     """
 
-    def __init__(self, argdown: Argdown, from_key: str = "from"):
+    def __init__(self, argdown: Argdown, from_key: str = "from", argument_idx: int = 0):
         super().__init__(argdown)
         # Additional initialization for InfReco can be added here
         if not isinstance(self.argdown, ArgdownMultiDiGraph):
@@ -23,7 +23,7 @@ class InfRecoVerifier(BaseArgdownVerifier):
 
         self.argument: Argument | None = None
         if len(argdown.arguments) == 1:
-            self.argument = argdown.arguments[0]
+            self.argument = argdown.arguments[argument_idx]
 
         self.from_key = from_key
 

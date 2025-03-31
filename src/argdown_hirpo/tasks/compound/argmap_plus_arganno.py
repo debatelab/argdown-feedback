@@ -72,7 +72,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
                    
             ## Argument Mapping Task Details                   
 
-            Create a syntactically correct informal Argdown argument that reconstructs the overall argumentation in the text. In particular, you should
+            Create a syntactically correct informal Argdown argument map that reconstructs the overall argumentation in the text. In particular, you should
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
@@ -87,9 +87,9 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
             In particular, you should ensure that: 
 
             - Every <proposition> element in the annotation has an `argument_label` attribute that refers to a node (label of claim or argument) in the argument map.
-            - Every node in the Argdown argument map has yaml inline data with an `annotation_ids` attribute that contains list of `id` attributes of the corresponding <proposition> element in the annotation.
-            - Two nodes in the argument map support each other if and only if the corresponding <proposition> elements are annotated to support each (`support` attribute).
-            - Two nodes in the argument map attack each other if and only if the corresponding <proposition> elements are annotated to attack each (`support` attribute).
+            - Every node in the Argdown argument map has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> element in the annotation.
+            - Two nodes in the argument map support each other if and only if the corresponding <proposition> elements are annotated to support each other (`support` attribute).
+            - Two nodes in the argument map attack each other if and only if the corresponding <proposition> elements are annotated to attack each other (`support` attribute).
         """)
             .strip()
             .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
@@ -447,9 +447,9 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     where the source text's annotated propositions are textually similiar to the node texts in the argument map."""
 
     hints = [
-        "Make sure that your argument reconstruction stays faithful to and mimics closely "
-        "the annotation of the source text. In particular, try to use supporting propositions from the annotation "
-        "as premises / intermediate conclusions in your argument reconstruction!"
+        "Make sure that your argument map stays faithful to and mimics closely "
+        "the annotation of the source text. In particular, use a similar wording for claims as "
+        "in the corresponding annotated source segments!"
     ]
 
     def _score(
