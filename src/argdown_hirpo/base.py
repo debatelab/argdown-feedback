@@ -5,6 +5,7 @@ import dataclasses
 import logging
 import random
 from statistics import mean
+from textwrap import dedent
 from typing import Any, Sequence, TypedDict
 
 from openai import AsyncOpenAI, OpenAI
@@ -209,6 +210,72 @@ class FeedbackGenerator(HIRAbstractGeneratorLLM):
         pass
 
 
+
+class GenericFeedbackGenerator(FeedbackGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.n_feedbacks = kwargs.get("n_solutions", 5)
+        self.temperature = kwargs.get("temperature", 0.7)
+        self.max_tokens = kwargs.get("max_tokens", 1024)
+
+    async def arun(
+        self,
+        problem: Problem,
+        solution: Solution,
+        evaluation: Evaluation,
+    ) -> list[Feedback]:
+        assert not evaluation.is_valid, (
+            "Can only generate feedback for invalid solutions"
+        )
+
+        evaluation_issues = "\n".join(
+            f"- **{k}**: {v}" for k, v in evaluation.metrics.items() if v
+        )
+        prompt = dedent("""
+            Assignment: Give feedback and provide instructions for how to improve a given argument map.
+
+            You will be shown an argument mapping problem, a student's preliminary solution, and its evaluation. Based on this information, provide feedback to the student and instructions for how to improve the solution.
+
+                                                
+            ## Problem Statement
+            {problem}
+
+            
+            ## Student's Solution
+            {solution}
+
+            
+            ## Evaluation
+            The student's solution is NOT valid.
+            Particular issues:
+            {evaluation_issues}
+
+            
+            Given this information, provide feedback to the student and clear instructions for how to improve the solution.
+        """).format(
+            problem=problem.instruct_prompt(),
+            solution=str(solution),
+            evaluation_issues=evaluation_issues,
+        )
+
+        answers = await self._generate(
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt,
+                }
+            ],
+            max_tokens=self.max_tokens,
+            n=self.n_feedbacks,
+            temperature=self.temperature,
+        )
+
+        return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
+
+
+
+
+
 class VirtuePreferencePairGenerator(HIRAbstractGenerator):
     """
     Generates preference pairs from differences in terms of additional
@@ -225,6 +292,80 @@ class VirtuePreferencePairGenerator(HIRAbstractGenerator):
         feedback: Feedback | None = None,
     ) -> list[ChatPreferencePair]:
         pass
+
+
+                        
+class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
+    """Generate virtue-preference pairs for the informal argument reconstruction task
+    based on score."""
+
+    hints: list[str] = []
+
+    @abstractmethod
+    def _score(
+        self,
+        problem: Problem,
+        reco: Solution,
+        evaluation: Evaluation,
+    ) -> float:
+        pass
+
+    async def arun(
+        self,
+        problem,
+        candidate_solutions: Sequence[Solution],
+        evaluations: Sequence[Evaluation],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> list[ChatPreferencePair]:
+        assert len(candidate_solutions) == len(evaluations), (
+            "Number of solutions must match number of evaluations"
+        )
+
+        pairs: list[ChatPreferencePair] = []
+
+        # rank valid recos according to the _score function
+        valid_recos: list[tuple[Solution, Evaluation]] = list(
+            zip(candidate_solutions, evaluations)  # type: ignore
+        )
+        valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
+        valid_recos = [
+            (solution, evaluation)
+            for solution, evaluation in valid_recos
+            if evaluation.is_valid
+        ]
+
+        if len(valid_recos) < 2:
+            return pairs
+        top_score = self._score(problem, *valid_recos[0])
+        if top_score == self._score(problem, *valid_recos[-1]):
+            return pairs
+
+        top_reco, _ = valid_recos[0]
+        weaker_reco = random.choice(
+            [s for s, e in valid_recos if self._score(problem, s, e) < top_score]
+        )
+
+        pairs.append(
+            ChatPreferencePair(
+                chosen=ProblemSolutionChat(
+                    problem=problem,
+                    solution=top_reco,
+                    feedback=feedback,
+                    original_solution=original_solution,
+                ).as_chat(hints=self.hints),
+                rejected=ProblemSolutionChat(
+                    problem=problem,
+                    solution=weaker_reco,
+                    feedback=feedback,
+                    original_solution=original_solution,
+                ).as_chat(hints=self.hints),
+            )
+        )
+
+        return pairs
+
+
 
 
 class FailureTypePreferencePairGenerator(HIRAbstractGenerator):

@@ -1,8 +1,6 @@
 from typing import Any, Sequence
 
-from abc import abstractmethod
 import dataclasses
-import random
 from textwrap import dedent
 import textdistance
 
@@ -15,16 +13,14 @@ from pyargdown import (
 
 from argdown_hirpo.base import (
     Problem,
+    ScoringVirtuePreferencePairGenerator,
     Solution,
     Evaluation,
     Feedback,
-    ChatPreferencePair,
-    ProblemSolutionChat,
     ProblemGenerator,
     SolutionGenerator,
     Judge,
     FeedbackGenerator,
-    VirtuePreferencePairGenerator,
 )
 
 from argdown_hirpo.logic.logic import get_propositional_variables
@@ -473,85 +469,8 @@ class LogRecoFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-class LogRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the informal argument reconstruction task."""
-
-    hints: list[str] = []
-
-    @abstractmethod
-    def _score(
-        self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
-        evaluation: Evaluation,
-    ) -> float:
-        pass
-
-    async def arun(
-        self,
-        problem,
-        candidate_solutions: Sequence[Solution],
-        evaluations: Sequence[Evaluation],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> list[ChatPreferencePair]:
-        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
-        assert all(isinstance(s, LogicalReco) for s in candidate_solutions), (
-            "All solutions must be LogicalReco objects"
-        )
-        assert original_solution is None or isinstance(
-            original_solution, LogicalReco
-        ), "Original solution must be an LogicalReco"
-        assert len(candidate_solutions) == len(evaluations), (
-            "Number of solutions must match number of evaluations"
-        )
-
-        pairs: list[ChatPreferencePair] = []
-
-        # rank valid argmaps according to the _score function
-        valid_recos: list[tuple[LogicalReco, Evaluation]] = list(
-            zip(candidate_solutions, evaluations)  # type: ignore
-        )
-        valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
-        valid_recos = [
-            (solution, evaluation)
-            for solution, evaluation in valid_recos
-            if evaluation.is_valid
-        ]
-
-        if len(valid_recos) < 2:
-            return pairs
-        top_score = self._score(problem, *valid_recos[0])
-        if top_score == self._score(problem, *valid_recos[-1]):
-            return pairs
-
-        top_reco, _ = valid_recos[0]
-        weaker_reco = random.choice(
-            [s for s, e in valid_recos if self._score(problem, s, e) < top_score]
-        )
-
-        pairs.append(
-            ChatPreferencePair(
-                chosen=ProblemSolutionChat(
-                    problem=problem,
-                    solution=top_reco,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-                rejected=ProblemSolutionChat(
-                    problem=problem,
-                    solution=weaker_reco,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-            )
-        )
-
-        return pairs
-
-
 class ManyIntermediateConclusionsPreferencePairGenerator(
-    LogRecoVirtuePreferencePairGenerator
+    ScoringVirtuePreferencePairGenerator
 ):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with more intermediate conclusions."""
@@ -563,8 +482,8 @@ class ManyIntermediateConclusionsPreferencePairGenerator(
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -577,7 +496,7 @@ class ManyIntermediateConclusionsPreferencePairGenerator(
 
 
 class FewIntermediateConclusionsPreferencePairGenerator(
-    LogRecoVirtuePreferencePairGenerator
+    ScoringVirtuePreferencePairGenerator
 ):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with fewer intermediate conclusions."""
@@ -589,8 +508,8 @@ class FewIntermediateConclusionsPreferencePairGenerator(
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -602,7 +521,7 @@ class FewIntermediateConclusionsPreferencePairGenerator(
         return (number_intermediate_conclusions + 1) ** -1
 
 
-class IndependentWordingPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+class IndependentWordingPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with independent wording of arguments and claims."""
 
@@ -613,10 +532,11 @@ class IndependentWordingPreferencePairGenerator(LogRecoVirtuePreferencePairGener
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         propositions: list[Proposition] = argdown.propositions
 
@@ -632,7 +552,7 @@ class IndependentWordingPreferencePairGenerator(LogRecoVirtuePreferencePairGener
         return round(sum(dlds) / len(dlds), 1) if dlds else 0
 
 
-class SourceTextProximityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco task, prefering valid argument recos
     that stick closely to the source text."""
 
@@ -642,10 +562,12 @@ class SourceTextProximityPreferencePairGenerator(LogRecoVirtuePreferencePairGene
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+        assert isinstance(reco, LogicalReco), "Solution must be an LogicalReco"
         return round(
                 textdistance.damerau_levenshtein.normalized_similarity(
                 problem.sources, reco.argdown_snippet
@@ -654,7 +576,7 @@ class SourceTextProximityPreferencePairGenerator(LogRecoVirtuePreferencePairGene
         )
 
 
-class SimplicityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with succinct and simple propositions."""
 
@@ -665,8 +587,8 @@ class SimplicityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -680,7 +602,7 @@ class SimplicityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
         return round(sum(lengths) / len(lengths), -1) ** -1 if lengths else 0
     
 
-class VerbosityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+class VerbosityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with elaborate and verbose propositions."""
 
@@ -691,8 +613,8 @@ class VerbosityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -707,7 +629,7 @@ class VerbosityPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
 
 
 
-class FormalizationsFaithfulnessPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+class FormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with formalizations that are similiar to the sentences being formalized."""
 
@@ -719,8 +641,8 @@ class FormalizationsFaithfulnessPreferencePairGenerator(LogRecoVirtuePreferenceP
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
@@ -752,7 +674,7 @@ class FormalizationsFaithfulnessPreferencePairGenerator(LogRecoVirtuePreferenceP
         return round(sum(dlds) / len(dlds), 1) if dlds else 0
 
 
-class PredicateLogicPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator):
+class PredicateLogicPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with formalizations that use but predicate logic."""
 
@@ -763,8 +685,8 @@ class PredicateLogicPreferencePairGenerator(LogRecoVirtuePreferencePairGenerator
 
     def _score(
         self,
-        problem: LogRecoProblem,
-        reco: LogicalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         all_expressions = evaluation.artifacts["all_expressions"]

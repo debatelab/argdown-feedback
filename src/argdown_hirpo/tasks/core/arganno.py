@@ -1,5 +1,5 @@
-from abc import abstractmethod
 import dataclasses
+from pprint import pprint
 from textwrap import dedent
 from typing import Sequence
 
@@ -7,16 +7,14 @@ from bs4 import BeautifulSoup
 
 from argdown_hirpo.base import (
     Problem,
+    ScoringVirtuePreferencePairGenerator,
     Solution,
     Evaluation,
     Feedback,
-    ChatPreferencePair,
-    ProblemSolutionChat,
     ProblemGenerator,
     SolutionGenerator,
     Judge,
     FeedbackGenerator,
-    VirtuePreferencePairGenerator,
 )
 from argdown_hirpo.verifiers.arganno_verifier import ArgAnnoVerifier
 
@@ -33,11 +31,12 @@ ANNOTATION_SCHEME = dedent("""
 class AnnotationProblem(Problem):
     """Task: Apply the argumentative annotation scheme to a text."""
 
-    def __init__(self, sources: str | list[str]):
+    def __init__(self, sources: str | list[str], strip_html: bool = True):
         if isinstance(sources, list):
             sources = "\n\n-----\n\n".join(sources)
         # strip html tags
-        sources = BeautifulSoup(sources, "html.parser").get_text()
+        if strip_html:
+            sources = BeautifulSoup(sources, "html.parser").get_text()
         # remove leading and trailing whitespace
         sources = sources.strip()
         self.sources = sources
@@ -391,94 +390,23 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-class AnnotationVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the annotation task."""
-
-    hints: list[str] = []
-
-    @abstractmethod
-    def _score(self, annotation: Solution, evaluation: Evaluation) -> float:
-        pass
-
-    async def arun(
-        self,
-        problem,
-        candidate_solutions: Sequence[Solution],
-        evaluations: Sequence[Evaluation],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> list[ChatPreferencePair]:
-        assert isinstance(problem, AnnotationProblem), (
-            "Problem must be an AnnotationProblem"
-        )
-        assert all(isinstance(s, Annotation) for s in candidate_solutions), (
-            "All solutions must be Annotations"
-        )
-        assert original_solution is None or isinstance(original_solution, Annotation), (
-            "Original solution must be an Annotation"
-        )
-        assert len(candidate_solutions) == len(evaluations), (
-            "Number of solutions must match number of evaluations"
-        )
-
-        pairs: list[ChatPreferencePair] = []
-
-        # rank valid annotations according to the _score function
-        valid_annotations = list(zip(candidate_solutions, evaluations))
-        valid_annotations.sort(
-            key=lambda x: self._score(x[0], x[1]), reverse=True
-        )
-        valid_annotations = [
-            (solution, evaluation)
-            for solution, evaluation in valid_annotations
-            if evaluation.is_valid
-        ]
-
-        if len(valid_annotations) < 2:
-            return pairs
-        if self._score(*valid_annotations[0]) == self._score(*valid_annotations[-1]):
-            return pairs
-
-        top_annotation, _ = valid_annotations[0]
-        bottom_annotation, _ = valid_annotations[-1]
-
-        pairs.append(
-            ChatPreferencePair(
-                chosen=ProblemSolutionChat(
-                    problem=problem,
-                    solution=top_annotation,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-                rejected=ProblemSolutionChat(
-                    problem=problem,
-                    solution=bottom_annotation,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-            )
-        )
-
-        return pairs
-
-
-class AnnotationScopePreferencePairGenerator(AnnotationVirtuePreferencePairGenerator):
+class AnnotationScopePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations
     with larger number of annotated proposition elements."""
 
     hints = ["Try to identify as many proposition elements as possible"]
 
-    def _score(self, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
         return len(evaluation.artifacts["soup"].find_all("proposition"))
 
 
-class AnnotationSupportsPreferencePairGenerator(AnnotationVirtuePreferencePairGenerator):
+class AnnotationSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations
     with larger number of support relations between propositions."""
 
     hints = ["Try to identify as many support relations as possible"]
 
-    def _score(self, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         supports = sum(
             len(proposition.get("supports", []))
@@ -487,13 +415,13 @@ class AnnotationSupportsPreferencePairGenerator(AnnotationVirtuePreferencePairGe
         return supports
 
 
-class AnnotationAttacksPreferencePairGenerator(AnnotationVirtuePreferencePairGenerator):
+class AnnotationAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations
     with larger number of attack relations between propositions."""
 
     hints = ["Try to identify as many attack / disconfirmation relations as possible"]
 
-    def _score(self, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         attacks = sum(
             len(proposition.get("attacks", []))
@@ -502,13 +430,13 @@ class AnnotationAttacksPreferencePairGenerator(AnnotationVirtuePreferencePairGen
         return attacks
 
 
-class AnnotationNoAttacksPreferencePairGenerator(AnnotationVirtuePreferencePairGenerator):
+class AnnotationNoAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations
     with smallest number of attack relations between propositions."""
 
     hints = ["Avoid using attack / disconfirmation relations"]
 
-    def _score(self, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         attacks = sum(
             len(proposition.get("attacks", []))
@@ -516,13 +444,13 @@ class AnnotationNoAttacksPreferencePairGenerator(AnnotationVirtuePreferencePairG
         )
         return 1/(1+attacks)
 
-class AnnotationCoveragePreferencePairGenerator(AnnotationVirtuePreferencePairGenerator):
+class AnnotationCoveragePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations
     with larger coverage of source text."""
 
     hints = ["Try to cover as much of the source text as possible"]
 
-    def _score(self, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         coverage = sum(
             len(proposition.get_text())

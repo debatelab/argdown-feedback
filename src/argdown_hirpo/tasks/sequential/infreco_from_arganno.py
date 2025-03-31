@@ -5,11 +5,12 @@ from argdown_hirpo.base import (
     Problem,
     Evaluation,
     ProblemGeneratorLLM,
+    ScoringVirtuePreferencePairGenerator,
+    Solution,
 )
 from argdown_hirpo.tasks.core.infreco import (
     InfRecoProblem,
-    InformalReco,
-    InfRecoVirtuePreferencePairGenerator,
+    InformalReco
 )
 from argdown_hirpo.tasks.core.arganno import (
     AnnotationProblemGenerator,
@@ -114,7 +115,7 @@ class InfRecoFromArgAnnoProblemGenerator(ProblemGeneratorLLM):
         )
 
 
-class AnnotationProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco task, prefering valid argument recos
     that stick closely to the source text's annotation."""
 
@@ -126,11 +127,12 @@ class AnnotationProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGene
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, InfRecoFromArgAnnoProblem)
+        assert isinstance(reco, InformalReco)
 
         soup, _ = AnnotationJudge().parse_xml_snippet(problem.annotation)
         anno_props = soup.find_all("proposition")

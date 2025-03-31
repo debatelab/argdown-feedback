@@ -1,8 +1,6 @@
 from typing import Sequence
 
-from abc import abstractmethod
 import dataclasses
-import random
 from textwrap import dedent
 import textdistance
 
@@ -15,17 +13,14 @@ from pyargdown import (
 
 from argdown_hirpo.base import (
     Problem,
+    ScoringVirtuePreferencePairGenerator,
     Solution,
     Evaluation,
     Feedback,
-    ChatPreferencePair,
-    ProblemSolutionChat,
     ProblemGenerator,
     SolutionGenerator,
     Judge,
     FeedbackGenerator,
-    FailureTypePreferencePairGenerator,
-    VirtuePreferencePairGenerator,
 )
 from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
 
@@ -460,85 +455,9 @@ class InfRecoFeedbackGenerator(FeedbackGenerator):
 
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
-                        
-class InfRecoVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the informal argument reconstruction task."""
-
-    hints: list[str] = []
-
-    @abstractmethod
-    def _score(
-        self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
-        evaluation: Evaluation,
-    ) -> float:
-        pass
-
-    async def arun(
-        self,
-        problem,
-        candidate_solutions: Sequence[Solution],
-        evaluations: Sequence[Evaluation],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> list[ChatPreferencePair]:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert all(isinstance(s, InformalReco) for s in candidate_solutions), (
-            "All solutions must be InformalReco objects"
-        )
-        assert original_solution is None or isinstance(
-            original_solution, InformalReco
-        ), "Original solution must be an InformalReco"
-        assert len(candidate_solutions) == len(evaluations), (
-            "Number of solutions must match number of evaluations"
-        )
-
-        pairs: list[ChatPreferencePair] = []
-
-        # rank valid argmaps according to the _score function
-        valid_recos: list[tuple[InformalReco, Evaluation]] = list(
-            zip(candidate_solutions, evaluations)  # type: ignore
-        )
-        valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
-        valid_recos = [
-            (solution, evaluation)
-            for solution, evaluation in valid_recos
-            if evaluation.is_valid
-        ]
-
-        if len(valid_recos) < 2:
-            return pairs
-        top_score = self._score(problem, *valid_recos[0])
-        if top_score == self._score(problem, *valid_recos[-1]):
-            return pairs
-
-        top_reco, _ = valid_recos[0]
-        weaker_reco = random.choice(
-            [s for s, e in valid_recos if self._score(problem, s, e) < top_score]
-        )
-
-        pairs.append(
-            ChatPreferencePair(
-                chosen=ProblemSolutionChat(
-                    problem=problem,
-                    solution=top_reco,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-                rejected=ProblemSolutionChat(
-                    problem=problem,
-                    solution=weaker_reco,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-            )
-        )
-
-        return pairs
 
 
-class NoUnusedPropsPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class NoUnusedPropsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with fewer unused premises or conclusions."""
 
@@ -549,10 +468,12 @@ class NoUnusedPropsPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator)
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         argument = argdown.arguments[0]
         used_labels = set()
@@ -567,7 +488,7 @@ class NoUnusedPropsPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator)
 
 
 class ManyIntermediateConclusionsPreferencePairGenerator(
-    InfRecoVirtuePreferencePairGenerator
+    ScoringVirtuePreferencePairGenerator
 ):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with more intermediate conclusions."""
@@ -579,10 +500,12 @@ class ManyIntermediateConclusionsPreferencePairGenerator(
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         argument = argdown.arguments[0]
         number_intermediate_conclusions = sum(
@@ -593,7 +516,7 @@ class ManyIntermediateConclusionsPreferencePairGenerator(
 
 
 class FewIntermediateConclusionsPreferencePairGenerator(
-    InfRecoVirtuePreferencePairGenerator
+    ScoringVirtuePreferencePairGenerator
 ):
     """Generate virtue-preference pairs for the argument reconstruction task, prefering valid recos
     with fewer intermediate conclusions."""
@@ -605,10 +528,12 @@ class FewIntermediateConclusionsPreferencePairGenerator(
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         argument = argdown.arguments[0]
         number_intermediate_conclusions = sum(
@@ -618,7 +543,7 @@ class FewIntermediateConclusionsPreferencePairGenerator(
         return (number_intermediate_conclusions + 1) ** -1
 
 
-class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class IndependentWordingPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with independent wording of arguments and claims."""
 
@@ -629,10 +554,12 @@ class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGener
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         propositions: list[Proposition] = argdown.propositions
 
@@ -648,7 +575,7 @@ class IndependentWordingPreferencePairGenerator(InfRecoVirtuePreferencePairGener
         return round(sum(dlds) / len(dlds), 1) if dlds else 0
 
 
-class SourceTextProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco task, prefering valid argument recos
     that stick closely to the source text."""
 
@@ -658,10 +585,12 @@ class SourceTextProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGene
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         return round(
             textdistance.damerau_levenshtein.normalized_similarity(
                 problem.sources, reco.argdown_snippet
@@ -670,7 +599,7 @@ class SourceTextProximityPreferencePairGenerator(InfRecoVirtuePreferencePairGene
         )
 
 
-class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with succinct and simple propositions."""
 
@@ -681,10 +610,12 @@ class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         propositions: list[Proposition] = argdown.propositions
 
@@ -696,7 +627,7 @@ class SimplicityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
         return round(sum(lengths) / len(lengths), -1) ** -1 if lengths else 0
 
 
-class VerbosityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
+class VerbosityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco, prefering valid reconstructions
     with elaborate and verbose propositions."""
 
@@ -707,10 +638,13 @@ class VerbosityPreferencePairGenerator(InfRecoVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: InfRecoProblem,
-        reco: InformalReco,
+        problem: Problem,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
+        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         propositions: list[Proposition] = argdown.propositions
 

@@ -1,9 +1,7 @@
 from typing import Sequence
 
-from abc import abstractmethod
 import dataclasses
-import random
-from textwrap import dedent, shorten
+from textwrap import dedent
 import textdistance
 
 import networkx as nx  # type: ignore
@@ -15,20 +13,17 @@ from pyargdown import (
     Valence,
     parse_argdown,
 )
-from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.base import (
     Problem,
+    ScoringVirtuePreferencePairGenerator,
     Solution,
     Evaluation,
     Feedback,
-    ChatPreferencePair,
-    ProblemSolutionChat,
     ProblemGenerator,
     SolutionGenerator,
     Judge,
     FeedbackGenerator,
-    VirtuePreferencePairGenerator,
 )
 from argdown_hirpo.verifiers.argmap_verifier import ArgMapVerifier
 
@@ -361,85 +356,8 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-class ArgMapVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the argument mapping task."""
 
-    hints: list[str] = []
-
-    @abstractmethod
-    def _score(
-        self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
-        evaluation: Evaluation,
-    ) -> float:
-        pass
-
-    async def arun(
-        self,
-        problem,
-        candidate_solutions: Sequence[Solution],
-        evaluations: Sequence[Evaluation],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> list[ChatPreferencePair]:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert all(isinstance(s, ArgumentMap) for s in candidate_solutions), (
-            "All solutions must be ArgumentMaps"
-        )
-        assert original_solution is None or isinstance(
-            original_solution, ArgumentMap
-        ), "Original solution must be an ArgumentMap"
-        assert len(candidate_solutions) == len(evaluations), (
-            "Number of solutions must match number of evaluations"
-        )
-
-        pairs: list[ChatPreferencePair] = []
-
-        # rank valid argmaps according to the _score function
-        valid_argmaps: list[tuple[ArgumentMap, Evaluation]] = list(
-            zip(candidate_solutions, evaluations)  # type: ignore
-        )
-        valid_argmaps.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
-        valid_argmaps = [
-            (solution, evaluation)
-            for solution, evaluation in valid_argmaps
-            if evaluation.is_valid
-            and evaluation.artifacts["argdown"].number_of_nodes() > 1
-        ]
-
-        if len(valid_argmaps) < 2:
-            return pairs
-        top_score = self._score(problem, *valid_argmaps[0])
-        if top_score == self._score(problem, *valid_argmaps[-1]):
-            return pairs
-
-        top_argmap, _ = valid_argmaps[0]
-        weaker_argmap = random.choice(
-            [s for s, e in valid_argmaps if self._score(problem, s, e) < top_score]
-        )
-
-        pairs.append(
-            ChatPreferencePair(
-                chosen=ProblemSolutionChat(
-                    problem=problem,
-                    solution=top_argmap,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-                rejected=ProblemSolutionChat(
-                    problem=problem,
-                    solution=weaker_argmap,
-                    feedback=feedback,
-                    original_solution=original_solution,
-                ).as_chat(hints=self.hints),
-            )
-        )
-
-        return pairs
-
-
-class ConnectednessPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class ConnectednessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with smaller number of weakly conncted components."""
 
@@ -449,17 +367,21 @@ class ConnectednessPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        
+        argdown = evaluation.artifacts.get("argdown")
+        assert argdown is not None and isinstance(argdown, ArgdownMultiDiGraph), (
+            "Evaluation must contain a valid ArgdownMultiDiGraph artifact."
+        )
         if argdown.number_of_nodes() == 0:
             return 0
         return len(list(nx.weakly_connected_components(argdown))) ** -1
 
 
-class MaxArgsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MaxArgsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger number of arguments."""
 
@@ -467,15 +389,19 @@ class MaxArgsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown = evaluation.artifacts.get("argdown")
+        assert argdown is not None and isinstance(argdown, ArgdownMultiDiGraph), (
+            "Evaluation must contain a valid ArgdownMultiDiGraph artifact."
+        )
+
         return len(argdown.arguments)
 
 
-class BalancePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class BalancePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with more balanced number of support and attack relations."""
 
@@ -483,10 +409,13 @@ class BalancePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         n_supp = sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
@@ -496,7 +425,7 @@ class BalancePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         return 1 - abs(n_supp - n_att) / (n_supp + n_att)
 
 
-class MaxSupportsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MaxSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger number of support relations."""
 
@@ -504,16 +433,19 @@ class MaxSupportsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         return sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
 
 
-class MaxAttacksPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MaxAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger number of attack relations."""
 
@@ -521,16 +453,19 @@ class MaxAttacksPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         return sum(1 for dr in drs if dr.valence == Valence.ATTACK)
 
 
-class MaxDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MaxDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger depth of the argument map."""
 
@@ -538,10 +473,13 @@ class MaxDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         if argdown.number_of_nodes() == 0:
             return 0
@@ -555,7 +493,7 @@ class MaxDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         return le
 
 
-class MinDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MinDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with smaller depth of the argument map."""
 
@@ -565,10 +503,13 @@ class MinDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         if argdown.number_of_nodes() == 0:
             return 0
@@ -582,7 +523,7 @@ class MinDiameterPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         return 1 / (1 + le)
 
 
-class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class DensityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger average degree of the argument map."""
 
@@ -592,10 +533,13 @@ class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         H = nx.DiGraph(argdown)
         degree_centrality = list(nx.degree_centrality(H).values())
@@ -604,7 +548,7 @@ class DensityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         )
 
 
-class MaxInDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MaxInDegreePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger maximum in degree of a node in the argument map."""
 
@@ -614,17 +558,20 @@ class MaxInDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         H = nx.DiGraph(argdown)
         in_degrees = list(dict(H.in_degree()).values())
         return max(in_degrees) if in_degrees else 0
 
 
-class MaxOutDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MaxOutDegreePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with larger maximum out degree of a node in the argument map."""
 
@@ -634,17 +581,20 @@ class MaxOutDegreePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         H = nx.DiGraph(argdown)
         out_degrees = list(dict(H.out_degree()).values())
         return max(out_degrees) if out_degrees else 0
 
 
-class MinLeafsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class MinLeafsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with smaller number of leaf nodes in the argument map."""
 
@@ -654,17 +604,20 @@ class MinLeafsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         H = nx.DiGraph(argdown)
         leafs = [n for n in H.nodes if H.in_degree(n) == 0]
         return 1 - len(leafs) / H.number_of_nodes() if H.number_of_nodes() else 0
 
 
-class ShortLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class ShortLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with short labels."""
 
@@ -674,10 +627,13 @@ class ShortLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
@@ -687,7 +643,7 @@ class ShortLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         return (round(sum(ll),-1) / len(ll)) ** -1 if ll else 0
 
 
-class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class DiverseLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with diverse labels."""
 
@@ -697,10 +653,13 @@ class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
@@ -717,7 +676,7 @@ class DiverseLabelsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
         return round(min(lds),2) if lds else 0
 
 
-class ShortClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class ShortClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with succinct claims."""
 
@@ -727,17 +686,20 @@ class ShortClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
         return round(sum(ll) / len(ll),-1) ** -1 if ll else 0
 
 
-class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class LongClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with verbose claims."""
 
@@ -747,17 +709,20 @@ class LongClaimsPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
         return round(sum(ll) / len(ll),-1) if ll else 0
 
 
-class ArgumentClaimSizePreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class ArgumentClaimSizePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with arguments being on average 2-3 times as longs as claims."""
 
@@ -767,10 +732,13 @@ class ArgumentClaimSizePreferencePairGenerator(ArgMapVirtuePreferencePairGenerat
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
@@ -789,7 +757,7 @@ class ArgumentClaimSizePreferencePairGenerator(ArgMapVirtuePreferencePairGenerat
         return len(good_args) / len(arguments)
 
 
-class IndependentWordingPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class IndependentWordingPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with independent wording of arguments and claims."""
 
@@ -799,10 +767,13 @@ class IndependentWordingPreferencePairGenerator(ArgMapVirtuePreferencePairGenera
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
@@ -826,7 +797,7 @@ class IndependentWordingPreferencePairGenerator(ArgMapVirtuePreferencePairGenera
         return round(sum(dlds) / len(dlds),1) if dlds else 0
 
 
-class SourceTextProximityPreferencePairGenerator(ArgMapVirtuePreferencePairGenerator):
+class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     that stick closely to the source text."""
 
@@ -836,10 +807,12 @@ class SourceTextProximityPreferencePairGenerator(ArgMapVirtuePreferencePairGener
 
     def _score(
         self,
-        problem: ArgMapProblem,
-        argmap: ArgumentMap,
+        problem: Problem,
+        argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
         return round(
             textdistance.damerau_levenshtein.normalized_similarity(
                 problem.sources, argmap.argdown_snippet

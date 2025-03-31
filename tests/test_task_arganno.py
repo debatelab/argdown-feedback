@@ -405,7 +405,8 @@ class TestAnnotationPreferencePairGenerators:
         print(cpps)
         assert len(cpps) == 1
         assert anno03 in cpps[0]['chosen'][-1]["content"]
-        assert anno01 in cpps[0]['rejected'][-1]["content"]
+        assert anno01 in cpps[0]['rejected'][-1]["content"] or anno02 in cpps[0]['rejected'][-1]["content"]
+        assert anno03 not in cpps[0]['rejected'][-1]["content"]
 
     async def test_annotation_supports_preference_pair_generator(self):
         judge = AnnotationJudge()
@@ -477,7 +478,8 @@ class TestAnnotationPreferencePairGenerators:
         print(cpps)
         assert len(cpps) == 1
         assert anno02 in cpps[0]['chosen'][-1]["content"]
-        assert anno01 in cpps[0]['rejected'][-1]["content"]
+        assert anno01 in cpps[0]['rejected'][-1]["content"] or anno03 in cpps[0]['rejected'][-1]["content"]
+        assert anno02 not in cpps[0]['rejected'][-1]["content"]
 
 
 @pytest.mark.asyncio

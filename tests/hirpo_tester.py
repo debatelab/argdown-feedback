@@ -93,7 +93,7 @@ class HirpoTester:
         assert len(evaluations) == len(valid_recos)
         for i, ev in enumerate(evaluations):
             print(f"## Solution {i + 1}")
-            print(ev)
+            pprint(ev)
             argdown = ev.artifacts.get("argdown")
             print(argdown)
             assert ev.is_valid
@@ -116,7 +116,7 @@ class HirpoTester:
         assert len(evaluations) == len(invalid_recos)
         for i, ev in enumerate(evaluations):
             print(f"## Solution {i + 1}")
-            print(ev)
+            pprint(ev)
             argdown = ev.artifacts.get("argdown")
             if argdown:
                 print(argdown.propositions)
@@ -207,13 +207,17 @@ class HirpoTester:
         judge = judge_class()
         ppg = GenericFailureDiffPreferencePairGenerator()
 
-        snippet_chosen = textwrap.dedent(chosen)
-        snippet_rejected = textwrap.dedent(rejected)
 
-        candidate_solutions = [
-            solution_class(snippet_chosen),
-            solution_class(snippet_rejected),
-        ]
+        if not isinstance(chosen, solution_class):
+            snippet_chosen = textwrap.dedent(chosen)
+            chosen = solution_class(snippet_chosen)
+
+        if not isinstance(rejected, solution_class):
+            snippet_rejected = textwrap.dedent(rejected)
+            rejected = solution_class(snippet_rejected)
+
+        candidate_solutions = [chosen, rejected]
+
         evaluations = await judge.arun(problem, candidate_solutions)
         print(evaluations)
 
@@ -222,5 +226,5 @@ class HirpoTester:
         assert len(cpps) == 1
         assert ppg.avoid_errors_hint in cpps[0]["chosen"][0]["content"]
         assert ppg.avoid_errors_hint in cpps[0]["rejected"][0]["content"]
-        assert snippet_chosen in cpps[0]["chosen"][-1]["content"]
-        assert snippet_rejected in cpps[0]["rejected"][-1]["content"]
+        assert str(chosen) in cpps[0]["chosen"][-1]["content"]
+        assert str(rejected) in cpps[0]["rejected"][-1]["content"]
