@@ -10,7 +10,6 @@ from argdown_hirpo.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
 )
 from argdown_hirpo.tasks.compound.arganno_plus_infreco import (
     ArgannoPlusInfreco,
@@ -166,70 +165,6 @@ class ArgannoPlusLogRecoProblemGenerator(ProblemGenerator):
             "Inputs to an annotation + LogReco problem must be a string or a list of strings"
         )
 
-"""
-class ArgannoPlusLogRecoSolutionGenerator(SolutionGenerator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.n_solutions = kwargs.get("n_solutions", 10)
-        self.temperature = kwargs.get("temperature", 0.5)
-        self.max_tokens = kwargs.get("max_tokens", 2048)
-
-    async def arun(
-        self,
-        problem: ArgannoPlusLogRecoProblem,
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[ArgannoPlusLogReco]:
-        assert (
-            isinstance(original_solution, ArgannoPlusLogReco)
-            or original_solution is None
-        )
-        assert feedback or original_solution is None, (
-            "Feedback is required for revised solutions"
-        )
-
-        messages = [
-            {
-                "role": "user",
-                "content": problem.instruct_prompt(),
-            }
-        ]
-
-        if original_solution and feedback:
-            messages += [
-                {
-                    "role": "assistant",
-                    "content": str(original_solution),
-                },
-                {
-                    "role": "user",
-                    "content": feedback.prompt,
-                },
-                {
-                    "role": "assistant",
-                    "content": feedback.feedback,
-                },
-                {
-                    "role": "user",
-                    "content": problem.revise_prompt(),
-                },
-            ]
-
-        answers = await self._generate(
-            messages,
-            max_tokens=self.max_tokens,
-            n=self.n_solutions,
-            temperature=self.temperature,
-        )
-
-        recos: list[ArgannoPlusLogReco] = []
-
-        for answer in answers:
-            reco = ArgannoPlusLogReco.from_raw_answer(answer)
-            recos.append(reco)  # type: ignore
-
-        return recos
-"""
 
 class ArgannoPlusLogRecoJudge(ArgannoPlusInfrecoJudge):
     """Judge for the anno plus argument mapping task."""

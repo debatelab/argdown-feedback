@@ -138,65 +138,6 @@ class AnnotationProblemGenerator(ProblemGenerator):
             "Inputs to an annotation problem must be a string or a list of strings"
         )
 
-"""
-class AnnotationSolutionGenerator(SolutionGenerator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.n_solutions = kwargs.get("n_solutions", 10)
-        self.temperature = kwargs.get("temperature", 0.3)
-        self.max_tokens = kwargs.get("max_tokens", 2048)
-
-    async def arun(
-        self,
-        problem: AnnotationProblem,
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Annotation]:
-        assert isinstance(original_solution, Annotation) or original_solution is None
-        assert feedback or original_solution is None, (
-            "Feedback is required for revised solutions"
-        )
-
-        messages = [
-            {
-                "role": "user",
-                "content": problem.instruct_prompt(),
-            }
-        ]
-
-        if original_solution and feedback:
-            messages += [
-                {
-                    "role": "assistant",
-                    "content": str(original_solution),
-                },
-                {
-                    "role": "user",
-                    "content": feedback.prompt,
-                },
-                {
-                    "role": "assistant",
-                    "content": feedback.feedback,
-                },
-                {
-                    "role": "user",
-                    "content": problem.revise_prompt(),
-                },
-            ]
-
-        answers = await self._generate(
-            messages,
-            max_tokens=self.max_tokens,
-            n=self.n_solutions,
-            temperature=self.temperature,
-        )
-
-        annotations = []
-
-
-        return annotations
-"""
-
 
 class AnnotationJudge(Judge):
     """Judge for the annotation task."""
