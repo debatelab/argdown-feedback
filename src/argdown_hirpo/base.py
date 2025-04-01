@@ -51,6 +51,12 @@ class Solution(ABC):
     def __str__(self) -> str:
         """Cast the solution as a string."""
 
+    @classmethod
+    @abstractmethod
+    def from_raw_answer(cls, answer: str) -> "Solution":
+        """Cast a raw answer as a solution."""
+
+
 
 @dataclasses.dataclass
 class Evaluation:
@@ -185,6 +191,72 @@ class SolutionGenerator(HIRAbstractGeneratorLLM):
     ) -> Sequence[Solution]:
         pass
 
+
+class GenericSolutionGenerator(SolutionGenerator):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # solution class
+        self.solution_class = kwargs.get("solution_class", Solution)
+        assert self.solution_class, "Solution class is required"
+        assert issubclass(
+            self.solution_class, Solution
+        ), "Solution class must be a subclass of Solution"
+        # generation kwargs
+        self.n_solutions = kwargs.get("n_solutions", 10)
+        self.temperature = kwargs.get("temperature", 0.5)
+        self.max_tokens = kwargs.get("max_tokens", 2048)
+
+    async def arun(
+        self,
+        problem: Problem,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> Sequence[Solution]:
+        assert feedback or original_solution is None, (
+            "Feedback is required for revised solutions"
+        )
+
+        messages = [
+            {
+                "role": "user",
+                "content": problem.instruct_prompt(),
+            }
+        ]
+
+        if original_solution and feedback:
+            messages += [
+                {
+                    "role": "assistant",
+                    "content": str(original_solution),
+                },
+                {
+                    "role": "user",
+                    "content": feedback.prompt,
+                },
+                {
+                    "role": "assistant",
+                    "content": feedback.feedback,
+                },
+                {
+                    "role": "user",
+                    "content": problem.revise_prompt(),
+                },
+            ]
+
+        answers = await self._generate(
+            messages,
+            max_tokens=self.max_tokens,
+            n=self.n_solutions,
+            temperature=self.temperature,
+        )
+
+        recos: list[Solution] = []
+
+        for answer in answers:
+            reco = self.solution_class.from_raw_answer(answer)
+            recos.append(reco)  # type: ignore
+
+        return recos
 
 class Judge(HIRAbstractGenerator):
     """Judges solutions."""

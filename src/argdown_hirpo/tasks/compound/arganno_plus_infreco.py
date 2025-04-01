@@ -35,17 +35,23 @@ from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
 
 # utility #
 
-def _get_props_used_in_inference(argument: Argument, pr_label: str, from_key: str="from") -> list[str]:
-    """Get all proposition labels used directly or indirectly in the inference 
-    to a conclusion with label `pr_label`."""
 
+def _get_props_used_in_inference(
+    argument: Argument, pr_label: str, from_key: str = "from"
+) -> list[str]:
+    """Get all proposition labels used directly or indirectly in the inference
+    to a conclusion with label `pr_label`."""
 
     if argument is None or not argument.pcs:
         return []
 
     used_labels = set()
+
     def add_parent_labels(label: str):
-        c = next((c for c in argument.pcs if isinstance(c, Conclusion) and c.label == label), None)
+        c = next(
+            (c for c in argument.pcs if isinstance(c, Conclusion) and c.label == label),
+            None,
+        )
         if c is None:
             return []
         parent_labels = c.inference_data.get(from_key, [])
@@ -53,10 +59,9 @@ def _get_props_used_in_inference(argument: Argument, pr_label: str, from_key: st
         for ref in parent_labels:
             add_parent_labels(ref)
 
-    add_parent_labels(pr_label)    
+    add_parent_labels(pr_label)
 
-    return list(used_labels)    
-
+    return list(used_labels)
 
 
 class ArgannoPlusInfrecoProblem(InfRecoProblem, AnnotationProblem):
@@ -149,7 +154,7 @@ class ArgannoPlusInfrecoProblem(InfRecoProblem, AnnotationProblem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = "Revise your previously submitted annotation and argument map given the above evaluation and feedback."
+        prompt = "Revise your previously submitted annotation and argument reconstruction given the above evaluation and feedback."
 
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)
@@ -175,7 +180,7 @@ class ArgannoPlusInfrecoProblem(InfRecoProblem, AnnotationProblem):
 class ArgannoPlusInfreco(Annotation, InformalReco):
     """
     Solution to the ArgannoPlusInfreco problem: annotation and argdown snippet.
-    
+
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
 
@@ -189,24 +194,31 @@ class ArgannoPlusInfreco(Annotation, InformalReco):
         return self.annotated_source_text + "\n\n" + self.argdown_snippet
 
     @classmethod
-    def from_raw_answer(
-        cls, raw_answer: str
-    ) -> "ArgannoPlusInfreco":
+    def from_raw_answer(cls, raw_answer: str) -> "ArgannoPlusInfreco":
         unparsed_solution = raw_answer
         annotated_source_text = ""
         argdown_snippet = ""
         if "\n```xml" in unparsed_solution:
-            annotated_source_text = unparsed_solution.split("\n```xml")[-1].split("\n```")[0]
+            annotated_source_text = unparsed_solution.split("\n```xml")[-1].split(
+                "\n```"
+            )[0]
             annotated_source_text = "```xml" + annotated_source_text + "\n```"
         if "\n```argdown" in unparsed_solution:
-            argdown_snippet = unparsed_solution.split("\n```argdown")[-1].split("\n```")[0]
-            argdown_snippet = "```argdown" + argdown_snippet + "\n```"                
+            argdown_snippet = unparsed_solution.split("\n```argdown")[-1].split(
+                "\n```"
+            )[0]
+            argdown_snippet = "```argdown" + argdown_snippet + "\n```"
 
         return cls(
-            annotated_source_text=annotated_source_text if annotated_source_text else unparsed_solution,
+            annotated_source_text=annotated_source_text
+            if annotated_source_text
+            else unparsed_solution,
             argdown_snippet=argdown_snippet if argdown_snippet else unparsed_solution,
-            unparsed_solution=None if annotated_source_text and argdown_snippet else unparsed_solution,
+            unparsed_solution=None
+            if annotated_source_text and argdown_snippet
+            else unparsed_solution,
         )
+
 
 class ArgannoPlusInfrecoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
@@ -218,7 +230,7 @@ class ArgannoPlusInfrecoProblemGenerator(ProblemGenerator):
             "Inputs to an annotation + infreco problem must be a string or a list of strings"
         )
 
-
+"""
 class ArgannoPlusInfrecoSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -280,7 +292,7 @@ class ArgannoPlusInfrecoSolutionGenerator(SolutionGenerator):
             recos.append(ArgannoPlusInfreco.from_raw_answer(answer))
 
         return recos
-
+"""
 
 class ArgannoPlusInfrecoJudge(Judge):
     """Judge for the anno plus argument mapping task."""
@@ -292,7 +304,6 @@ class ArgannoPlusInfrecoJudge(Judge):
         artifacts: dict[str, Any] = {}
         eval_data = {
             "fenced_code_blocks": "",
-
             "annotation_empty": "",
             "annotation_nested_propositions": "",
             "annotation_missing_id": "",
@@ -300,13 +311,11 @@ class ArgannoPlusInfrecoJudge(Judge):
             "annotation_invalid_support_ids": "",
             "annotation_invalid_attack_ids": "",
             "annotation_unknown_attributes": "",
-
             "argument_invalid_argdown_syntax": "",
             "argument_missing": "",
             "argument_illformed_argument": "",  # starts with conclusion / ends with premise
             "argument_missing_inference_info": "",
             "argument_unknown_proposition_references": "",  # in inference info
-
             "elements_correspondence": "",
             "relations_correspondence": "",
         }
@@ -351,7 +360,9 @@ class ArgannoPlusInfrecoJudge(Judge):
         except Exception as e:
             argdown = None
             is_valid = False
-            eval_data["argument_invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
+            eval_data["argument_invalid_argdown_syntax"] = (
+                f"Failed to parse argdown: {str(e)}"
+            )
 
         artifacts["argdown"] = argdown
         if argdown is None:
@@ -367,22 +378,32 @@ class ArgannoPlusInfrecoJudge(Judge):
             verifier = InfRecoVerifier(argdown, argument_idx=argument_idx)
             check, msg = verifier.has_pcs()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' lacks premise conclusion structure: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' lacks premise conclusion structure: {msg}"
+                )
             check, msg = verifier.starts_with_premise()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' does not start with a premise: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' does not start with a premise: {msg}"
+                )
 
             check, msg = verifier.ends_with_conclusion()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' does not end with a conclusion: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' does not end with a conclusion: {msg}"
+                )
 
             check, msg = verifier.has_not_multiple_gists()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' has more than one gist: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' has more than one gist: {msg}"
+                )
 
             check, msg = verifier.has_no_duplicate_pcs_labels()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' has duplicate labels in the standard form: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' has duplicate labels in the standard form: {msg}"
+                )
         if msgs:
             is_valid = False
             eval_data["argument_illformed_argument"] = " ".join(msgs)
@@ -394,7 +415,9 @@ class ArgannoPlusInfrecoJudge(Judge):
             verifier = InfRecoVerifier(argdown, argument_idx=argument_idx)
             check, msg = verifier.has_inference_data()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' lacks inference information: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' lacks inference information: {msg}"
+                )
         if msgs:
             is_valid = False
             eval_data["argument_missing_inference_info"] = " ".join(msgs)
@@ -405,7 +428,9 @@ class ArgannoPlusInfrecoJudge(Judge):
             verifier = InfRecoVerifier(argdown, argument_idx=argument_idx)
             check, msg = verifier.prop_refs_exist()
             if check is False:
-                msgs.append(f"Argument '{argument.label}' has unknown proposition references: {msg}")
+                msgs.append(
+                    f"Argument '{argument.label}' has unknown proposition references: {msg}"
+                )
         if msgs:
             is_valid = False
             eval_data["argument_unknown_proposition_references"] = " ".join(msgs)
@@ -415,10 +440,12 @@ class ArgannoPlusInfrecoJudge(Judge):
         msgs = []
         all_argument_labels = [arg.label for arg in argdown.arguments if arg.label]
         all_annotation_ids = [
-            a.get("id") for a in soup.find_all("proposition") if a.get("id")  # type: ignore
+            a.get("id")  # type: ignore
+            for a in soup.find_all("proposition")
+            if a.get("id")  # type: ignore
         ]
-        argument_label_map: dict[str,str] = {}
-        refreco_map: dict[str,str] = {}
+        argument_label_map: dict[str, str] = {}
+        refreco_map: dict[str, str] = {}
         for a in soup.find_all("proposition"):
             a_label = a.get("argument_label")  # type: ignore
             a_id = a.get("id")  # type: ignore
@@ -432,16 +459,21 @@ class ArgannoPlusInfrecoJudge(Judge):
             argument_label_map[str(a_id)] = str(a_label)
             refreco_map[str(a_id)] = str(a_ref_reco)
             argument = next(arg for arg in argdown.arguments if arg.label == a_label)
-            if not argument.pcs or not any(a_ref_reco == pr.label for pr in argument.pcs):
+            if not argument.pcs or not any(
+                a_ref_reco == pr.label for pr in argument.pcs
+            ):
                 msgs.append(
                     f"Illegal 'ref_reco_label' reference of proposition element with id={a_id}: "
                     f"No premise or conclusion with label '{a_ref_reco}' in argument '{a_label}'."
-                )            
-
+                )
 
         for argument in argdown.arguments:
             for pr in argument.pcs:
-                proposition = next(prop for prop in argdown.propositions if prop.label == pr.proposition_label)
+                proposition = next(
+                    prop
+                    for prop in argdown.propositions
+                    if prop.label == pr.proposition_label
+                )
                 id_refs = proposition.data.get("annotation_ids")
                 if id_refs is None:
                     msgs.append(
@@ -461,15 +493,15 @@ class ArgannoPlusInfrecoJudge(Judge):
                             f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
                             f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
                             f"with id={id_ref} in the annotation has a different argument_label"
-                            f"{': '+argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
+                            f"{': ' + argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
                         )
                     if refreco_map.get(id_ref) != pr.label:
                         msgs.append(
                             f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
                             f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
                             f"with id={id_ref} in the annotation has a different ref_reco_label"
-                            f"{': '+refreco_map[id_ref] if id_ref in refreco_map else ''}."
-                        )   
+                            f"{': ' + refreco_map[id_ref] if id_ref in refreco_map else ''}."
+                        )
         if msgs:
             is_valid = False
             eval_data["elements_correspondence"] = " - ".join(msgs)
@@ -505,7 +537,10 @@ class ArgannoPlusInfrecoJudge(Judge):
                 )
                 continue
             del argument
-            argument = next((arg for arg in argdown.arguments if arg.label == arglabel_from), None)  # type: ignore
+            argument = next(
+                (arg for arg in argdown.arguments if arg.label == arglabel_from),
+                None  # type: ignore
+            )
             ref_reco_from = refreco_map.get(ar["from_id"])
             ref_reco_to = refreco_map.get(ar["to_id"])
             if argument is None or ref_reco_from is None or ref_reco_to is None:
@@ -518,7 +553,7 @@ class ArgannoPlusInfrecoJudge(Judge):
 
         if msgs:
             is_valid = False
-            eval_data["relations_correspondence"] = " - ".join(msgs)            
+            eval_data["relations_correspondence"] = " - ".join(msgs)
 
         return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
 
@@ -529,8 +564,13 @@ class ArgannoPlusInfrecoJudge(Judge):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgannoPlusInfrecoProblem), "Problem must be an ArgannoPlusInfrecoProblem"
-        assert isinstance(original_solution, ArgannoPlusInfreco) or original_solution is None
+        assert isinstance(problem, ArgannoPlusInfrecoProblem), (
+            "Problem must be an ArgannoPlusInfrecoProblem"
+        )
+        assert (
+            isinstance(original_solution, ArgannoPlusInfreco)
+            or original_solution is None
+        )
         assert feedback or original_solution is None, (
             "Feedback is required for evaluating revised solutions"
         )
@@ -550,9 +590,11 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     where the source text's annotated propositions are textually similiar to the node texts in the argument map."""
 
     hints = [
-        "Make sure that your argument reconstruction stays faithful to and mimics closely "
-        "the annotation of the source text. In particular, try to use supporting propositions from the annotation "
-        "as premises / intermediate conclusions in your argument reconstruction!"
+        (
+            "Make sure that your argument reconstruction stays faithful to and mimics closely "
+            "the annotation of the source text. In particular, use formulations of premises and conclusions "
+            "that are similar to the corresponding annotated text segments!"
+        )
     ]
 
     def _score(
@@ -569,7 +611,7 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
 
         argdown = evaluation.artifacts["argdown"]
 
-        matches: list[tuple[str,str]] = []
+        matches: list[tuple[str, str]] = []
         for proposition in argdown.propositions:
             for annotation_id in proposition.data.get("annotation_ids", []):
                 anno_prop = next(
@@ -584,8 +626,6 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
         print(matches)
         dlss = [
             textdistance.damerau_levenshtein.normalized_similarity(s, t)
-            for s,t in matches
+            for s, t in matches
         ]
-        return round(
-            sum(dlss) / len(dlss), 1
-        )
+        return round(sum(dlss) / len(dlss), 1)

@@ -15,7 +15,6 @@ from argdown_hirpo.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
     Judge,
     ScoringVirtuePreferencePairGenerator,
 )
@@ -189,7 +188,7 @@ class ArgmapPlusArgannoProblemGenerator(ProblemGenerator):
             "Inputs to an annotation + argument mapping problem must be a string or a list of strings"
         )
 
-
+"""
 class ArgmapPlusArgannoSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -251,7 +250,7 @@ class ArgmapPlusArgannoSolutionGenerator(SolutionGenerator):
             recos.append(ArgmapPlusArganno.from_raw_answer(answer))
 
         return recos
-
+"""
 
 class ArgmapPlusArgannoJudge(Judge):
     """Judge for the anno plus argument mapping task."""

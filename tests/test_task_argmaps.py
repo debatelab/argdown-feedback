@@ -1,12 +1,11 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.base import Evaluation, Feedback
+from argdown_hirpo.base import Feedback, GenericSolutionGenerator
 from argdown_hirpo.tasks.core.argmap import (
     ArgumentMap,
     ArgMapProblem,
     ArgMapProblemGenerator,
-    ArgMapSolutionGenerator,
     ArgMapJudge,
     ArgMapFeedbackGenerator,
     ConnectednessPreferencePairGenerator,
@@ -55,7 +54,7 @@ def solution_class():
 
 @pytest.fixture
 def solution_generator_class():
-    return ArgMapSolutionGenerator
+    return GenericSolutionGenerator
 
 
 @pytest.fixture

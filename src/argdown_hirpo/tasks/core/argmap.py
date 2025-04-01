@@ -123,6 +123,16 @@ class ArgumentMap(Solution):
 
     def __str__(self):
         return self.argdown_snippet
+    
+    @classmethod
+    def from_raw_answer(cls, answer) -> "ArgumentMap":
+        # extract fenced code block
+        if answer.count("```argdown") == 1:
+            if answer.split("```argdown")[1].count("\n```") == 1:
+                answer = answer.split("```argdown")[1].split("\n```")[0]
+                answer = "```argdown" + answer + "\n```"
+        return cls(argdown_snippet=answer)
+
 
 
 class ArgMapProblemGenerator(ProblemGenerator):
@@ -136,6 +146,7 @@ class ArgMapProblemGenerator(ProblemGenerator):
         )
 
 
+"""
 class ArgMapSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -199,7 +210,7 @@ class ArgMapSolutionGenerator(SolutionGenerator):
             argmaps.append(ArgumentMap(argdown_snippet=answer))
 
         return argmaps
-
+"""
 
 class ArgMapJudge(Judge):
     """Judge for the argument mapping task."""

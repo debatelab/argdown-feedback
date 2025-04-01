@@ -21,8 +21,9 @@ class LogRecoVerifier(InfRecoVerifier):
         from_key: str = "from",
         formalization_key: str = "formalization",
         declarations_key: str = "declarations",
+        argument_idx: int = 0,
     ):
-        super().__init__(argdown, from_key)
+        super().__init__(argdown, from_key=from_key, argument_idx=argument_idx)
 
         self.formalization_key = formalization_key
         self.declarations_key = declarations_key

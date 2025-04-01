@@ -50,6 +50,10 @@ class NumberSolution(Solution):
 
     def __str__(self):
         return self.answer
+    
+    @classmethod
+    def from_raw_answer(cls, answer):
+        return answer
 
 
 class NumberProblemGenerator(ProblemGenerator):

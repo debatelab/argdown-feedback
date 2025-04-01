@@ -116,6 +116,15 @@ class Annotation(Solution):
 
     def __str__(self):
         return self.annotated_source_text
+    
+    @classmethod
+    def from_raw_answer(cls, answer) -> "Annotation":
+        """Extract the annotated source text from the answer."""
+        if answer.count("```xml") == 1:
+            if answer.split("```xml")[1].count("\n```") == 1:
+                answer = answer.split("```xml")[1].split("\n```")[0]
+                answer = "```xml" + answer + "\n```"
+        return cls(annotated_source_text=answer)
 
 
 class AnnotationProblemGenerator(ProblemGenerator):
@@ -129,7 +138,7 @@ class AnnotationProblemGenerator(ProblemGenerator):
             "Inputs to an annotation problem must be a string or a list of strings"
         )
 
-
+"""
 class AnnotationSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -184,15 +193,10 @@ class AnnotationSolutionGenerator(SolutionGenerator):
 
         annotations = []
 
-        # postprocess: extract fenced code block
-        for answer in answers:
-            if answer.count("```xml") == 1:
-                if answer.split("```xml")[1].count("\n```") == 1:
-                    answer = answer.split("```xml")[1].split("\n```")[0]
-                    answer = "```xml" + answer + "\n```"
-            annotations.append(Annotation(annotated_source_text=answer))
 
         return annotations
+"""
+
 
 class AnnotationJudge(Judge):
     """Judge for the annotation task."""

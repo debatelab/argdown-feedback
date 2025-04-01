@@ -2,12 +2,11 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.base import Feedback, Solution, GenericFeedbackGenerator
+from argdown_hirpo.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
 from argdown_hirpo.tasks.compound.arganno_plus_infreco import (
     ArgannoPlusInfrecoProblem,
     ArgannoPlusInfrecoProblemGenerator,
     ArgannoPlusInfreco,
-    ArgannoPlusInfrecoSolutionGenerator,
     ArgannoPlusInfrecoJudge,
     AnnotationProximityPreferencePairGenerator,
 )
@@ -43,7 +42,7 @@ def solution_class():
 
 @pytest.fixture
 def solution_generator_class():
-    return ArgannoPlusInfrecoSolutionGenerator
+    return GenericSolutionGenerator
 
 @pytest.fixture
 def judge_class():

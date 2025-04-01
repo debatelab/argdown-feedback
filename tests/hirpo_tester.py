@@ -67,7 +67,7 @@ class HirpoTester:
         else:
             pg = problem_generator_class()
         sg = solution_generator_class(
-            n_solutions=1, **model_kwargs
+            solution_class=solution_class, n_solutions=1, **model_kwargs
         )  # lmstudio server does not support param n
         problem = await pg.arun(source_texts)
         solutions = await sg.arun(problem)
@@ -183,7 +183,7 @@ class HirpoTester:
         feedback = feedbacks[0]
 
         sg = solution_generator_class(
-            n_solutions=1, **model_kwargs
+            solution_class=solution_class, n_solutions=1, **model_kwargs
         )  # lmstudio server does not support param n
         revised_solutions = await sg.arun(
             problem=problem, original_solution=original_solution, feedback=feedback

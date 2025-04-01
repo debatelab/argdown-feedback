@@ -3,12 +3,11 @@ import pytest
 import textwrap
 import warnings
 
-from argdown_hirpo.base import Evaluation, Feedback, HIRPreferencePairGenerator
+from argdown_hirpo.base import Evaluation, Feedback, HIRPreferencePairGenerator, GenericSolutionGenerator, Solution
 from argdown_hirpo.tasks.core.arganno import(
     Annotation,
     AnnotationProblem,
     AnnotationProblemGenerator,
-    AnnotationSolutionGenerator,
     AnnotationJudge,
     AnnotationFeedbackGenerator,
     AnnotationScopePreferencePairGenerator,
@@ -57,7 +56,7 @@ def solution_class():
 
 @pytest.fixture
 def solution_generator_class():
-    return AnnotationSolutionGenerator
+    return GenericSolutionGenerator
 
 @pytest.fixture
 def judge_class():
@@ -250,7 +249,7 @@ def feedback1() -> Feedback:
 def hirp_factory(model_kwargs, vpp_gen=AnnotationSupportsPreferencePairGenerator):
     return HIRPreferencePairGenerator(
         problem_generator=AnnotationProblemGenerator(),
-        solution_generator=AnnotationSolutionGenerator(n_solutions=8, **model_kwargs),
+        solution_generator=GenericSolutionGenerator(n_solutions=8, **model_kwargs),
         judge=AnnotationJudge(),
         feedback_generator=AnnotationFeedbackGenerator(**model_kwargs),
         virtue_preference_pair_generator=vpp_gen(),
@@ -295,7 +294,7 @@ async def test_annotation_problem_generator(source_texts):
 @pytest.mark.asyncio
 async def test_annotation_solution_generator(source_texts, model_kwargs):
     pg = AnnotationProblemGenerator()
-    sg = AnnotationSolutionGenerator(n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
+    sg = GenericSolutionGenerator(solution_class=Annotation, n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
     problem = await pg.arun(source_texts)
     solutions = await sg.arun(problem)
     assert len(solutions) == 1
@@ -378,7 +377,7 @@ async def test_revised_solution_generator(invalid_annotations1, source_texts, mo
     feedbacks = await fg.arun(problem, annotation, evaluation)
     feedback = feedbacks[0]
 
-    sg = AnnotationSolutionGenerator(n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
+    sg = GenericSolutionGenerator(solution_class=Annotation, n_solutions=1, **model_kwargs)  # lmstudio server does not support param n
     revised_annotations = await sg.arun(problem=problem, original_solution=annotation, feedback=feedback)
     assert len(revised_annotations) == 1
     revised_annotation = revised_annotations[0]

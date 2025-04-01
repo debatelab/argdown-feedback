@@ -18,7 +18,6 @@ from argdown_hirpo.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
     Judge,
     FeedbackGenerator,
 )
@@ -142,6 +141,15 @@ class LogicalReco(Solution):
 
     def __str__(self):
         return self.argdown_snippet
+    
+    @classmethod
+    def from_raw_answer(cls, answer) -> "LogicalReco":
+        """Extract a LogicalReco from a raw answer string."""
+        if answer.count("```argdown") == 1:
+            if answer.split("```argdown")[1].count("\n```") == 1:
+                answer = answer.split("```argdown")[1].split("\n```")[0]
+                answer = "```argdown" + answer + "\n```"
+        return cls(argdown_snippet=answer)
 
 
 class LogRecoProblemGenerator(ProblemGenerator):
@@ -154,7 +162,7 @@ class LogRecoProblemGenerator(ProblemGenerator):
             "Inputs to an argument reconstruction problem must be a string or a list of strings"
         )
 
-
+"""
 class LogRecoSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -218,7 +226,7 @@ class LogRecoSolutionGenerator(SolutionGenerator):
             recos.append(LogicalReco(argdown_snippet=answer))
 
         return recos
-
+"""
 
 class LogRecoJudge(Judge):
     """Judge for the informal argument reconstruction task."""

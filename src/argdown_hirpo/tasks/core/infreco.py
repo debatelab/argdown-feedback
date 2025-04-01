@@ -133,6 +133,15 @@ class InformalReco(Solution):
     def __str__(self):
         return self.argdown_snippet
 
+    @classmethod
+    def from_raw_answer(cls, answer) -> "InformalReco":
+        """extract the argdown snippet from a raw answer"""
+        if answer.count("```argdown") == 1:
+            if answer.split("```argdown")[1].count("\n```") == 1:
+                answer = answer.split("```argdown")[1].split("\n```")[0]
+                answer = "```argdown" + answer + "\n```"
+        return cls(argdown_snippet=answer)
+
 
 class InfRecoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
@@ -144,7 +153,7 @@ class InfRecoProblemGenerator(ProblemGenerator):
             "Inputs to an argument recinstruction problem must be a string or a list of strings"
         )
 
-
+"""
 class InfRecoSolutionGenerator(SolutionGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -208,7 +217,7 @@ class InfRecoSolutionGenerator(SolutionGenerator):
             recos.append(InformalReco(argdown_snippet=answer))
 
         return recos
-
+"""
 
 class InfRecoJudge(Judge):
     """Judge for the informal argument reconstruction task."""

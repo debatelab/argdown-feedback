@@ -1,12 +1,11 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.base import Feedback, Solution
+from argdown_hirpo.base import Feedback, Solution, GenericSolutionGenerator
 from argdown_hirpo.tasks.core.infreco import (
     InformalReco,
     InfRecoProblem,
     InfRecoProblemGenerator,
-    InfRecoSolutionGenerator,
     InfRecoJudge,
     InfRecoFeedbackGenerator,
     NoUnusedPropsPreferencePairGenerator,
@@ -40,7 +39,7 @@ def solution_class():
 
 @pytest.fixture
 def solution_generator_class():
-    return InfRecoSolutionGenerator
+    return GenericSolutionGenerator
 
 @pytest.fixture
 def judge_class():

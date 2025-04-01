@@ -5,6 +5,7 @@ from argdown_hirpo.base import (
     Problem,
     Evaluation,
     ProblemGeneratorLLM,
+    GenericSolutionGenerator,
     ScoringVirtuePreferencePairGenerator,
     Solution,
 )
@@ -14,7 +15,6 @@ from argdown_hirpo.tasks.core.infreco import (
 )
 from argdown_hirpo.tasks.core.arganno import (
     AnnotationProblemGenerator,
-    AnnotationSolutionGenerator,
     AnnotationJudge,
 )
 
@@ -101,7 +101,7 @@ class InfRecoFromArgAnnoProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._arganno_pg = AnnotationProblemGenerator()
-        self._arganno_sg = AnnotationSolutionGenerator(*args, **kwargs)
+        self._arganno_sg = GenericSolutionGenerator(*args, **kwargs)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
