@@ -39,6 +39,7 @@ def _get_props_used_in_inference(argument: Argument, pr_label: str, from_key: st
     """Get all proposition labels used directly or indirectly in the inference 
     to a conclusion with label `pr_label`."""
 
+
     if argument is None or not argument.pcs:
         return []
 
@@ -284,7 +285,7 @@ class ArgannoPlusInfrecoSolutionGenerator(SolutionGenerator):
 class ArgannoPlusInfrecoJudge(Judge):
     """Judge for the anno plus argument mapping task."""
 
-    def _evaluate_argmap(
+    def _evaluate_solution(
         self, problem: ArgannoPlusInfrecoProblem, reco: ArgannoPlusInfreco
     ) -> Evaluation:
         is_valid = True
@@ -338,7 +339,7 @@ class ArgannoPlusInfrecoJudge(Judge):
         for k, v in evaluation_anno.metrics.items():
             if k != "fenced_code_block":
                 eval_data["annotation_" + k] = v
-        if not soup.get("proposition"):
+        if not list(soup.find_all("proposition")):
             is_valid = False
             eval_data["annotation_empty"] = "No proposition elements in the annotation."
 
@@ -437,6 +438,7 @@ class ArgannoPlusInfrecoJudge(Judge):
                     f"No premise or conclusion with label '{a_ref_reco}' in argument '{a_label}'."
                 )            
 
+
         for argument in argdown.arguments:
             for pr in argument.pcs:
                 proposition = next(prop for prop in argdown.propositions if prop.label == pr.proposition_label)
@@ -502,8 +504,13 @@ class ArgannoPlusInfrecoJudge(Judge):
                     f"are not assigned to one and the same argument (different argument_labels)."
                 )
                 continue
-            argument = next(arg for arg in argdown.arguments if arg.label == arglabel_from)
-            if ar["from_id"] not in _get_props_used_in_inference(argument, ar["to_id"]):
+            del argument
+            argument = next((arg for arg in argdown.arguments if arg.label == arglabel_from), None)  # type: ignore
+            ref_reco_from = refreco_map.get(ar["from_id"])
+            ref_reco_to = refreco_map.get(ar["to_id"])
+            if argument is None or ref_reco_from is None or ref_reco_to is None:
+                continue
+            if ref_reco_from not in _get_props_used_in_inference(argument, ref_reco_to):
                 msgs.append(
                     f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
                     f"matched by the inferential relations in the argument '{argument.label}'."
@@ -533,7 +540,7 @@ class ArgannoPlusInfrecoJudge(Judge):
             assert isinstance(solution, ArgannoPlusInfreco), (
                 "All solutions must be ArgannoPlusInfreco"
             )
-            evaluations.append(self._evaluate_argmap(problem, solution))
+            evaluations.append(self._evaluate_solution(problem, solution))
 
         return evaluations
 
@@ -559,16 +566,26 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
 
         soup = evaluation.artifacts["soup"]
         anno_props = soup.find_all("proposition")
-        supporting_props = [
-            ap
-            for ap in anno_props
-            if ap.get("supports")  # type: ignore
-        ]
-        list_anno_props = "\n".join([ap.text for ap in supporting_props])
 
+        argdown = evaluation.artifacts["argdown"]
+
+        matches: list[tuple[str,str]] = []
+        for proposition in argdown.propositions:
+            for annotation_id in proposition.data.get("annotation_ids", []):
+                anno_prop = next(
+                    (ap for ap in anno_props if ap.get("id") == annotation_id), None
+                )
+                if anno_prop is None:
+                    continue
+                for text in proposition.texts:
+                    matches.append((anno_prop.get_text(), text))
+
+        print("matches")
+        print(matches)
+        dlss = [
+            textdistance.damerau_levenshtein.normalized_similarity(s, t)
+            for s,t in matches
+        ]
         return round(
-            textdistance.damerau_levenshtein.normalized_similarity(
-                list_anno_props, reco.argdown_snippet
-            ),
-            1,
+            sum(dlss) / len(dlss), 1
         )

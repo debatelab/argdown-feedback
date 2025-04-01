@@ -472,8 +472,6 @@ class NoUnusedPropsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
         reco: Solution,
         evaluation: Evaluation,
     ) -> float:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         argument = argdown.arguments[0]
         used_labels = set()
