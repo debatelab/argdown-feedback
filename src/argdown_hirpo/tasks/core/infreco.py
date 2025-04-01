@@ -556,8 +556,6 @@ class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         reco: Solution,
         evaluation: Evaluation,
     ) -> float:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         propositions: list[Proposition] = argdown.propositions
 
@@ -584,8 +582,6 @@ class VerbosityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         reco: Solution,
         evaluation: Evaluation,
     ) -> float:
-        assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-        assert isinstance(reco, InformalReco), "Solution must be an InformalReco"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         propositions: list[Proposition] = argdown.propositions

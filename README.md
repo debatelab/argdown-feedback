@@ -100,7 +100,7 @@ SE4[[InfReco➡LogReco]]
 T7 --> SE4 --> T8
 
 classDef Completed fill:#292;
-class T2,T5,T6,T7,T8,T9,SE3 Completed;
+class T2,T3,T5,T6,T7,T8,T9,SE3 Completed;
 
 
 ```

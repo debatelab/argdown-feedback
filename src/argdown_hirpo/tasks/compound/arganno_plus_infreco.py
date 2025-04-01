@@ -405,6 +405,11 @@ class ArgannoPlusInfrecoJudge(Judge):
                 )
 
         for argument in argdown.arguments:
+            if argument.label not in argument_label_map.values():
+                msgs.append(
+                    f"Free floating argument: Argument '{argument.label}' does not have any "
+                    "corresponding elements in the annotation."
+                )
             for pr in argument.pcs:
                 proposition = next(
                     prop
@@ -540,8 +545,6 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
         reco: Solution,
         evaluation: Evaluation,
     ) -> float:
-        assert isinstance(problem, ArgannoPlusInfrecoProblem)
-        assert isinstance(reco, InformalReco)
 
         soup = evaluation.artifacts["soup"]
         anno_props = soup.find_all("proposition")

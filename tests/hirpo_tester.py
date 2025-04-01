@@ -219,8 +219,8 @@ class HirpoTester:
         candidate_solutions = [chosen, rejected]
 
         evaluations = await judge.arun(problem, candidate_solutions)
-        print(evaluations)
-
+        pprint(evaluations)
+        
         cpps = await ppg.arun(problem, candidate_solutions, evaluations)
         pprint(cpps)
         assert len(cpps) == 1

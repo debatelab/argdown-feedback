@@ -3,15 +3,16 @@ import pytest
 import textwrap
 
 from argdown_hirpo.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
+from argdown_hirpo.tasks.compound.arganno_plus_logreco import (
+    ArgannoPlusLogRecoProblem,
+    ArgannoPlusLogRecoProblemGenerator,
+    ArgannoPlusLogReco,
+    ArgannoPlusLogRecoJudge,
+)
 from argdown_hirpo.tasks.compound.arganno_plus_infreco import (
-    ArgannoPlusInfrecoProblem,
-    ArgannoPlusInfrecoProblemGenerator,
-    ArgannoPlusInfreco,
-    ArgannoPlusInfrecoJudge,
     AnnotationProximityPreferencePairGenerator,
 )
 from argdown_hirpo.tasks.core.infreco import (
-    NoUnusedPropsPreferencePairGenerator,
     SimplicityPreferencePairGenerator,
 )
 from argdown_hirpo.tasks.core.arganno import (
@@ -30,15 +31,15 @@ def model_kwargs():
 
 @pytest.fixture
 def problem_class():
-    return ArgannoPlusInfrecoProblem
+    return ArgannoPlusLogRecoProblem
 
 @pytest.fixture
 def problem_generator_class():
-    return ArgannoPlusInfrecoProblemGenerator
+    return ArgannoPlusLogRecoProblemGenerator
 
 @pytest.fixture
 def solution_class():
-    return ArgannoPlusInfreco
+    return ArgannoPlusLogReco
 
 @pytest.fixture
 def solution_generator_class():
@@ -46,7 +47,7 @@ def solution_generator_class():
 
 @pytest.fixture
 def judge_class():
-    return ArgannoPlusInfrecoJudge
+    return ArgannoPlusLogRecoJudge
 
 @pytest.fixture
 def feedback_generator_class():
@@ -78,49 +79,9 @@ def valid_recos(solution_class) -> list[Solution]:
             ```argdown
             <Suffering>
                             
-            (1) Animals suffer. {annotation_ids: ['2']}
+            (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
             -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
-            ```
-            """)
-        ),
-        solution_class.from_raw_answer(
-            textwrap.dedent("""
-            ```xml
-            <proposition id="1" argument_label="Climate Change" ref_reco_label="2">We should stop eating meat.</proposition>
-                            
-            <proposition id="2" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
-            ```
-
-            ```argdown
-            <Suffering>
-                            
-            (1) Animals suffer. {annotation_ids: ['2']}
-            -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: []}
-
-            <Climate Change>
-                            
-            (1) Animals suffer. {annotation_ids: []}
-            -- {from: ["1"]} --
-            (2) We should stop eating meat. {annotation_ids: ['1']}
-            ```
-            """)
-        ),
-        solution_class.from_raw_answer(
-            textwrap.dedent("""
-            ```xml
-            <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                            
-            <proposition id="2" argument_label="Suffering" ref_reco_label="2">Animals suffer.</proposition> Animal farming causes climate change.
-            ```
-
-            ```argdown
-            <Suffering>
-                            
-            (1) Animals suffer. {annotation_ids: []}
-            -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1','2']}
+            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
             ```
             """)
         ),
@@ -135,53 +96,17 @@ def valid_recos(solution_class) -> list[Solution]:
             ```argdown
             <Suffering>
                             
-            (1) Animals suffer. {annotation_ids: ['2']}
+            (1) Animals suffer. {annotation_ids: ['2'], formalization: "p", declarations: {"p": "Animals suffer."}}
                 <+ Animals are screaming.
-            (2) If they suffer, they have rights. {annotation_ids: []}
+            (2) If they suffer, they have rights. {annotation_ids: [], formalization: "p -> q", declarations: {q: "Animals have rights."}}
             -- {from: ["1", "2"]} --
-            (3) Animals have rights. {annotation_ids: []}
-            (4) If they have rights, we should stop eating meat. {annotation_ids: []}
+            (3) Animals have rights. {annotation_ids: [], formalization: "q"}
+            (4) If they have rights, we should stop eating meat. {annotation_ids: [], formalization: "q -> r", declarations: {"r": "No meat."}}
             -- {from: ["3", "4"]} --
-            (5) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+            (5) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "r"}
             ```
             """)
-        ),
-        solution_class.from_raw_answer(
-            textwrap.dedent("""
-            Bad stuff...
-                            
-            ```xml
-            <proposition argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                            
-            <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
-            ```
-
-            ```argdown
-            <Suffering>
-                            
-            (1) Animals suffer. {annotation_ids: ['2']}
-            -----
-            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
-            ```
-
-            Revised stuff:
-
-            ```xml
-            <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                            
-            <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
-            ```
-
-            ```argdown
-            <Suffering>
-                            
-            (1) Animals suffer. {annotation_ids: ['2']}
-            -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
-            ```
-            """)
-        ),
-    ]
+        ),    ]
 
 
 @pytest.fixture
@@ -198,6 +123,63 @@ def invalid_recos(solution_class) -> list[Solution]:
             ```
             <Suffering>
                             
+            (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
+            -- {from: ["1"]} --
+            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
+            ```
+            """)
+        ),
+        solution_class.from_raw_answer(
+            textwrap.dedent("""
+            ```xml
+            <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
+                            
+            <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+            ```
+
+            Non sequitur
+
+            ```argdown
+            <Suffering>
+                            
+            (1) Animals suffer. {annotation_ids: ['2'], formalization: "p | q", declarations: {"p": "Animals suffer.", q: "Very much."}}
+            -- {from: ["1"]} --
+            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
+            ```
+            """)
+        ),
+        solution_class.from_raw_answer(
+            textwrap.dedent("""
+            ```xml
+            <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
+                            
+            <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+            ```
+
+            Inconsistent premises
+
+            ```argdown
+            <Suffering>
+                            
+            (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & -p", declarations: {"p": "Animals suffer."}}
+            -- {from: ["1"]} --
+            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
+            ```
+            """)
+        ),
+        solution_class.from_raw_answer(
+            textwrap.dedent("""
+            ```xml
+            <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
+                            
+            <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+            ```
+
+            Missing formalization
+
+            ```argdown
+            <Suffering>
+                            
             (1) Animals suffer. {annotation_ids: ['2']}
             -- {from: ["1"]} --
             (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
@@ -206,6 +188,8 @@ def invalid_recos(solution_class) -> list[Solution]:
         ),
         solution_class.from_raw_answer(
             textwrap.dedent("""
+            Wrong argument_labels
+
             ```xml
             <proposition id="1" argument_label="No meat">We should stop eating meat.</proposition>
                             
@@ -243,31 +227,6 @@ def invalid_recos(solution_class) -> list[Solution]:
             (1) Animals suffer. {annotation_ids: []}
             -- {from: ["1"]} --
             (2) We should stop eating meat. {annotation_ids: ['1']}
-            ```
-            """)
-        ),
-        solution_class.from_raw_answer(
-            textwrap.dedent("""
-            Free-floating <Climate Change> argument 
-
-            ```xml
-            <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                            
-            <proposition id="2" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
-            ```
-
-            ```argdown
-            <Suffering>
-                            
-            (1) Animals suffer. {annotation_ids: ['2']}
-            -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
-
-            <Climate Change>
-                            
-            (1) Animals suffer. {annotation_ids: []}
-            -- {from: ["1"]} --
-            (2) We should stop eating meat. {annotation_ids: []}
             ```
             """)
         ),
@@ -459,58 +418,44 @@ async def test_revised_solution_generator(
 
 
 @pytest.mark.asyncio
-class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
+class TestArgannoPlusLogRecoFailureTypePreferencePairGenerator:
 
     @pytest.mark.parametrize(
         "chosen,rejected",
         [
             (
-                ArgannoPlusInfreco.from_raw_answer(
+                ArgannoPlusLogReco.from_raw_answer(
                     textwrap.dedent("""
                     ```xml
-                    <proposition id="1" argument_label="Climate Change" ref_reco_label="2">We should stop eating meat.</proposition>
+                    <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
                                     
-                    <proposition id="2" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                    <proposition id="2" supports="1" argument_label="Climate Change" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
                     ```
 
                     ```argdown
                     <Suffering>
                                     
-                    (1) Animals suffer. {annotation_ids: ['2']}
+                    (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                     -- {from: ["1"]} --
-                    (2) [No meat]: We should stop eating meat. {annotation_ids: ['2']}
-
-                    <Climate Change>
-                                    
-                    (1) Animals suffer. {annotation_ids: []}
-                    -- {from: ["1"]} --
-                    (2) We should stop eating meat. {annotation_ids: ['1']}
+                    (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                     ```
                     """)
                 ),
-                ArgannoPlusInfreco.from_raw_answer(
+                ArgannoPlusLogReco.from_raw_answer(
                     textwrap.dedent("""
                     ```xml
-                    <proposition id="1" argument_label="Climate Change" ref_reco_label="2">We should stop eating meat.</proposition>
+                    <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
                                     
-                    <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                    <proposition id="2" supports="1" argument_label="Climate Change" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
                     ```
 
                     ```argdown
                     <Suffering>
                                     
-                    (1) Animals suffer. {annotation_ids: ['2']}
+                    (1) Animals suffer. {annotation_ids: ['2'], formalization: "p | q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                     -- {from: ["1"]} --
-                    (2) [No meat]: We should stop eating meat. {annotation_ids: ['2']}
-
-                    <Climate Change>
-                                    
-                    (1) Animals suffer. {annotation_ids: []}
-                    -- {from: ["1"]} --
-                    (2) We should stop eating meat. {annotation_ids: ['1']}
+                    (2) [No meat]: We should stop eating meat. {annotation_ids: ['3'], formalization: "p"}
                     ```
-                                    
-                    <No argument>: Nothing
                     """)
                 ),
             ),
@@ -537,7 +482,7 @@ class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
 
 
 @pytest.mark.asyncio
-class TestArgannoPlusInfrecoPreferencePairGenerators:
+class TestArgannoPlusLogRecoPreferencePairGenerators:
 
     @pytest.mark.parametrize(
         "PPG,chosen,rejected",
@@ -554,9 +499,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
                 """
@@ -569,43 +514,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Most living beings feel pain. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: It is wrong to eat meat. {annotation_ids: ['1']}
-                ```
-                """,
-            ),
-            (
-                NoUnusedPropsPreferencePairGenerator,
-                """
-                ```xml
-                <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                                
-                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
-                ```
-
-                ```argdown
-                <Suffering>
-                                
-                (1) Animals suffer. {annotation_ids: ['2']}
-                -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
-                ```
-                """,
-                """
-                ```xml
-                <proposition id="1" argument_label="Suffering" ref_reco_label="3">We should stop eating meat.</proposition>
-                                
-                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
-                ```
-
-                ```argdown
-                <Suffering>
-                                
-                (1) Animals suffer. {annotation_ids: ['2']}
-                (2) Another premise, unused. {annotation_ids: []}
-                -- {from: ["1"]} --
-                (3) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: Animals must not be consumed. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
             ),
@@ -621,9 +532,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
                 """
@@ -636,9 +547,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer and feel pain. {annotation_ids: ['2']}
+                (1) Animals suffer and feel pain. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat and not consume any animal products. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat and not consume animal products. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
             ),
@@ -654,9 +565,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
                 """
@@ -669,9 +580,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: []}
+                (1) Animals suffer. {annotation_ids: [], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
             ),
@@ -687,9 +598,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
                 """
@@ -702,9 +613,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
             ),
@@ -720,9 +631,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
                 """
@@ -735,9 +646,9 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
                 ```argdown
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Animals suffer.", q: "Very much."}}
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
                 ```
                 """,
             ),
@@ -758,8 +669,8 @@ class TestArgannoPlusInfrecoPreferencePairGenerators:
         judge = judge_class()
         ppg = PPG()
 
-        chosen = ArgannoPlusInfreco.from_raw_answer(textwrap.dedent(chosen))
-        rejected = ArgannoPlusInfreco.from_raw_answer(textwrap.dedent(rejected))
+        chosen = ArgannoPlusLogReco.from_raw_answer(textwrap.dedent(chosen))
+        rejected = ArgannoPlusLogReco.from_raw_answer(textwrap.dedent(rejected))
         candidate_solutions = [chosen, rejected]
         evaluations = await judge.arun(problem, candidate_solutions)
         pprint(evaluations)

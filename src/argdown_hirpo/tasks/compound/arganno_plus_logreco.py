@@ -153,6 +153,14 @@ class ArgannoPlusLogReco(ArgannoPlusInfreco):
     
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
+    @classmethod
+    def from_raw_answer(cls, raw_answer):
+        solution = super().from_raw_answer(raw_answer)
+        return cls(
+            annotated_source_text=solution.annotated_source_text,
+            argdown_snippet=solution.argdown_snippet,
+            unparsed_solution=solution.unparsed_solution,
+        )
 
 
 class ArgannoPlusLogRecoProblemGenerator(ProblemGenerator):
@@ -177,6 +185,11 @@ class ArgannoPlusLogRecoJudge(ArgannoPlusInfrecoJudge):
         if argdown is None:
             return evaluation
     
+        eval_data["argument_unused_propositions"] = ""
+        eval_data["argument_flawed_formalizations"] = ""
+        eval_data["argument_invalid_inference"] = ""
+        eval_data["argument_redundant_premises"] = ""
+        eval_data["argument_inconsistent_premises"] = ""
 
         # unused propositions
         msgs = []

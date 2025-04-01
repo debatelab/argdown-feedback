@@ -3,6 +3,7 @@
 from abc import ABC, abstractmethod
 import dataclasses
 import logging
+from pprint import pprint
 import random
 from statistics import mean
 from textwrap import dedent
@@ -485,7 +486,7 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
         for key in evaluations[0].metrics.keys():
             error_counts[key] = len([1 for e in evaluations if e.metrics[key]])
         # dismiss errors that are never avoided, i.e. always present
-        error_counts = {k: v for k, v in error_counts.items() if v < len(evaluations)}
+        error_counts = {k: v for k, v in error_counts.items() if 0 < v < len(evaluations)}
 
         if not error_counts:
             return pairs

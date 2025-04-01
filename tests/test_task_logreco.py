@@ -379,6 +379,28 @@ def invalid_recos(solution_class) -> list[Solution]:
         solution_class(
             argdown_snippet=textwrap.dedent("""
             ```argdown
+            <Single inconsistent conclusion>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "p", declarations: {"p": "some prop"}}
+            -- {from: ["1"]} --
+            (2) Eating animals is wrong. {formalization: "p & -p"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Premise contradicts conclusion>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "p", declarations: {"p": "some prop"}}
+            -- {from: ["1"]} --
+            (2) Eating animals is wrong. {formalization: "-p"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
             <Non sequitur>: Globally, see Premise 2
 
             (1) Animals have big brain. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "has big brain"}}
