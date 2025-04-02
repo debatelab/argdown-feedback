@@ -209,7 +209,7 @@ class ArgMapJudge(Judge):
             )
 
         return Evaluation(
-            is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
+            is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
         )
 
     async def arun(

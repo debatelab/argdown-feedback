@@ -85,8 +85,8 @@ def valid_argmaps() -> list[ArgumentMap]:
             argdown_snippet=textwrap.dedent("""
         ```argdown
         [No meat]: We should stop eating meat.
-        <+ <Suffering>: Animals suffer.
-        <+ <Climate change>: Animal farming causes climate change.
+            <+ <Suffering>: Animals suffer.
+            <+ <Climate change>: Animal farming causes climate change.
         ```
         """)
         ),

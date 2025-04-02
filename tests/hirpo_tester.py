@@ -1,6 +1,6 @@
 from pprint import pprint
 import textwrap
-import pytest
+import networkx as nx  # type: ignore
 
 
 from argdown_hirpo.base import Evaluation, Feedback, GenericFailureDiffPreferencePairGenerator, Problem, Solution, HIRAbstractGeneratorLLM
@@ -79,7 +79,7 @@ class HirpoTester:
 
     @staticmethod
     async def test_judge_valid(
-        problem_generator_class, judge_class, valid_recos, source_texts, model_kwargs = None
+        problem_generator_class, judge_class, valid_recos, source_texts, argdown_artifact_keys=["argdown"], model_kwargs = None
     ):
         source_text = source_texts[0]
         if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
@@ -94,11 +94,15 @@ class HirpoTester:
         for i, ev in enumerate(evaluations):
             print(f"## Solution {i + 1}")
             pprint(ev)
-            argdown = ev.artifacts.get("argdown")
-            print(argdown)
+            for ad_key in argdown_artifact_keys:
+                if ad_key in ev.artifacts:
+                    print(f"## {ad_key}")
+                    argdown = ev.artifacts.get(ad_key)
+                    pprint(argdown.dialectical_relations)
+                    print(nx.node_link_data(argdown))
+                    assert argdown
             assert ev.is_valid
             assert not any(v for _, v in ev.metrics.items())
-            assert ev.artifacts["argdown"]
 
     @staticmethod
     async def test_judge_invalid(

@@ -53,7 +53,7 @@ class InfRecoVerifier(BaseArgdownVerifier):
             raise TypeError("argdown must be of type ArgdownMultiDiGraph")
 
         self.argument: Argument | None = None
-        if len(argdown.arguments) == 1:
+        if argument_idx < len(argdown.arguments):
             self.argument = argdown.arguments[argument_idx]
 
         self.from_key = from_key
@@ -71,7 +71,7 @@ class InfRecoVerifier(BaseArgdownVerifier):
                     check, msg = veri_fn()
                     if check is False:
                         msg = msg if msg else veri_fn_name 
-                        eval_results[eval_dim] = eval_results[eval_dim] + f"Error in argument <{argument.label}>: {msg}. "
+                        eval_results[eval_dim] = eval_results[eval_dim] + f"Error in argument <{argument.label}>: {msg} "
         eval_results = {k: v.strip() for k,v in eval_results.items()}
         return eval_results
 
@@ -177,6 +177,7 @@ class InfRecoVerifier(BaseArgdownVerifier):
         return True, None
 
     def uses_all_props(self) -> tuple[bool | None, str | None]:
+
         if self.argument is None or not self.argument.pcs:
             return None, None
 

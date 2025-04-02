@@ -1,8 +1,9 @@
+import copy
 from typing import Any, Sequence
 
 import dataclasses
 from textwrap import dedent
-from pyargdown import Argdown, ArgdownMultiDiGraph, Argument, Proposition, Valence, DialecticalType, parse_argdown
+from pyargdown import Argdown, ArgdownMultiDiGraph, Argument, Conclusion, Proposition, Valence, DialecticalType, parse_argdown
 
 from argdown_hirpo.base import (
     Problem,
@@ -232,6 +233,8 @@ class ArgmapPlusInfrecoJudge(Judge):
         """Check if two propositions are identical."""
         if prop1 is None or prop2 is None:
             return False
+        if prop1.label != prop2.label:
+            return False
         return (
             prop1.label == prop2.label
             or any(text in prop2.texts for text in prop1.texts)
@@ -294,20 +297,18 @@ class ArgmapPlusInfrecoJudge(Judge):
             # get matched source nodes in reco
             source_m: Argument | Proposition | None
             target_m: Argument | Proposition | None
-            if drel.source in argdown_map.arguments:
+            if any(a.label==drel.source for a in argdown_map.arguments):
                 source_m =  next( 
-                    (a for a in argdown_reco.arguments if a.label==drel.source),
-                    None
+                    a for a in argdown_reco.arguments if a.label==drel.source
                 )  
             else:
                 source_m = next(
                     (p for p in argdown_reco.propositions if p.label==drel.source),
                     None
                 )
-            if drel.target in argdown_map.arguments:
+            if any(a.label==drel.target for a in argdown_map.arguments):
                 target_m = next(
-                    (a for a in argdown_reco.arguments if a.label==drel.target),
-                    None
+                    a for a in argdown_reco.arguments if a.label==drel.target
                 )
             else:
                 target_m = next(
@@ -316,7 +317,6 @@ class ArgmapPlusInfrecoJudge(Judge):
                 )
             if source_m is None or target_m is None:
                 continue
-
             # check if the relation is grounded in reco
             if isinstance(source_m, Argument) and isinstance(target_m, Argument):
                 if not source_m.pcs or not target_m.pcs:
@@ -328,6 +328,7 @@ class ArgmapPlusInfrecoJudge(Judge):
                             argdown_reco.get_proposition(source_m.pcs[-1].proposition_label)
                         )
                         for pr in target_m.pcs
+                        if not isinstance(pr, Conclusion)
                     ):
                         continue
                     msgs.append(
@@ -343,6 +344,7 @@ class ArgmapPlusInfrecoJudge(Judge):
                             argdown_reco
                         )
                         for pr in target_m.pcs
+                        if not isinstance(pr, Conclusion)
                     ):
                         continue
                     msgs.append(
@@ -360,6 +362,7 @@ class ArgmapPlusInfrecoJudge(Judge):
                             source_m,
                         )
                         for pr in target_m.pcs
+                        if not isinstance(pr, Conclusion)
                     ):
                         continue
                     msgs.append(
@@ -375,6 +378,7 @@ class ArgmapPlusInfrecoJudge(Judge):
                             argdown_reco
                         )
                         for pr in target_m.pcs
+                        if not isinstance(pr, Conclusion)
                     ):
                         continue
                     msgs.append(
@@ -459,7 +463,7 @@ class ArgmapPlusInfrecoJudge(Judge):
         # evaluate argmap
         evaluation_argmap = ArgMapJudge()._evaluate_argmap(
             problem=ArgMapProblem(sources=problem.sources),
-            argmap=ArgumentMap(ad_map.replace('argdown {filename="map.ad"}', '```argdown')),
+            argmap=ArgumentMap(ad_map.replace('```argdown {filename="map.ad"}', '```argdown')),
         )
         argdown_map: ArgdownMultiDiGraph = evaluation_argmap.artifacts["argdown_map"]
         artifacts["argdown_map"] = argdown_map
@@ -485,10 +489,14 @@ class ArgmapPlusInfrecoJudge(Judge):
             if len(argdown_reco.arguments) == 0:
                 eval_data["recos_no_arguments"] = "No argument in argdown snippet."
 
-            eval_dimensions_map = InfRecoVerifier.default_eval_dimensions_map.copy()            
+            eval_dimensions_map = copy.deepcopy(InfRecoVerifier.default_eval_dimensions_map)        
+            print(eval_dimensions_map)    
             eval_dimensions_map["illformed_argument"].remove("has_not_multiple_gists")
             eval_dimensions_map["missing_label_gist"].remove("has_gist")
+            eval_dimensions_map["disallowed_material"].remove("only_grounded_dialectical_relations")
+            eval_dimensions_map["disallowed_material"].remove("no_extra_propositions")
             reco_eval_data = InfRecoVerifier.run_battery(argdown_reco, eval_dimensions_map)
+            print(f"Reco eval data: {reco_eval_data}")
             for k,v in reco_eval_data.items():
                 eval_data["recos_" + k] = v
 

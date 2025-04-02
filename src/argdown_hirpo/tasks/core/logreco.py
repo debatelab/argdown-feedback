@@ -223,7 +223,6 @@ class LogRecoJudge(Judge):
 
             del verifier
 
-            #eval_dimensions_map = DEFAULT_EVAL_DIMENSIONS_MAP.copy()
             eval_data.update(LogRecoVerifier.run_battery(argdown))
 
             is_valid = not any(v for v in eval_data.values())

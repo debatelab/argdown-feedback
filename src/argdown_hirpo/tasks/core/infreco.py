@@ -1,3 +1,4 @@
+import copy
 from typing import Sequence
 
 import dataclasses
@@ -194,7 +195,7 @@ class InfRecoJudge(Judge):
                 eval_data["no_unique_argument"] = msg if msg else "No unique argument."
             del verifier
 
-            eval_dimensions_map = DEFAULT_EVAL_DIMENSIONS_MAP.copy()
+            eval_dimensions_map = copy.deepcopy(DEFAULT_EVAL_DIMENSIONS_MAP)
             eval_dimensions_map.pop("unused_propositions")
             eval_data.update(InfRecoVerifier.run_battery(argdown, eval_dimensions_map=eval_dimensions_map))
 
