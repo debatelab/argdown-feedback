@@ -13,6 +13,7 @@ from argdown_hirpo.tasks.compound.argmap_plus_infreco import (
     MaxArgsPreferencePairGeneratorCT,
     MaxSupportsPreferencePairGeneratorCT,
     MaxAttacksPreferencePairGeneratorCT,
+    SourceTextProximityPreferencePairGeneratorCT,
 )
 
 from .hirpo_tester import HirpoTester
@@ -491,50 +492,50 @@ class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
             (
                 ArgmapPlusInfreco.from_raw_answer(
                     textwrap.dedent("""
-                    ```xml
-                    <proposition id="1" argument_label="Climate Change" ref_reco_label="2">We should stop eating meat.</proposition>
-                                    
-                    <proposition id="2" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                    ```argdown {filename="map.ad"}
+                    [No meat]: We should stop eating meat.
+                        <+ <Suffering>: Animals suffer.
+                        <+ <Climate Change>: Animal farming causes climate change.
+                        <- unlabeled prop
                     ```
 
-                    ```argdown
+                    ```argdown {filename="reconstructions.ad"}
                     <Suffering>
                                     
-                    (1) Animals suffer. {annotation_ids: ['2']}
+                    (1) Animals suffer.
                     -- {from: ["1"]} --
-                    (2) [No meat]: We should stop eating meat. {annotation_ids: ['2']}
-
+                    (2) [No meat]: We should stop eating meat.
+                                    
                     <Climate Change>
                                     
-                    (1) Animals suffer. {annotation_ids: []}
+                    (1) Animal farming causes climate change.
                     -- {from: ["1"]} --
-                    (2) We should stop eating meat. {annotation_ids: ['1']}
+                    (2) [No meat]
                     ```
                     """)
                 ),
                 ArgmapPlusInfreco.from_raw_answer(
                     textwrap.dedent("""
-                    ```xml
-                    <proposition id="1" argument_label="Climate Change" ref_reco_label="2">We should stop eating meat.</proposition>
-                                    
-                    <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                    ```argdown {filename="map.ad"}
+                    [No meat]: We should stop eating meat.
+                        <+ <Suffering>: Animals suffer.
+                        <+ <Climate Change>: Animal farming causes climate change.
+                        <- unlabeled prop
                     ```
 
-                    ```argdown
-                    <Suffering>
+                    ```argdown {filename="reconstructions.ad"}
+                    <Suffering2>
                                     
-                    (1) Animals suffer. {annotation_ids: ['2']}
+                    (1) Animals suffer.
                     -- {from: ["1"]} --
-                    (2) [No meat]: We should stop eating meat. {annotation_ids: ['2']}
-
+                    (2) [No meat]: We should stop eating meat.
+                                    
                     <Climate Change>
                                     
-                    (1) Animals suffer. {annotation_ids: []}
-                    -- {from: ["1"]} --
-                    (2) We should stop eating meat. {annotation_ids: ['1']}
+                    (1) Animal farming causes climate change.
+                    -- {from: ["2"]} --
+                    (2) [No meat]
                     ```
-                                    
-                    <No argument>: Nothing
                     """)
                 ),
             ),
@@ -569,33 +570,271 @@ class TestArgmapPlusInfrecoPreferencePairGenerators:
             (
                 SimplicityPreferencePairGenerator,
                 """
-                ```xml
-                <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                                
-                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
                 ```
 
-                ```argdown
+                ```argdown {filename="reconstructions.ad"}
                 <Suffering>
                                 
-                (1) Animals suffer. {annotation_ids: ['2']}
+                (1) Animals suffer.
                 -- {from: ["1"]} --
-                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
                 ```
                 """,
                 """
-                ```xml
-                <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
-                                
-                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
                 ```
 
-                ```argdown
+                ```argdown {filename="reconstructions.ad"}
                 <Suffering>
                                 
-                (1) Most living beings feel pain. {annotation_ids: ['2']}
+                (1) Animals suffer a lot.
                 -- {from: ["1"]} --
-                (2) [No meat]: It is wrong to eat meat. {annotation_ids: ['1']}
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change and increases global greenhous gas emissions.
+                -- {from: ["1"]} --
+                (2) [No meat]
+                ```
+                """,
+            ),
+            (
+                ConnectednessPreferencePairGeneratorCT,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
+                ```
+                """,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    + <Suffering>: Animals suffer.
+
+                <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat ever again]
+                ```
+                """,
+            ),
+            (
+                MaxArgsPreferencePairGeneratorCT,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
+                ```
+                """,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ [Climate Change]: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                [Climate Change]
+
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.                                
+                ```
+                """,
+            ),
+            (
+                MaxSupportsPreferencePairGeneratorCT,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
+                ```
+                """,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <- <Suffering>: Animals suffer.
+                    <- <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                [No meat]: We should stop eating meat.
+
+                <Suffering>
+                                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) NOT: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) NOT: We should stop eating meat.
+                ```
+                """,
+            ),
+            (
+                MaxAttacksPreferencePairGeneratorCT,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <- <Suffering>: Animals suffer.
+                    <- <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                [No meat]: We should stop eating meat.
+
+                <Suffering>
+                                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) NOT: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) NOT: We should stop eating meat.
+                ```
+                """,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
+                ```
+                """,
+            ),
+            (
+                SourceTextProximityPreferencePairGeneratorCT,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
+                ```
+                """,
+                """
+                ```argdown {filename="map.ad"}
+                [No meat]: Farming and consuming animals is wrong.
+                    <+ <Suffering>: That is because animals are sentient beings.
+                    <+ <Climate Change>: And raising animals in farms is a major driver of anthopogenic greenhaóuse gas emissions.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <Suffering>
+                                
+                (1) Animals suffer.
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat.
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change.
+                -- {from: ["1"]} --
+                (2) [No meat]
                 ```
                 """,
             ),

@@ -3,7 +3,16 @@ from typing import Any, Sequence
 
 import dataclasses
 from textwrap import dedent
-from pyargdown import Argdown, ArgdownMultiDiGraph, Argument, Conclusion, Proposition, Valence, DialecticalType, parse_argdown
+from pyargdown import (
+    Argdown,
+    ArgdownMultiDiGraph,
+    Argument,
+    Conclusion,
+    Proposition,
+    Valence,
+    DialecticalType,
+    parse_argdown,
+)
 
 from argdown_hirpo.base import (
     Problem,
@@ -22,6 +31,7 @@ from argdown_hirpo.tasks.core.argmap import (
     MaxArgsPreferencePairGenerator,
     MaxSupportsPreferencePairGenerator,
     MaxAttacksPreferencePairGenerator,
+    SourceTextProximityPreferencePairGenerator,
 )
 from argdown_hirpo.tasks.core.infreco import (
     InfRecoProblem,
@@ -233,8 +243,6 @@ class ArgmapPlusInfrecoJudge(Judge):
         """Check if two propositions are identical."""
         if prop1 is None or prop2 is None:
             return False
-        if prop1.label != prop2.label:
-            return False
         return (
             prop1.label == prop2.label
             or any(text in prop2.texts for text in prop1.texts)
@@ -244,6 +252,8 @@ class ArgmapPlusInfrecoJudge(Judge):
     def are_contradictory(prop1: Proposition | None, prop2: Proposition | None, argdown: Argdown | None = None) -> bool:
         """Check if two propositions are identical."""
         if prop1 is None or prop2 is None:
+            return False
+        if prop1.label == prop2.label:
             return False
         if argdown is not None:
             if any(
@@ -299,7 +309,8 @@ class ArgmapPlusInfrecoJudge(Judge):
             target_m: Argument | Proposition | None
             if any(a.label==drel.source for a in argdown_map.arguments):
                 source_m =  next( 
-                    a for a in argdown_reco.arguments if a.label==drel.source
+                    (a for a in argdown_reco.arguments if a.label==drel.source),
+                    None
                 )  
             else:
                 source_m = next(
@@ -308,7 +319,8 @@ class ArgmapPlusInfrecoJudge(Judge):
                 )
             if any(a.label==drel.target for a in argdown_map.arguments):
                 target_m = next(
-                    a for a in argdown_reco.arguments if a.label==drel.target
+                    (a for a in argdown_reco.arguments if a.label==drel.target),
+                    None
                 )
             else:
                 target_m = next(
@@ -637,6 +649,27 @@ class MaxSupportsPreferencePairGeneratorCT(MaxSupportsPreferencePairGenerator):
 
 class MaxAttacksPreferencePairGeneratorCT(MaxAttacksPreferencePairGenerator):
     """Simple wrapper around MaxAttacksPreferencePairGenerator"""
+    def _score(
+        self,
+        problem: Problem,
+        solution: Solution,
+        evaluation: Evaluation,
+    ) -> float:
+        assert "argdown_map" in evaluation.artifacts, (
+            "Evaluation must contain argdown_map artifact"
+        )
+        assert isinstance(solution, ArgmapPlusInfreco), (
+            "Solution must be an ArgmapPlusInfreco"
+        )
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
+        return super()._score(
+            problem=problem,
+            argmap=solution.partial_argmap(),
+            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
+        )
+    
+class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreferencePairGenerator):
+    """Simple wrapper around SourceTextProximityPreferencePairGenerator"""
     def _score(
         self,
         problem: Problem,

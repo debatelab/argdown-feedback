@@ -222,6 +222,9 @@ class HirpoTester:
 
         candidate_solutions = [chosen, rejected]
 
+        pprint(problem)
+        pprint(candidate_solutions)
+        pprint(judge)
         evaluations = await judge.arun(problem, candidate_solutions)
         pprint(evaluations)
         
