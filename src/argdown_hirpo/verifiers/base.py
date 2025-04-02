@@ -6,6 +6,17 @@ from pyargdown import Argdown
 class Verifier(ABC):
     pass
 
+
+
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+#     BIG REFACTORING TODO     # 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+
+"""
+* Recast verifiers as handlers that can be chained by judges.
+"""
+
+
 class BaseArgdownVerifier(Verifier):
     """
     Base class for all Argdown verifiers.

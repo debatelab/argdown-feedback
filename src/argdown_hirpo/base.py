@@ -273,6 +273,19 @@ class Judge(HIRAbstractGenerator):
         pass
 
 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+#     BIG REFACTORING TODO     # 
+# !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
+
+
+class BaseJudge(HIRAbstractGenerator):
+    """
+    BaseJudge implenents skeleton handler / chain-of-repsonsibility pattern
+    Specific judges individually construct handler chains fromVerifiers
+    """
+
+
+
 class FeedbackGenerator(HIRAbstractGeneratorLLM):
     """Generates feedback."""
 

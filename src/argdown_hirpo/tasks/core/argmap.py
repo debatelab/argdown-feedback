@@ -58,7 +58,7 @@ class ArgMapProblem(Problem):
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
-            - indicate suppport and attack relations between nodes in accordance with Argdown syntax conventions;
+            - indicate support and attack relations between nodes in accordance with Argdown syntax conventions;
             - do not include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
 
             Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
@@ -145,72 +145,6 @@ class ArgMapProblemGenerator(ProblemGenerator):
             "Inputs to an argument mapping problem must be a string or a list of strings"
         )
 
-
-"""
-class ArgMapSolutionGenerator(SolutionGenerator):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.n_solutions = kwargs.get("n_solutions", 10)
-        self.temperature = kwargs.get("temperature", 0.5)
-        self.max_tokens = kwargs.get("max_tokens", 2048)
-
-    async def arun(
-        self,
-        problem: ArgMapProblem,
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[ArgumentMap]:
-        assert isinstance(original_solution, ArgumentMap) or original_solution is None
-        assert feedback or original_solution is None, (
-            "Feedback is required for revised solutions"
-        )
-
-        messages = [
-            {
-                "role": "user",
-                "content": problem.instruct_prompt(),
-            }
-        ]
-
-        if original_solution and feedback:
-            messages += [
-                {
-                    "role": "assistant",
-                    "content": str(original_solution),
-                },
-                {
-                    "role": "user",
-                    "content": feedback.prompt,
-                },
-                {
-                    "role": "assistant",
-                    "content": feedback.feedback,
-                },
-                {
-                    "role": "user",
-                    "content": problem.revise_prompt(),
-                },
-            ]
-
-        answers = await self._generate(
-            messages,
-            max_tokens=self.max_tokens,
-            n=self.n_solutions,
-            temperature=self.temperature,
-        )
-
-        argmaps: list[ArgumentMap] = []
-
-        # postprocess: extract fenced code block
-        for answer in answers:
-            if answer.count("```argdown") == 1:
-                if answer.split("```argdown")[1].count("\n```") == 1:
-                    answer = answer.split("```argdown")[1].split("\n```")[0]
-                    answer = "```argdown" + answer + "\n```"
-            argmaps.append(ArgumentMap(argdown_snippet=answer))
-
-        return argmaps
-"""
 
 class ArgMapJudge(Judge):
     """Judge for the argument mapping task."""
@@ -448,8 +382,6 @@ class MaxSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
@@ -468,8 +400,6 @@ class MaxAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations

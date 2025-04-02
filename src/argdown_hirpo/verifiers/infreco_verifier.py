@@ -1,3 +1,4 @@
+from typing import Callable
 from pyargdown import (
     Argdown,
     ArgdownMultiDiGraph,
@@ -9,11 +10,41 @@ from pyargdown.parser.base import ArgdownParser
 
 from .base import BaseArgdownVerifier
 
+DEFAULT_EVAL_DIMENSIONS_MAP = {
+    "illformed_argument": [
+        "has_pcs",
+        "starts_with_premise",
+        "ends_with_conclusion",
+        "has_not_multiple_gists",
+        "has_no_duplicate_pcs_labels",
+    ],
+    "missing_label_gist": [
+        "has_label",
+        "has_gist",
+    ],
+    "missing_inference_info": [
+        "has_inference_data"
+    ],
+    "unknown_proposition_references": [
+        "prop_refs_exist",
+    ],  # in inference info
+    "unused_propositions": [
+        "uses_all_props",
+    ],
+    "disallowed_material": [
+        "no_extra_propositions",
+        "only_grounded_dialectical_relations",
+        "no_prop_inline_data",
+        "no_arg_inline_data",
+    ],  # more propositions, inline dialectical relations, yaml inline data
+}
 
 class InfRecoVerifier(BaseArgdownVerifier):
     """
     InfRecoVerifier is a specialized verifier for informal reconstructions.
     """
+
+    default_eval_dimensions_map = DEFAULT_EVAL_DIMENSIONS_MAP
 
     def __init__(self, argdown: Argdown, from_key: str = "from", argument_idx: int = 0):
         super().__init__(argdown)
@@ -27,6 +58,23 @@ class InfRecoVerifier(BaseArgdownVerifier):
 
         self.from_key = from_key
 
+    @classmethod
+    def run_battery(cls, argdown: Argdown, eval_dimensions_map: dict[str, list[str]] | None = None) -> dict[str, str]:
+        if eval_dimensions_map is None:
+            eval_dimensions_map = cls.default_eval_dimensions_map
+        eval_results: dict[str,str] = {k: "" for k in eval_dimensions_map}
+        for argument_idx, argument in enumerate(argdown.arguments):
+            verifier = cls(argdown, argument_idx=argument_idx)
+            for eval_dim, veri_fn_names in eval_dimensions_map.items():
+                for veri_fn_name in veri_fn_names:
+                    veri_fn = getattr(verifier, veri_fn_name)
+                    check, msg = veri_fn()
+                    if check is False:
+                        msg = msg if msg else veri_fn_name 
+                        eval_results[eval_dim] = eval_results[eval_dim] + f"Error in argument <{argument.label}>: {msg}. "
+        eval_results = {k: v.strip() for k,v in eval_results.items()}
+        return eval_results
+
     def has_unique_argument(self) -> tuple[bool | None, str | None]:
         if len(self.argdown.arguments) > 1:
             return False, "More than one argument in argdown snippet."
@@ -34,6 +82,11 @@ class InfRecoVerifier(BaseArgdownVerifier):
             return False, "No argument in argdown snippet."
         if self.argument is None:
             return None, None
+        return True, None
+
+    def has_arguments(self) -> tuple[bool | None, str | None]:
+        if len(self.argdown.arguments) > 1:
+            return False, "More than one argument in argdown snippet."
         return True, None
 
     def has_pcs(self) -> tuple[bool | None, str | None]:
@@ -71,7 +124,9 @@ class InfRecoVerifier(BaseArgdownVerifier):
         if self.argument is None or not self.argument.pcs:
             return None, None
         pcs_labels = [p.label for p in self.argument.pcs]
-        duplicates = list(set([label for label in pcs_labels if pcs_labels.count(label) > 1]))
+        duplicates = list(
+            set([label for label in pcs_labels if pcs_labels.count(label) > 1])
+        )
         if duplicates:
             return (
                 False,
@@ -129,15 +184,15 @@ class InfRecoVerifier(BaseArgdownVerifier):
         for c in self.argument.pcs:
             if isinstance(c, Conclusion):
                 used_labels.update(c.inference_data.get(self.from_key, []))
-        unused_props = [f"({p.label})" for p in self.argument.pcs[:-1] if p.label not in used_labels]
+        unused_props = [
+            f"({p.label})" for p in self.argument.pcs[:-1] if p.label not in used_labels
+        ]
         if unused_props:
             return (
                 False,
                 f"Some propositions are not explicitly used in any of the argument's inferences: {', '.join(unused_props)}.",
             )
         return True, None
-
-
 
     def prop_refs_exist(self) -> tuple[bool | None, str | None]:
         if self.argument is None or not self.argument.pcs:

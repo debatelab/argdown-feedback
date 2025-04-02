@@ -23,7 +23,7 @@ from argdown_hirpo.base import (
 )
 
 from argdown_hirpo.logic.logic import get_propositional_variables
-from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
+from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier, DEFAULT_EVAL_DIMENSIONS_MAP
 from argdown_hirpo.logic.fol_to_nl import FOL2NLTranslator
     
 
@@ -61,7 +61,7 @@ class LogRecoProblem(Problem):
               ending with '```'. Just include a single Argdown codeblock in your answer.                                            
 
             - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
-              conclusion, and possible intemediate conclusions).
+              conclusion, and possible intermediate conclusions).
 
             - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
               syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Minimal example:
@@ -217,109 +217,16 @@ class LogRecoJudge(Judge):
             verifier = LogRecoVerifier(argdown)
             artifacts["all_expressions"] = verifier.all_expressions
             artifacts["all_declarations"] = verifier.all_declarations
-
             check, msg = verifier.has_unique_argument()
             if check is False:
-                is_valid = False
                 eval_data["no_unique_argument"] = msg if msg else "No unique argument."
 
-            # illformed argument
-            msgs = []
-            for veri_fn in [
-                verifier.has_pcs,
-                verifier.ends_with_conclusion,
-                verifier.has_no_duplicate_pcs_labels,
-            ]:
-                check, msg = veri_fn()
-                if check is False:
-                    is_valid = False
-                    msgs.append(msg if msg else "Argument is illformed.")
-            if msgs:
-                eval_data["illformed_argument"] = " ".join(msgs)
-            del msgs
+            del verifier
 
-            # missing label/gist
-            msgs = []
-            for veri_fn in [
-                verifier.has_label,
-                verifier.has_gist,
-            ]:
-                check, msg = veri_fn()
-                if check is False:
-                    is_valid = False
-                    msgs.append(msg if msg else "Argument lacks a label or gist.")
-            if msgs:
-                eval_data["missing_label_gist"] = " ".join(msgs)
-            del msgs
+            #eval_dimensions_map = DEFAULT_EVAL_DIMENSIONS_MAP.copy()
+            eval_data.update(LogRecoVerifier.run_battery(argdown))
 
-            # missing inference information
-            check, msg = verifier.has_inference_data()
-            if check is False:
-                is_valid = False
-                eval_data["missing_inference_info"] = (
-                    msg if msg else "Argument lacks inference information."
-                )
-
-            # unknown proposition references in inference information
-            check, msg = verifier.prop_refs_exist()
-            if check is False:
-                is_valid = False
-                eval_data["unknown_proposition_references"] = (
-                    msg
-                    if msg
-                    else "Unknown proposition references in inference information."
-                )
-
-            # unused propositions
-            check, msg = verifier.uses_all_props()
-            if check is False:
-                is_valid = False
-                eval_data["unused_propositions"] = (
-                    msg if msg else "Some propositions are not used in any inference."
-                )
-
-            # disallowed material
-            check, msg = verifier.no_extra_propositions()
-            if check is False:
-                is_valid = False
-                eval_data["disallowed_material"] = msg if msg else "Argdown snippet contains extra propositions."
-
-            # check for syntactically correct formalizations
-            check, msg = verifier.has_flawless_formalizations()
-            if check is False:
-                is_valid = False
-                eval_data["flawed_formalizations"] = (
-                    msg if msg else "Formalizations are flawed."
-                )
-
-            # check for valid inference
-            msgs = []
-            for veri_fn in [
-                verifier.is_globally_deductively_valid,
-                verifier.is_locally_deductively_valid
-            ]:
-                check, msg = veri_fn()
-                if check is False:
-                    is_valid = False
-                    msgs.append(msg if msg else "Invalid inference.")
-            if msgs:
-                eval_data["invalid_inference"] = "\n".join(msgs)
-
-            # check for redundant premises
-            check, msg = verifier.all_premises_relevant()
-            if check is False:
-                is_valid = False
-                eval_data["redundant_premises"] = (
-                    msg if msg else "Redundant premises in the argument."
-                )
-
-            # check for inconsistent premises
-            check, msg = verifier.premises_consistent()
-            if check is False:
-                is_valid = False
-                eval_data["inconsistent_premises"] = (
-                    msg if msg else "Argument's premises are logically inconsistent."
-                )
+            is_valid = not any(v for v in eval_data.values())
 
         return Evaluation(
             is_valid=is_valid, artifacts=artifacts, metrics=eval_data

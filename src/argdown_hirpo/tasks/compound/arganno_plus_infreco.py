@@ -16,7 +16,6 @@ from argdown_hirpo.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
     Judge,
     ScoringVirtuePreferencePairGenerator,
 )
@@ -107,7 +106,7 @@ class ArgannoPlusInfrecoProblem(InfRecoProblem, AnnotationProblem):
             Informally analyse and reconstruct the text's main argumentation with Argdown. In particular, you should
 
             - reconstruct *at least one argument* in standard form (including premises, final 
-              conclusion, and possible intemediate conclusions).
+              conclusion, and possible intermediate conclusions).
             - provide, for each conclusion in an argument, information about which previously introduced premises or 
               conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
               where the list items refer to the respective premise or conclusion labels.
@@ -116,7 +115,7 @@ class ArgannoPlusInfrecoProblem(InfRecoProblem, AnnotationProblem):
 
             ## Required Coherence of Annotation and Argument Reconstruction                                                
 
-            The argument reconstruction and the annotated source text must cohere with each other. There should be one-to-many correspondence between premises/conclusion(s) and annotated text segments. Moreover, the inferential relations in the reconstructed argument should reflect the annotated support relations.
+            The argument reconstruction and the annotated source text must cohere with each other. There should be a one-to-many correspondence between premises/conclusion(s) and annotated text segments. Moreover, the inferential relations in the reconstructed argument should reflect the annotated support relations.
                    
             In particular, you should ensure that: 
 

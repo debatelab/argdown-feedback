@@ -9,11 +9,51 @@ from argdown_hirpo.logic.fol_parser import FOLParser
 from argdown_hirpo.logic.smtlib import check_validity_z3
 
 
+DEFAULT_EVAL_DIMENSIONS_MAP = {
+    "illformed_argument": [
+        "has_pcs",
+        "starts_with_premise",
+        "ends_with_conclusion",
+        "has_no_duplicate_pcs_labels",
+    ],
+    "missing_label_gist": [
+        "has_label",
+        "has_gist",
+    ],
+    "missing_inference_info": [
+        "has_inference_data"
+    ],
+    "unknown_proposition_references": [
+        "prop_refs_exist",
+    ],  # in inference info
+    "unused_propositions": [
+        "uses_all_props",
+    ],
+    "disallowed_material": [
+        "no_extra_propositions",
+    ],  # more propositions
+    "flawed_formalizations": [
+        "has_flawless_formalizations"
+    ],
+    "invalid_inference": [
+        "is_globally_deductively_valid",
+        "is_locally_deductively_valid",
+    ],
+    "redundant_premises": [
+        "all_premises_relevant"
+    ],
+    "inconsistent_premises": [
+        "premises_consistent"
+    ],
+}
+
 class LogRecoVerifier(InfRecoVerifier):
     """
     LogRecoVerifier is a specialized verifier for logical reconstructions
     with methods for checking formalizations and deductive validity
     """
+
+    default_eval_dimensions_map = DEFAULT_EVAL_DIMENSIONS_MAP
 
     def __init__(
         self,

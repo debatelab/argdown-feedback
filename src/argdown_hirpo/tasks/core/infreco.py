@@ -18,11 +18,10 @@ from argdown_hirpo.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
     Judge,
     FeedbackGenerator,
 )
-from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
+from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier, DEFAULT_EVAL_DIMENSIONS_MAP
 
 
 class InfRecoProblem(Problem):
@@ -56,7 +55,7 @@ class InfRecoProblem(Problem):
             - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
               ending with '```'. Just include a single Argdown codeblock in your answer.                                            
             - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
-              conclusion, and possible intemediate conclusions).
+              conclusion, and possible intermediate conclusions).
             - For each conclusion in the argument, provide information about which previously introduced premises or 
               conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
               where the list items refer to the respective premise or conclusion labels.
@@ -165,18 +164,12 @@ class InfRecoJudge(Judge):
             "fenced_code_block": "",
             "invalid_argdown_syntax": "",
             "no_unique_argument": "",
-            "illformed_argument": "",  # starts with conclusion / ends with premise
-            "missing_label_gist": "",
-            "missing_inference_info": "",
-            "unknown_proposition_references": "",  # in inference info
-            "disallowed_material": "",  # more propositions, inline dialectical relations, yaml inline data
         }
 
         ads = reco.argdown_snippet.strip("\n ")
         if ads.startswith("```argdown") and ads.endswith("```"):
             ads = "\n".join(ads.splitlines()[1:-1])
         else:  # no fenced code block
-            is_valid = False
             error_msg = "Failed to extract single fenced argdown block:"
             if ads.count("```argdown") == 0:
                 error_msg += " No fenced code block starting with '```argdown'."
@@ -192,122 +185,20 @@ class InfRecoJudge(Judge):
             argdown = parse_argdown(ads)
         except Exception as e:
             argdown = None
-            is_valid = False
             eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
 
         if argdown:
             verifier = InfRecoVerifier(argdown)
-
             check, msg = verifier.has_unique_argument()
             if check is False:
-                is_valid = False
                 eval_data["no_unique_argument"] = msg if msg else "No unique argument."
+            del verifier
 
-            # illformed argument
-            msgs = []
+            eval_dimensions_map = DEFAULT_EVAL_DIMENSIONS_MAP.copy()
+            eval_dimensions_map.pop("unused_propositions")
+            eval_data.update(InfRecoVerifier.run_battery(argdown, eval_dimensions_map=eval_dimensions_map))
 
-            check, msg = verifier.has_pcs()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg if msg else "Argument lacks premise conclusion structure."
-                )
-
-            check, msg = verifier.starts_with_premise()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument does not start with a premise.")
-
-            check, msg = verifier.ends_with_conclusion()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument does not end with a conclusion.")
-
-            check, msg = verifier.has_not_multiple_gists()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument has more than one gist.")
-
-            check, msg = verifier.has_no_duplicate_pcs_labels()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg
-                    if msg
-                    else "Argument has duplicate labels in the standard form."
-                )
-
-            if msgs:
-                eval_data["illformed_argument"] = " ".join(msgs)
-            del msgs
-
-            # missing label/gist
-            msgs = []
-
-            check, msg = verifier.has_label()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument lacks a label / title.")
-
-            check, msg = verifier.has_gist()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Argument lacks a gist / summary.")
-
-            if msgs:
-                eval_data["missing_label_gist"] = " ".join(msgs)
-            del msgs
-
-            # missing inference information
-            check, msg = verifier.has_inference_data()
-            if check is False:
-                is_valid = False
-                eval_data["missing_inference_info"] = (
-                    msg if msg else "Argument lacks inference information."
-                )
-
-            # unknown proposition references in inference information
-            check, msg = verifier.prop_refs_exist()
-            if check is False:
-                is_valid = False
-                eval_data["unknown_proposition_references"] = (
-                    msg
-                    if msg
-                    else "Unknown proposition references in inference information."
-                )
-
-            # disallowed material
-            msgs = []
-
-            check, msg = verifier.no_extra_propositions()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg if msg else "Argdown snippet contains extra propositions."
-                )
-
-            check, msg = verifier.only_grounded_dialectical_relations()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg if msg else "Argdown snippet defines dialectical relations."
-                )
-
-            check, msg = verifier.no_prop_inline_data()
-            if check is False:
-                is_valid = False
-                msgs.append(
-                    msg if msg else "Some propositions contain yaml inline data."
-                )
-
-            check, msg = verifier.no_arg_inline_data()
-            if check is False:
-                is_valid = False
-                msgs.append(msg if msg else "Some arguments contain yaml inline data.")
-
-            if msgs:
-                eval_data["disallowed_material"] = " ".join(msgs)
-            del msgs
+        is_valid = not any(v for v in eval_data.values())
 
         return Evaluation(
             is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
