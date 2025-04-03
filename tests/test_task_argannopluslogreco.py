@@ -2,7 +2,12 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
+from argdown_hirpo.base import (
+    Feedback,
+    Solution,
+    GenericFeedbackGenerator,
+    GenericSolutionGenerator,
+)
 from argdown_hirpo.tasks.compound.arganno_plus_logreco import (
     ArgannoPlusLogRecoProblem,
     ArgannoPlusLogRecoProblemGenerator,

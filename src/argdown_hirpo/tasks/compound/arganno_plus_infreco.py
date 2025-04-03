@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 from pyargdown import (
     Argdown,
     Conclusion,
+    Valence,
     parse_argdown,
     Argument,
 )
@@ -198,13 +199,13 @@ class ArgannoPlusInfreco(Annotation, InformalReco):
         unparsed_solution = raw_answer
         annotated_source_text = ""
         argdown_snippet = ""
-        if "\n```xml" in unparsed_solution:
-            annotated_source_text = unparsed_solution.split("\n```xml")[-1].split(
+        if "```xml" in unparsed_solution:
+            annotated_source_text = unparsed_solution.split("```xml")[-1].split(
                 "\n```"
             )[0]
             annotated_source_text = "```xml" + annotated_source_text + "\n```"
-        if "\n```argdown" in unparsed_solution:
-            argdown_snippet = unparsed_solution.split("\n```argdown")[-1].split(
+        if "```argdown" in unparsed_solution:
+            argdown_snippet = unparsed_solution.split("```argdown")[-1].split(
                 "\n```"
             )[0]
             argdown_snippet = "```argdown" + argdown_snippet + "\n```"
@@ -248,6 +249,7 @@ class ArgannoPlusInfrecoJudge(Judge):
             if a.get("id")  # type: ignore
         ]
         argument_label_map: dict[str, str] = {}
+        proposition_label_map: dict[str, str] = {}
         refreco_map: dict[str, str] = {}
         for a in soup_anno.find_all("proposition"):
             a_label = a.get("argument_label")  # type: ignore
@@ -269,6 +271,23 @@ class ArgannoPlusInfrecoJudge(Judge):
                     f"Illegal 'ref_reco_label' reference of proposition element with id={a_id}: "
                     f"No premise or conclusion with label '{a_ref_reco}' in argument '{a_label}'."
                 )
+            else:
+                pr = next(
+                    pr for pr in argument.pcs if a_ref_reco == pr.label
+                )
+                proposition = next(
+                    prop
+                    for prop in argdown_reco.propositions
+                    if prop.label == pr.proposition_label
+                )
+                proposition_label_map[str(a_id)] = str(pr.proposition_label)
+                id_refs = proposition.data.get("annotation_ids", [])
+                if str(a_id) not in id_refs:
+                    msgs.append(
+                        f"Label reference mismatch: proposition element with id={a_id} in the annotation "
+                        f"references (via ref_reco) the proposition '{pr.label}' of argument '{argument.label}', "
+                        f"but the annotation_ids={str(id_refs)} of that proposition do not include the id={a_id}."
+                    )
 
         for argument in argdown_reco.arguments:
             if argument.label not in argument_label_map.values():
@@ -296,6 +315,7 @@ class ArgannoPlusInfrecoJudge(Judge):
                             f"No proposition element with id='{id_ref}' in the annotation."
                         )
                         continue
+                    """
                     if argument_label_map.get(id_ref) != argument.label:
                         msgs.append(
                             f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
@@ -310,13 +330,32 @@ class ArgannoPlusInfrecoJudge(Judge):
                             f"with id={id_ref} in the annotation has a different ref_reco_label"
                             f"{': ' + refreco_map[id_ref] if id_ref in refreco_map else ''}."
                         )
+                    """
+
+        for i in range(len(argdown_reco.propositions)):
+            for j in range(i + 1, len(argdown_reco.propositions)):
+                prop1 = argdown_reco.propositions[i]
+                prop2 = argdown_reco.propositions[j]
+                dps = [
+                    f"'{x}'"
+                    for x in prop1.data.get("annotation_ids", [])
+                    if x in prop2.data.get("annotation_ids", [])
+                ]
+                if dps:
+                    msgs.append(
+                        f"Label reference mismatch: annotation text segment(s) {', '.join(dps)} "
+                        f"are referenced by distinct propositions in the Argdown argument "
+                        f"reconstruction ('{prop1.label}', '{prop2.label}')."
+                    )
+
         if msgs:
             eval_data["elements_correspondence"] = " - ".join(msgs)
         del msgs
 
-        # check support relations correspondence
+        # check support and attack relations correspondence
         msgs = []
         annotated_support_relations: list[dict] = []
+        annotated_attack_relations: list[dict] = []
         for a in soup_anno.find_all("proposition"):
             from_id = a.get("id")  # type: ignore
             for support in a.get("supports", []):  # type: ignore
@@ -327,21 +366,49 @@ class ArgannoPlusInfrecoJudge(Judge):
                             "to_id": str(support),
                         }
                     )
+            for attack in a.get("attacks", []):  # type: ignore
+                if attack in all_annotation_ids:
+                    annotated_attack_relations.append(
+                        {
+                            "from_id": str(from_id),
+                            "to_id": str(attack),
+                        }
+                    )
+
+        # helper
+        def _drel_fn(x,y):
+            drels = argdown_reco.get_dialectical_relation(x, y)
+            return drels if drels is not None else []
 
         for ar in annotated_support_relations:
             arglabel_from = argument_label_map.get(ar["from_id"])
+            proplabel_from = proposition_label_map.get(ar["from_id"])
             arglabel_to = argument_label_map.get(ar["to_id"])
+            proplabel_to = proposition_label_map.get(ar["to_id"])
             if arglabel_from is None or arglabel_to is None:
                 msgs.append(
                     f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
-                    f"matched by any relation in the argument map (illegal argument_labels)."
+                    f"matched by any relation in the reconstruction (illegal argument_labels)."
                 )
                 continue
             if arglabel_from != arglabel_to:
-                msgs.append(
-                    f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to support each other, but "
-                    f"are not assigned to one and the same argument (different argument_labels)."
+                drels = _drel_fn(
+                    arglabel_from, arglabel_to,
+                ) + _drel_fn(
+                    arglabel_from, proplabel_to,
+                ) + _drel_fn(
+                    proplabel_from, arglabel_to,
+                ) + _drel_fn(
+                    proplabel_from, proplabel_to,
                 )
+                if drels is None or not any(
+                    dr.valence == Valence.SUPPORT
+                    for dr in drels
+                ):
+                    msgs.append(
+                        f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to support each other, but "
+                        f"the corresponding argument <{arglabel_from}> does not support <{arglabel_to}>."
+                    )
                 continue
             del argument
             argument = next(
@@ -356,6 +423,41 @@ class ArgannoPlusInfrecoJudge(Judge):
                 msgs.append(
                     f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
                     f"matched by the inferential relations in the argument '{argument.label}'."
+                )
+
+        for ar in annotated_attack_relations:
+            arglabel_from = argument_label_map.get(ar["from_id"])
+            proplabel_from = proposition_label_map.get(ar["from_id"])
+            arglabel_to = argument_label_map.get(ar["to_id"])
+            proplabel_to = proposition_label_map.get(ar["to_id"])
+            if arglabel_from is None or arglabel_to is None:
+                msgs.append(
+                    f"Annotated attack relation from {ar['from_id']} to {ar['to_id']} is not "
+                    f"matched by any relation in the reconstruction (illegal argument_labels)."
+                )
+                continue
+            if arglabel_from == arglabel_to:
+                msgs.append(
+                    f"Text segments assigned to the same argument cannot attack each other "
+                    f"({ar['from_id']} attacks {ar['to_id']} while both are assigned to {arglabel_from})."
+                )
+                continue
+            drels = _drel_fn(
+                arglabel_from, arglabel_to,
+            ) + _drel_fn(
+                arglabel_from, proplabel_to,
+            ) + _drel_fn(
+                proplabel_from, arglabel_to,
+            ) + _drel_fn(
+                proplabel_from, proplabel_to,
+            )
+            if drels is None or not any(
+                dr.valence == Valence.ATTACK
+                for dr in drels
+            ):
+                msgs.append(
+                    f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to attack each other, but "
+                    f"the corresponding argument <{arglabel_from}> does not attack <{arglabel_to}>."
                 )
         if msgs:
             eval_data["relations_correspondence"] = " - ".join(msgs)

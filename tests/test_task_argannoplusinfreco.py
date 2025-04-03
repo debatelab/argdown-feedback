@@ -181,6 +181,29 @@ def valid_recos(solution_class) -> list[Solution]:
             ```
             """)
         ),
+        solution_class.from_raw_answer(
+            textwrap.dedent("""
+            ```xml
+            <proposition id="1" argument_label="Climate Change" ref_reco_label="2">We should stop eating meat.</proposition>
+                            
+            <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+            ```
+
+            ```argdown
+            <Suffering>
+                            
+            (1) Animals suffer. {annotation_ids: ['2']}
+            -- {from: ["1"]} --
+            (2) [No meat]: We should stop eating meat. {annotation_ids: []}
+
+            <Climate Change>
+                            
+            (1) Animals suffer. {annotation_ids: []}
+            -- {from: ["1"]} --
+            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+            ```
+            """)
+        ),
     ]
 
 
@@ -284,13 +307,13 @@ def invalid_recos(solution_class) -> list[Solution]:
                             
             (1) Animals suffer. {annotation_ids: ['2']}
             -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: []}
+            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
 
             <Climate Change>
                             
             (1) Animals suffer. {annotation_ids: []}
             -- {from: ["1"]} --
-            (2) [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+            (2) [No meat]: We should stop eating meat. {annotation_ids: []}
             ```
             """)
         ),

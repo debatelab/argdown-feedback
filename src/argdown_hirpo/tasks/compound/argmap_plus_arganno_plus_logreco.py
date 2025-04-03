@@ -115,7 +115,8 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
             5. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument -- and vice versa.
             6. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B -- and vice versa.
             7. Whenever a claim A, in the _argdown reconstructions_, is declared to support, attack, or contradict another claim B, then the formalizations of A and B must logically ground this relation.
-            8. Whenever a text segment A in the _annotation_ supports another text segment B, then B corresponds to a conclusion in the reconstructions which is directly or indirectly supported by a proposition corresponding to A.
+            8. Whenever a text segment A in the _annotation_ supports another text segment B, then, in the _argdown reconstructions_, B's corresponding proposition is inferred from the proposition corresponding to A, or A refers to an argument that supports the argument referenced by B.
+            9. Whenever a text segment A in the _annotation_ attacks another text segment B, then, in the _argdown reconstructions_, A's corresponding argument attacks the argument referenced by B.
                                       
             Here are the specific notation instructions which help you to ensure that annotation, argument map and argument reconstructions fully cohere with each other in the above sense: 
 
@@ -204,18 +205,18 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
         argdown_reconstructions_snippet = ""
 
         _code_label = 'xml {filename="annotation.txt"}'
-        if f'\n```{_code_label}' in unparsed_solution:
-            annotated_source_text = unparsed_solution.split("\n```xml")[-1].split("\n```")[0]
+        if f'```{_code_label}' in unparsed_solution:
+            annotated_source_text = unparsed_solution.split("```xml")[-1].split("\n```")[0]
             annotated_source_text = f"```{_code_label}" + annotated_source_text + "\n```"
 
         _code_label = 'argdown {filename="map.ad"}'
-        if f"\n```{_code_label}" in unparsed_solution:
-            argdown_map_snippet = unparsed_solution.split(f"\n```{_code_label}")[-1].split("\n```")[0]
+        if f"```{_code_label}" in unparsed_solution:
+            argdown_map_snippet = unparsed_solution.split(f"```{_code_label}")[-1].split("\n```")[0]
             argdown_map_snippet = f"```{_code_label}" + argdown_map_snippet + "\n```"
 
         _code_label = 'argdown {filename="reconstructions.ad"}'
-        if f"\n```{_code_label}" in unparsed_solution:
-            argdown_reconstructions_snippet = unparsed_solution.split(f"\n```{_code_label}")[-1].split("\n```")[0]
+        if f"```{_code_label}" in unparsed_solution:
+            argdown_reconstructions_snippet = unparsed_solution.split(f"```{_code_label}")[-1].split("\n```")[0]
             argdown_reconstructions_snippet = f"```{_code_label}" + argdown_reconstructions_snippet + "\n```"
 
         return cls(
@@ -270,6 +271,9 @@ class ArgmapPlusArgannoPlusLogrecoJudge(ArgmapPlusLogrecoJudge):
         self, problem: Problem, reco: Solution
     ) -> Evaluation:
         
+        # check that solution has required fields
+        assert hasattr(reco, "annotated_source_text")
+
         # evaluate argmap+logreco
         evaluation = super()._evaluate_solution(problem, reco)  # type: ignore
         argdown_reco = evaluation.artifacts["argdown_reco"]
@@ -295,7 +299,7 @@ class ArgmapPlusArgannoPlusLogrecoJudge(ArgmapPlusLogrecoJudge):
         # check fenced annotation codeblocks
         msgs = [eval_data["fenced_code_blocks"]]
         _code_label = 'xml {filename="annotation.txt"}'
-        ast = reco.argdown_map_snippet.strip("\n ")  # type: ignore
+        ast = reco.annotated_source_text.strip("\n ")  # type: ignore
         if not (ast.startswith(f"```{_code_label}") and ast.endswith("```")):
             msgs.append('Failed to extract fenced xml block with annotation.')
             if ast.count(f"```{_code_label}") == 0:
@@ -355,7 +359,7 @@ class ArgmapPlusArgannoPlusLogrecoJudge(ArgmapPlusLogrecoJudge):
 
         evaluations = []
         for solution in solutions:
-            assert isinstance(solution, ArgmapPlusLogreco), (
+            assert isinstance(solution, ArgmapPlusArgannoPlusLogreco), (
                 "All solutions must be ArgmapPlusLogreco"
             )
             evaluations.append(self._evaluate_solution(problem, solution))

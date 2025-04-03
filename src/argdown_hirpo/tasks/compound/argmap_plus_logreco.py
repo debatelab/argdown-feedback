@@ -322,8 +322,12 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
         assert isinstance(problem, ArgmapPlusLogrecoProblem), (
             "Problem must be an ArgmapPlusLogrecoProblem"
         )
-        assert isinstance(reco, ArgmapPlusLogreco), (
-            "Solution must be an ArgmapPlusLogreco"
+        # check that reco has 'argdown_map_snippet' and 'argdown_reconstructions_snippet' attributes
+        assert hasattr(reco, "argdown_map_snippet"), (
+            "Solution must have 'argdown_map_snippet' attribute"
+        )
+        assert hasattr(reco, "argdown_reconstructions_snippet"), (
+            "Solution must have 'argdown_reconstructions_snippet' attribute"
         )
         is_valid = True
         artifacts: dict[str, Any] = {}

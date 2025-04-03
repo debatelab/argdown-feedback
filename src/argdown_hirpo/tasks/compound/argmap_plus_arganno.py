@@ -165,11 +165,11 @@ class ArgmapPlusArganno(Annotation, ArgumentMap):
         unparsed_solution = raw_answer
         annotated_source_text = ""
         argdown_snippet = ""
-        if "\n```xml" in unparsed_solution:
-            annotated_source_text = unparsed_solution.split("\n```xml")[-1].split("\n```")[0]
+        if "```xml" in unparsed_solution:
+            annotated_source_text = unparsed_solution.split("```xml")[-1].split("\n```")[0]
             annotated_source_text = "```xml" + annotated_source_text + "\n```"
-        if "\n```argdown" in unparsed_solution:
-            argdown_snippet = unparsed_solution.split("\n```argdown")[-1].split("\n```")[0]
+        if "```argdown" in unparsed_solution:
+            argdown_snippet = unparsed_solution.split("```argdown")[-1].split("\n```")[0]
             argdown_snippet = "```argdown" + argdown_snippet + "\n```"                
 
         return cls(
