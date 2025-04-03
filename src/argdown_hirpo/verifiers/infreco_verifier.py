@@ -75,6 +75,21 @@ class InfRecoVerifier(BaseArgdownVerifier):
         eval_results = {k: v.strip() for k,v in eval_results.items()}
         return eval_results
 
+    @classmethod
+    def _no_extra_propositions(cls, argdown: Argdown) -> tuple[bool | None, str | None]:
+        pcs_props = set(
+            [p.proposition_label for argument in argdown.arguments for p in argument.pcs]
+        )
+        all_probs = set(
+            [p.label for p in argdown.propositions if p.label is not None]
+        )
+        outside_props = list(all_probs - pcs_props)
+        outside_props = [f"[{lb}]" for lb in outside_props]
+        if outside_props:
+            return False, f"Argdown snippet contains propositions not used in any argument: {', '.join(outside_props)}."
+
+        return True, None
+
     def has_unique_argument(self) -> tuple[bool | None, str | None]:
         if len(self.argdown.arguments) > 1:
             return False, "More than one argument in argdown snippet."
@@ -215,18 +230,10 @@ class InfRecoVerifier(BaseArgdownVerifier):
         return True, None
 
     def no_extra_propositions(self) -> tuple[bool | None, str | None]:
-        if self.argument is None:
+        if self.argument is None or not self.argument.pcs:
             return None, None
-        if self.argument.pcs and len(self.argdown.propositions) > len(
-            self.argument.pcs
-        ):
-            return (
-                False,
-                "Argdown snippet contains propositions other than the ones in the argument.",
-            )
-        if not self.argument.pcs and len(self.argdown.propositions) > 0:
-            return False, "Argdown snippet contains propositions outside the argument."
-        return True, None
+        return self._no_extra_propositions(self.argdown)
+
 
     def only_grounded_dialectical_relations(self) -> tuple[bool | None, str | None]:
         if any(

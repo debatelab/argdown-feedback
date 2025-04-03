@@ -186,7 +186,7 @@ class ArgMapJudge(Judge):
 
         if not argdown:
             return Evaluation(
-                is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
+                is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
             )
 
         verifier = ArgMapVerifier(argdown)
@@ -317,7 +317,7 @@ class ConnectednessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
         evaluation: Evaluation,
     ) -> float:
         
-        argdown = evaluation.artifacts.get("argdown")
+        argdown = evaluation.artifacts.get("argdown_map")
         assert argdown is not None and isinstance(argdown, ArgdownMultiDiGraph), (
             "Evaluation must contain a valid ArgdownMultiDiGraph artifact."
         )
@@ -338,7 +338,7 @@ class MaxArgsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-        argdown = evaluation.artifacts.get("argdown")
+        argdown = evaluation.artifacts.get("argdown_map")
         assert argdown is not None and isinstance(argdown, ArgdownMultiDiGraph), (
             "Evaluation must contain a valid ArgdownMultiDiGraph artifact."
         )
@@ -361,7 +361,7 @@ class BalancePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         n_supp = sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
         n_att = sum(1 for dr in drs if dr.valence == Valence.ATTACK)
@@ -383,7 +383,7 @@ class MaxSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         return sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
 
@@ -401,7 +401,7 @@ class MaxAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         evaluation: Evaluation,
     ) -> float:
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         return sum(1 for dr in drs if dr.valence == Valence.ATTACK)
 
@@ -421,7 +421,7 @@ class MaxDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         if argdown.number_of_nodes() == 0:
             return 0
         H = nx.DiGraph(argdown)
@@ -451,7 +451,7 @@ class MinDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         if argdown.number_of_nodes() == 0:
             return 0
         H = nx.DiGraph(argdown)
@@ -481,7 +481,7 @@ class DensityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
         degree_centrality = list(nx.degree_centrality(H).values())
         return (
@@ -506,7 +506,7 @@ class MaxInDegreePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
         in_degrees = list(dict(H.in_degree()).values())
         return max(in_degrees) if in_degrees else 0
@@ -529,7 +529,7 @@ class MaxOutDegreePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
         out_degrees = list(dict(H.out_degree()).values())
         return max(out_degrees) if out_degrees else 0
@@ -552,7 +552,7 @@ class MinLeafsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
         leafs = [n for n in H.nodes if H.in_degree(n) == 0]
         return 1 - len(leafs) / H.number_of_nodes() if H.number_of_nodes() else 0
@@ -575,7 +575,7 @@ class ShortLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
         ll = [len(a.label) if a.label else 0 for a in arguments] + [
@@ -601,7 +601,7 @@ class DiverseLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
         labels = [a.label for a in arguments] + [c.label for c in claims]
@@ -634,7 +634,7 @@ class ShortClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
         return round(sum(ll) / len(ll),-1) ** -1 if ll else 0
@@ -657,7 +657,7 @@ class LongClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
         return round(sum(ll) / len(ll),-1) if ll else 0
@@ -680,7 +680,7 @@ class ArgumentClaimSizePreferencePairGenerator(ScoringVirtuePreferencePairGenera
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
         cls = [len(c.texts[0]) if c.texts else 0 for c in claims]
@@ -715,7 +715,7 @@ class IndependentWordingPreferencePairGenerator(ScoringVirtuePreferencePairGener
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
         assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
 
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown"]
+        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
         claims: list[Proposition] = argdown.propositions
 

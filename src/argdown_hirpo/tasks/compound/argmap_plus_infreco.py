@@ -281,24 +281,25 @@ class ArgmapPlusInfrecoJudge(Judge):
         if from_label == to_label:
             return True
 
-        rel_direct = argdown_map.get_dialectical_relation(from_label, to_label)
-        if (
-            rel_direct is not None
-            and rel_direct.valence == Valence.SUPPORT
-        ):
+        rels_direct = argdown_map.get_dialectical_relation(from_label, to_label)
+        rels_direct = [] if rels_direct is None else rels_direct
+        if any(rd.valence == Valence.SUPPORT for rd in rels_direct):
             return True
 
         for prop in argdown_map.propositions:
             if prop.label is None or prop.label == from_label or prop.label == to_label:
                 continue
-            rel1 = argdown_map.get_dialectical_relation(from_label, prop.label)
-            rel2 = argdown_map.get_dialectical_relation(prop.label, to_label)
-            if rel1 is not None and rel2 is not None:
-                if (
-                    (rel1.valence == Valence.SUPPORT and rel2.valence == Valence.SUPPORT)
-                    or (rel1.valence in [Valence.ATTACK, Valence.CONTRADICT] and rel2.valence in [Valence.ATTACK, Valence.CONTRADICT]) 
-                ):
-                    return True
+            rels1 = argdown_map.get_dialectical_relation(from_label, prop.label)
+            rels2 = argdown_map.get_dialectical_relation(prop.label, to_label)
+            rels1 = [] if rels1 is None else rels1
+            rels2 = [] if rels2 is None else rels2
+            for rel1 in rels1:
+                for rel2 in rels2:
+                    if (
+                        (rel1.valence == Valence.SUPPORT and rel2.valence == Valence.SUPPORT)
+                        or (rel1.valence in [Valence.ATTACK, Valence.CONTRADICT] and rel2.valence in [Valence.ATTACK, Valence.CONTRADICT]) 
+                    ):
+                        return True
 
         return False
 
@@ -309,24 +310,25 @@ class ArgmapPlusInfrecoJudge(Judge):
         if from_label == to_label:
             return False
 
-        rel_direct = argdown_map.get_dialectical_relation(from_label, to_label)
-        if (
-            rel_direct is not None
-            and rel_direct.valence == Valence.ATTACK
-        ):
+        rels_direct = argdown_map.get_dialectical_relation(from_label, to_label)
+        rels_direct = [] if rels_direct is None else rels_direct
+        if any(rd.valence == Valence.ATTACK for rd in rels_direct):
             return True
 
         for prop in argdown_map.propositions:
             if prop.label is None or prop.label == from_label or prop.label == to_label:
                 continue
-            rel1 = argdown_map.get_dialectical_relation(from_label, prop.label)
-            rel2 = argdown_map.get_dialectical_relation(prop.label, to_label)
-            if rel1 is not None and rel2 is not None:
-                if (
-                    (rel1.valence == Valence.SUPPORT and rel2.valence in [Valence.ATTACK, Valence.CONTRADICT])
-                    or (rel1.valence in [Valence.ATTACK, Valence.CONTRADICT] and rel2.valence == Valence.SUPPORT) 
-                ):
-                    return True
+            rels1 = argdown_map.get_dialectical_relation(from_label, prop.label)
+            rels2 = argdown_map.get_dialectical_relation(prop.label, to_label)
+            rels1 = [] if rels1 is None else rels1
+            rels2 = [] if rels2 is None else rels2
+            for rel1 in rels1:
+                for rel2 in rels2:
+                    if (
+                        (rel1.valence == Valence.SUPPORT and rel2.valence in [Valence.ATTACK, Valence.CONTRADICT])
+                        or (rel1.valence in [Valence.ATTACK, Valence.CONTRADICT] and rel2.valence == Valence.SUPPORT) 
+                    ):
+                        return True
 
         return False
 
@@ -654,7 +656,7 @@ class ConnectednessPreferencePairGeneratorCT(ConnectednessPreferencePairGenerato
         return super()._score(
             problem=problem,
             argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
+            evaluation=Evaluation(is_valid=True, artifacts={"argdown_map": argdown}, metrics={}),
         )
     
 class MaxArgsPreferencePairGeneratorCT(MaxArgsPreferencePairGenerator):
@@ -675,7 +677,7 @@ class MaxArgsPreferencePairGeneratorCT(MaxArgsPreferencePairGenerator):
         return super()._score(
             problem=problem,
             argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
+            evaluation=Evaluation(is_valid=True, artifacts={"argdown_map": argdown}, metrics={}),
         )
     
 
@@ -697,7 +699,7 @@ class MaxSupportsPreferencePairGeneratorCT(MaxSupportsPreferencePairGenerator):
         return super()._score(
             problem=problem,
             argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
+            evaluation=Evaluation(is_valid=True, artifacts={"argdown_map": argdown}, metrics={}),
         )
     
 
@@ -719,7 +721,7 @@ class MaxAttacksPreferencePairGeneratorCT(MaxAttacksPreferencePairGenerator):
         return super()._score(
             problem=problem,
             argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
+            evaluation=Evaluation(is_valid=True, artifacts={"argdown_map": argdown}, metrics={}),
         )
     
 class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreferencePairGenerator):
@@ -740,6 +742,6 @@ class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreference
         return super()._score(
             problem=problem,
             argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
+            evaluation=Evaluation(is_valid=True, artifacts={"argdown_map": argdown}, metrics={}),
         )
     

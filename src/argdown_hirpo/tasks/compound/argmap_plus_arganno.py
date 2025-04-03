@@ -249,8 +249,8 @@ class ArgmapPlusArgannoJudge(Judge):
         )
         if evaluation_argmap.is_valid is False:
             is_valid = False
-        argdown: ArgdownMultiDiGraph = evaluation_argmap.artifacts["argdown"]
-        artifacts["argdown"] = argdown
+        argdown: ArgdownMultiDiGraph = evaluation_argmap.artifacts["argdown_map"]
+        artifacts["argdown_map"] = argdown
         for k, v in evaluation_argmap.metrics.items():
             if k != "fenced_code_block":
                 eval_data["argmap_" + k] = v
@@ -396,7 +396,7 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     ) -> float:
 
         soup = evaluation.artifacts.get("soup")
-        argdown = evaluation.artifacts.get("argdown")
+        argdown = evaluation.artifacts.get("argdown_map")
         assert soup and argdown, (
             "AnnotationProximityPreferencePairGenerator: Missing soup or argdown in evaluation artifacts"
         )

@@ -26,11 +26,6 @@ from argdown_hirpo.tasks.core.argmap import (
     ArgMapJudge,
     ArgMapProblem,
     ArgumentMap,
-    ConnectednessPreferencePairGenerator,
-    MaxArgsPreferencePairGenerator,
-    MaxSupportsPreferencePairGenerator,
-    MaxAttacksPreferencePairGenerator,
-    SourceTextProximityPreferencePairGenerator,
 )
 from argdown_hirpo.tasks.core.logreco import (
     LogicalReco,
@@ -85,15 +80,15 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
 
             ## Argument Reconstruction Task Details                   
 
-            Logically analyse and reconstruct the text's arguments with Argdown and ensuring the inferences are deductively valid.
+            Logically analyse and reconstruct the text's arguments with Argdown, ensuring the inferences are deductively valid.
 
             - Reconstruct *at least two arguments* in standard form (including premises, final 
               conclusion, and possible intermediate conclusions).
                    
-            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
-              syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.
-              Only declare variables that are used in the corresponding formalization and that have not been declared before.
-              Ensure that all your formalizations are consistent with each other.
+            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in
+              NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.
+              Only declare variables that are used in the corresponding formalization and that have not been declared in the 
+              corresponding argument before. Ensure that your formalizations are consistent across different arguments.
 
             - For each inference step in the argument, provide information about which previously introduced premises or 
               conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
@@ -211,16 +206,19 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
 
         # equivalence via dialectical relations        
         if argdown is not None:
-            rel1 = argdown.get_dialectical_relation(prop1.label, prop2.label)
-            rel2 = argdown.get_dialectical_relation(prop2.label, prop1.label)
-            if (
-                rel1 is not None and rel2 is not None
-                and rel1.valence == Valence.SUPPORT
-                and DialecticalType.AXIOMATIC in rel1.dialectics
-                and rel2.valence == Valence.SUPPORT
-                and DialecticalType.AXIOMATIC in rel2.dialectics
-            ):
-                return True
+            rels1 = argdown.get_dialectical_relation(prop1.label, prop2.label)
+            rels2 = argdown.get_dialectical_relation(prop2.label, prop1.label)
+            if rels1 and rels2 :
+                for rel1 in rels1:
+                    for rel2 in rels2:
+                        if (
+                            rel1 is not None and rel2 is not None
+                            and rel1.valence == Valence.SUPPORT
+                            and DialecticalType.AXIOMATIC in rel1.dialectics
+                            and rel2.valence == Valence.SUPPORT
+                            and DialecticalType.AXIOMATIC in rel2.dialectics
+                        ):
+                            return True
 
         return prop1.label == prop2.label
 
@@ -274,22 +272,27 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
             if drel.source not in reco_labels or drel.target not in reco_labels:
                 continue
             if DialecticalType.SKETCHED in drel.dialectics:
-                rel_match = argdown_reco.get_dialectical_relation(drel.source, drel.target)
-                if (
-                    rel_match is None
-                    or drel.valence != rel_match.valence
+                rel_matches = argdown_reco.get_dialectical_relation(drel.source, drel.target)
+                rel_matches = [] if rel_matches is None else rel_matches
+
+                if any(
+                    rm.valence == drel.valence
+                    and DialecticalType.GROUNDED in rm.dialectics
+                    for rm in rel_matches
                 ):
+                    continue
+
+                if not any(rm.valence == drel.valence for rm in rel_matches):
                     msgs.append(
                         f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
                         f"in argument map is not matched by any relation in the argument reconstruction."
                     )
-                elif (
-                    DialecticalType.GROUNDED not in rel_match.dialectics
-                ):
-                    msgs.append(
-                        f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
-                        f"in argument map is not grounded in logical argument reconstructions."
-                    )
+                    continue
+                msgs.append(
+                    f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
+                    f"in argument map is not grounded in logical argument reconstructions."
+                )
+
 
         for drel in argdown_reco.dialectical_relations:
             if drel.source not in map_labels or drel.target not in map_labels:
@@ -333,11 +336,12 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
             "argmap_premise_conclusion_structures": "",
 
             "recos_invalid_argdown_syntax": "",
-            "recos_no_arguments": "",
+            "recos_too_few_arguments": "",
             "recos_illformed_arguments": "",  # starts with conclusion / ends with premise / no pcs
             "recos_missing_inference_info": "",
             "recos_unknown_proposition_references": "",  # in inference info
             "recos_unused_propositions": "",
+            "recos_disallowed_material": "",  # more propositions
             "recos_flawed_formalizations": "",
             "recos_invalid_inference": "",
             "recos_redundant_premises": "",
@@ -392,19 +396,25 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
         artifacts["argdown_reco"] = argdown_reco
         if argdown_reco:
 
-            if len(argdown_reco.arguments) == 0:
-                eval_data["recos_no_arguments"] = "No argument in argdown snippet."
+            if len(argdown_reco.arguments) < 2:
+                eval_data["recos_too_few_arguments"] = "Too few arguments in argdown snippet (at least 2 required)."
 
             eval_dimensions_map = copy.deepcopy(LogRecoVerifier.default_eval_dimensions_map)        
             print(eval_dimensions_map)    
-            eval_dimensions_map["illformed_argument"].remove("has_not_multiple_gists")
             eval_dimensions_map["missing_label_gist"].remove("has_gist")
-            eval_dimensions_map["disallowed_material"].remove("only_grounded_dialectical_relations")
-            eval_dimensions_map["disallowed_material"].remove("no_extra_propositions")
+            eval_dimensions_map.pop("disallowed_material")
             reco_eval_data, all_expressions, all_declarations = LogRecoVerifier.run_battery(argdown_reco, eval_dimensions_map)
             print(f"Reco eval data: {reco_eval_data}")
             for k,v in reco_eval_data.items():
                 eval_data["recos_" + k] = v
+
+            check, msg = LogRecoVerifier._no_extra_propositions(argdown_reco)
+            if check is False:
+                eval_data["recos_disallowed_material"] = (
+                    msg
+                    if msg
+                    else "Some propositions are not used as premise and/or conclusion."
+                )
 
             artifacts["all_expressions"] = all_expressions
             artifacts["all_declarations"] = all_declarations
@@ -462,142 +472,6 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
         return evaluations
 
 
-class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the ArgmapPlusLogreco, prefering valid reconstructions
-    with succinct and simple propositions."""
-
-    hints = [
-        "Make sure that you keep each of the arguments premises and conclusion(s) simple and succinct. "
-        "Short sentences are crucial at this step. (Number of premises and conclusions is not important.)"
-    ]
-
-    def _score(
-        self,
-        problem: Problem,
-        reco: Solution,
-        evaluation: Evaluation,
-    ) -> float:
-        assert "argdown_reco" in evaluation.artifacts, (
-            "Evaluation must contain argdown_reco artifact"
-        )
-        argdown_reco: ArgdownMultiDiGraph = evaluation.artifacts["argdown_reco"]
-        propositions: list[Proposition] = argdown_reco.propositions
-
-        lengths: list[float] = []
-        for p in propositions:
-            for t in p.texts:
-                lengths.append(len(t))
-
-        return round(sum(lengths) / len(lengths), -1) ** -1 if lengths else 0
-
-
-class ConnectednessPreferencePairGeneratorCT(ConnectednessPreferencePairGenerator):
-    """Simple wrapper around ConnectednessPreferencePairGenerator"""
-    def _score(
-        self,
-        problem: Problem,
-        solution: Solution,
-        evaluation: Evaluation,
-    ) -> float:
-        assert "argdown_map" in evaluation.artifacts, (
-            "Evaluation must contain argdown_map artifact"
-        )
-        assert isinstance(solution, ArgmapPlusLogreco), (
-            "Solution must be an ArgmapPlusLogreco"
-        )
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
-        return super()._score(
-            problem=problem,
-            argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
-        )
-    
-class MaxArgsPreferencePairGeneratorCT(MaxArgsPreferencePairGenerator):
-    """Simple wrapper around MaxArgsPreferencePairGenerator"""
-    def _score(
-        self,
-        problem: Problem,
-        solution: Solution,
-        evaluation: Evaluation,
-    ) -> float:
-        assert "argdown_map" in evaluation.artifacts, (
-            "Evaluation must contain argdown_map artifact"
-        )
-        assert isinstance(solution, ArgmapPlusLogreco), (
-            "Solution must be an ArgmapPlusLogreco"
-        )
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
-        return super()._score(
-            problem=problem,
-            argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
-        )
-    
-
-class MaxSupportsPreferencePairGeneratorCT(MaxSupportsPreferencePairGenerator):
-    """Simple wrapper around MaxSupportsPreferencePairGenerator"""
-    def _score(
-        self,
-        problem: Problem,
-        solution: Solution,
-        evaluation: Evaluation,
-    ) -> float:
-        assert "argdown_map" in evaluation.artifacts, (
-            "Evaluation must contain argdown_map artifact"
-        )
-        assert isinstance(solution, ArgmapPlusLogreco), (
-            "Solution must be an ArgmapPlusLogreco"
-        )
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
-        return super()._score(
-            problem=problem,
-            argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
-        )
-    
-
-class MaxAttacksPreferencePairGeneratorCT(MaxAttacksPreferencePairGenerator):
-    """Simple wrapper around MaxAttacksPreferencePairGenerator"""
-    def _score(
-        self,
-        problem: Problem,
-        solution: Solution,
-        evaluation: Evaluation,
-    ) -> float:
-        assert "argdown_map" in evaluation.artifacts, (
-            "Evaluation must contain argdown_map artifact"
-        )
-        assert isinstance(solution, ArgmapPlusLogreco), (
-            "Solution must be an ArgmapPlusLogreco"
-        )
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
-        return super()._score(
-            problem=problem,
-            argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
-        )
-    
-class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreferencePairGenerator):
-    """Simple wrapper around SourceTextProximityPreferencePairGenerator"""
-    def _score(
-        self,
-        problem: Problem,
-        solution: Solution,
-        evaluation: Evaluation,
-    ) -> float:
-        assert "argdown_map" in evaluation.artifacts, (
-            "Evaluation must contain argdown_map artifact"
-        )
-        assert isinstance(solution, ArgmapPlusLogreco), (
-            "Solution must be an ArgmapPlusLogreco"
-        )
-        argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
-        return super()._score(
-            problem=problem,
-            argmap=solution.partial_argmap(),
-            evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
-        )
-    
 class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Global FormalizationsFaithfulnessPreferencePairGenerator"""
     def _score(
@@ -623,6 +497,7 @@ class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePrefe
         for argument in argdown_reco.arguments:
             if argument.label not in all_expressions:
                 continue
+            print(f"Argument: {argument.label}")
             for pr in argument.pcs:
                 if pr.label not in all_expressions[argument.label]:
                     continue
@@ -638,8 +513,10 @@ class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePrefe
                 text_1 = FOL2NLTranslator.translate_to_nl_sentence(
                     expression, all_declarations
                 )
+                print(f"Text 1: {text_1}")
 
                 for text_2 in proposition.texts:
+                    print(f"Text 2: {text_2}")
                     dlds.append(
                         textdistance.damerau_levenshtein.normalized_similarity(
                             text_1, text_2

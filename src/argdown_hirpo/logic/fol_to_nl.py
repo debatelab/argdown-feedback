@@ -33,7 +33,7 @@ class FOL2NLTranslator:
         for placeholder in cls._get_placeholders(scheme):
             if placeholder not in substitutions:
                 substitutions[placeholder] = placeholder
-        print(substitutions)
+        print(scheme, substitutions)
         return scheme.format(**substitutions)
 
 
@@ -133,4 +133,4 @@ class FOL2NLTranslator:
             return "for every {%s} it holds that %s" % (
                 expression.variable.name, cls.translate_to_nl_scheme(expression.term)
             )
-        return str(expression)  
+        return "{%s}" % str(expression)  
