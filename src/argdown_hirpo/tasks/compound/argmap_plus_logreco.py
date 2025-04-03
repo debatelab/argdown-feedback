@@ -41,7 +41,7 @@ from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
 
 
 class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
-    """Task: Create coherent informal reco and argument map."""
+    """Task: Create coherent logical reco and argument map."""
 
     def __init__(self, sources: str | list[str]):
         if isinstance(sources, list):

@@ -4,6 +4,7 @@ import dataclasses
 from textwrap import dedent
 from bs4 import BeautifulSoup
 from pyargdown import (
+    Argdown,
     Conclusion,
     parse_argdown,
     Argument,
@@ -233,8 +234,137 @@ class ArgannoPlusInfrecoProblemGenerator(ProblemGenerator):
 class ArgannoPlusInfrecoJudge(Judge):
     """Judge for the anno plus argument mapping task."""
 
+    def _evaluate_coherence(self, soup_anno: BeautifulSoup, argdown_reco: Argdown) -> dict[str, str]:
+        """Check the coherence between the annotation and the argument reconstruction."""
+        eval_data = {
+            "elements_correspondence": "",
+            "relations_correspondence": "",
+        }
+        msgs = []
+        all_argument_labels = [arg.label for arg in argdown_reco.arguments if arg.label]
+        all_annotation_ids = [
+            a.get("id")  # type: ignore
+            for a in soup_anno.find_all("proposition")
+            if a.get("id")  # type: ignore
+        ]
+        argument_label_map: dict[str, str] = {}
+        refreco_map: dict[str, str] = {}
+        for a in soup_anno.find_all("proposition"):
+            a_label = a.get("argument_label")  # type: ignore
+            a_id = a.get("id")  # type: ignore
+            a_ref_reco = a.get("ref_reco_label")  # type: ignore
+            if a_label not in all_argument_labels:
+                msgs.append(
+                    f"Illegal 'argument_label' reference of proposition element with id={a_id}: "
+                    f"No argument with label '{a_label}' in the Argdown snippet."
+                )
+                continue
+            argument_label_map[str(a_id)] = str(a_label)
+            refreco_map[str(a_id)] = str(a_ref_reco)
+            argument = next(arg for arg in argdown_reco.arguments if arg.label == a_label)
+            if not argument.pcs or not any(
+                a_ref_reco == pr.label for pr in argument.pcs
+            ):
+                msgs.append(
+                    f"Illegal 'ref_reco_label' reference of proposition element with id={a_id}: "
+                    f"No premise or conclusion with label '{a_ref_reco}' in argument '{a_label}'."
+                )
+
+        for argument in argdown_reco.arguments:
+            if argument.label not in argument_label_map.values():
+                msgs.append(
+                    f"Free floating argument: Argument '{argument.label}' does not have any "
+                    "corresponding elements in the annotation."
+                )
+            for pr in argument.pcs:
+                proposition = next(
+                    prop
+                    for prop in argdown_reco.propositions
+                    if prop.label == pr.proposition_label
+                )
+                id_refs = proposition.data.get("annotation_ids")
+                if id_refs is None:
+                    msgs.append(
+                        f"Missing 'annotation_ids' attribute in proposition '{pr.label}' "
+                        f"of argument '{argument.label}'."
+                    )
+                    continue
+                for id_ref in id_refs:
+                    if id_ref not in all_annotation_ids:
+                        msgs.append(
+                            f"Illegal 'annotation_ids' reference in proposition '{pr.label}' of argument '{argument.label}': "
+                            f"No proposition element with id='{id_ref}' in the annotation."
+                        )
+                        continue
+                    if argument_label_map.get(id_ref) != argument.label:
+                        msgs.append(
+                            f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
+                            f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
+                            f"with id={id_ref} in the annotation has a different argument_label"
+                            f"{': ' + argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
+                        )
+                    if refreco_map.get(id_ref) != pr.label:
+                        msgs.append(
+                            f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
+                            f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
+                            f"with id={id_ref} in the annotation has a different ref_reco_label"
+                            f"{': ' + refreco_map[id_ref] if id_ref in refreco_map else ''}."
+                        )
+        if msgs:
+            eval_data["elements_correspondence"] = " - ".join(msgs)
+        del msgs
+
+        # check support relations correspondence
+        msgs = []
+        annotated_support_relations: list[dict] = []
+        for a in soup_anno.find_all("proposition"):
+            from_id = a.get("id")  # type: ignore
+            for support in a.get("supports", []):  # type: ignore
+                if support in all_annotation_ids:
+                    annotated_support_relations.append(
+                        {
+                            "from_id": str(from_id),
+                            "to_id": str(support),
+                        }
+                    )
+
+        for ar in annotated_support_relations:
+            arglabel_from = argument_label_map.get(ar["from_id"])
+            arglabel_to = argument_label_map.get(ar["to_id"])
+            if arglabel_from is None or arglabel_to is None:
+                msgs.append(
+                    f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
+                    f"matched by any relation in the argument map (illegal argument_labels)."
+                )
+                continue
+            if arglabel_from != arglabel_to:
+                msgs.append(
+                    f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to support each other, but "
+                    f"are not assigned to one and the same argument (different argument_labels)."
+                )
+                continue
+            del argument
+            argument = next(
+                (arg for arg in argdown_reco.arguments if arg.label == arglabel_from),
+                None  # type: ignore
+            )
+            ref_reco_from = refreco_map.get(ar["from_id"])
+            ref_reco_to = refreco_map.get(ar["to_id"])
+            if argument is None or ref_reco_from is None or ref_reco_to is None:
+                continue
+            if ref_reco_from not in _get_props_used_in_inference(argument, ref_reco_to):
+                msgs.append(
+                    f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
+                    f"matched by the inferential relations in the argument '{argument.label}'."
+                )
+        if msgs:
+            eval_data["relations_correspondence"] = " - ".join(msgs)
+        del msgs
+
+        return eval_data
+
     def _evaluate_solution(
-        self, problem: ArgannoPlusInfrecoProblem, reco: ArgannoPlusInfreco
+        self, problem: Problem, reco: Solution
     ) -> Evaluation:
         is_valid = True
         artifacts: dict[str, Any] = {}
@@ -258,12 +388,12 @@ class ArgannoPlusInfrecoJudge(Judge):
 
         # check fenced codeblocks
         msgs = []
-        ast = reco.annotated_source_text.strip("\n ")
+        ast = reco.annotated_source_text.strip("\n ")  # type: ignore
         if not (ast.startswith("```xml") and ast.endswith("```")):
             msgs.append("Failed to extract fenced xml block with annotation.")
             if ast.count("```xml") == 0:
                 msgs.append("No fenced code block starting with '```xml'.")
-        ads = reco.argdown_snippet.strip("\n ")
+        ads = reco.argdown_snippet.strip("\n ")  # type: ignore
         if not (ads.startswith("```argdown") and ads.endswith("```")):
             msgs.append("Failed to extract fenced argdown block.")
             if ads.count("```argdown") == 0:
@@ -274,7 +404,7 @@ class ArgannoPlusInfrecoJudge(Judge):
 
         # evaluate anno
         evaluation_anno = AnnotationJudge()._evaluate_annotation(
-            problem=AnnotationProblem(problem.sources, strip_html=False),
+            problem=AnnotationProblem(problem.sources, strip_html=False),  # type: ignore
             annotation=Annotation(ast),
         )
         if evaluation_anno.is_valid is False:
@@ -373,128 +503,14 @@ class ArgannoPlusInfrecoJudge(Judge):
         del msgs
 
         # check 1:1 correspondence between annotation and argument elements
-        msgs = []
-        all_argument_labels = [arg.label for arg in argdown.arguments if arg.label]
-        all_annotation_ids = [
-            a.get("id")  # type: ignore
-            for a in soup.find_all("proposition")
-            if a.get("id")  # type: ignore
-        ]
-        argument_label_map: dict[str, str] = {}
-        refreco_map: dict[str, str] = {}
-        for a in soup.find_all("proposition"):
-            a_label = a.get("argument_label")  # type: ignore
-            a_id = a.get("id")  # type: ignore
-            a_ref_reco = a.get("ref_reco_label")  # type: ignore
-            if a_label not in all_argument_labels:
-                msgs.append(
-                    f"Illegal 'argument_label' reference of proposition element with id={a_id}: "
-                    f"No argument with label '{a_label}' in the Argdown snippet."
-                )
-                continue
-            argument_label_map[str(a_id)] = str(a_label)
-            refreco_map[str(a_id)] = str(a_ref_reco)
-            argument = next(arg for arg in argdown.arguments if arg.label == a_label)
-            if not argument.pcs or not any(
-                a_ref_reco == pr.label for pr in argument.pcs
-            ):
-                msgs.append(
-                    f"Illegal 'ref_reco_label' reference of proposition element with id={a_id}: "
-                    f"No premise or conclusion with label '{a_ref_reco}' in argument '{a_label}'."
-                )
 
-        for argument in argdown.arguments:
-            if argument.label not in argument_label_map.values():
-                msgs.append(
-                    f"Free floating argument: Argument '{argument.label}' does not have any "
-                    "corresponding elements in the annotation."
-                )
-            for pr in argument.pcs:
-                proposition = next(
-                    prop
-                    for prop in argdown.propositions
-                    if prop.label == pr.proposition_label
-                )
-                id_refs = proposition.data.get("annotation_ids")
-                if id_refs is None:
-                    msgs.append(
-                        f"Missing 'annotation_ids' attribute in proposition '{pr.label}' "
-                        f"of argument '{argument.label}'."
-                    )
-                    continue
-                for id_ref in id_refs:
-                    if id_ref not in all_annotation_ids:
-                        msgs.append(
-                            f"Illegal 'annotation_ids' reference in proposition '{pr.label}' of argument '{argument.label}': "
-                            f"No proposition element with id='{id_ref}' in the annotation."
-                        )
-                        continue
-                    if argument_label_map.get(id_ref) != argument.label:
-                        msgs.append(
-                            f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
-                            f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
-                            f"with id={id_ref} in the annotation has a different argument_label"
-                            f"{': ' + argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
-                        )
-                    if refreco_map.get(id_ref) != pr.label:
-                        msgs.append(
-                            f"Label reference mismatch: proposition '{pr.label}' of argument '{argument.label}' "
-                            f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
-                            f"with id={id_ref} in the annotation has a different ref_reco_label"
-                            f"{': ' + refreco_map[id_ref] if id_ref in refreco_map else ''}."
-                        )
-        if msgs:
-            is_valid = False
-            eval_data["elements_correspondence"] = " - ".join(msgs)
-        del msgs
-
-        # check support relations correspondence
-        msgs = []
-        annotated_support_relations: list[dict] = []
-        for a in soup.find_all("proposition"):
-            from_id = a.get("id")  # type: ignore
-            for support in a.get("supports", []):  # type: ignore
-                if support in all_annotation_ids:
-                    annotated_support_relations.append(
-                        {
-                            "from_id": str(from_id),
-                            "to_id": str(support),
-                        }
-                    )
-
-        for ar in annotated_support_relations:
-            arglabel_from = argument_label_map.get(ar["from_id"])
-            arglabel_to = argument_label_map.get(ar["to_id"])
-            if arglabel_from is None or arglabel_to is None:
-                msgs.append(
-                    f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
-                    f"matched by any relation in the argument map (illegal argument_labels)."
-                )
-                continue
-            if arglabel_from != arglabel_to:
-                msgs.append(
-                    f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to support each other, but "
-                    f"are not assigned to one and the same argument (different argument_labels)."
-                )
-                continue
-            del argument
-            argument = next(
-                (arg for arg in argdown.arguments if arg.label == arglabel_from),
-                None  # type: ignore
-            )
-            ref_reco_from = refreco_map.get(ar["from_id"])
-            ref_reco_to = refreco_map.get(ar["to_id"])
-            if argument is None or ref_reco_from is None or ref_reco_to is None:
-                continue
-            if ref_reco_from not in _get_props_used_in_inference(argument, ref_reco_to):
-                msgs.append(
-                    f"Annotated support relation {ar['from_id']} -> {ar['to_id']} is not "
-                    f"matched by the inferential relations in the argument '{argument.label}'."
-                )
-
-        if msgs:
-            is_valid = False
-            eval_data["relations_correspondence"] = " - ".join(msgs)
+        coherence_eval_data = self._evaluate_coherence(
+            soup_anno = soup,
+            argdown_reco = argdown,
+        )
+        eval_data.update(coherence_eval_data)
+                
+        is_valid = not any(v for v in eval_data.values())        
 
         return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
 

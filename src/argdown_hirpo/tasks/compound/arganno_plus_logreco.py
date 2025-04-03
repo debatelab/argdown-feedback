@@ -48,7 +48,7 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
             dedent("""
             # Assignment: Annotate a source text and logically reconstruct its main argument in standard form using Argdown syntax.
                         
-            Analyse the argumentation in the following **source text**. Create a a coherent argumentative text annotation and a corresponding logical argument reconstruction in standard form (premise-conclusion structure).
+            Analyse the argumentation in the following **source text**. Create a coherent argumentative text annotation and a corresponding logical argument reconstruction in standard form (premise-conclusion structure).
 
             ::: {{.source_text}}              
             {sources}
