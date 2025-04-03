@@ -68,7 +68,7 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
 
             ## Argument Reconstruction Task Details                   
 
-            Logically analyse and reconstruct the text's main argumentation with Argdown.
+            Logically analyse and reconstruct the text's main argumentation as deductively valid inference with Argdown.
 
             - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
               syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.

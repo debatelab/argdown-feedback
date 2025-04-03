@@ -1,18 +1,17 @@
 import copy
+import dataclasses
 from typing import Any, Sequence
 
-import dataclasses
 from textwrap import dedent
 from pyargdown import (
     Argdown,
     ArgdownMultiDiGraph,
-    Argument,
-    Conclusion,
     Proposition,
     Valence,
     DialecticalType,
     parse_argdown,
 )
+import textdistance
 
 from argdown_hirpo.base import (
     Problem,
@@ -20,9 +19,9 @@ from argdown_hirpo.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    Judge,
     ScoringVirtuePreferencePairGenerator,
 )
+from argdown_hirpo.logic.fol_to_nl import FOL2NLTranslator
 from argdown_hirpo.tasks.core.argmap import (
     ArgMapJudge,
     ArgMapProblem,
@@ -33,20 +32,20 @@ from argdown_hirpo.tasks.core.argmap import (
     MaxAttacksPreferencePairGenerator,
     SourceTextProximityPreferencePairGenerator,
 )
-from argdown_hirpo.tasks.core.infreco import (
-    InfRecoProblem,
-    InformalReco,
+from argdown_hirpo.tasks.core.logreco import (
+    LogicalReco,
 )
-from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier
+from argdown_hirpo.tasks.compound.argmap_plus_infreco import (
+    ArgmapPlusInfreco,
+    ArgmapPlusInfrecoJudge,
+    ArgmapPlusInfrecoProblem,
+)
+from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
 
-NEGATION_SCHEMES = [
-    "NOT: {text}",
-    "Not: {text}",
-    "NOT {text}",
-    "Not {text}",   
-]
 
-class ArgmapPlusInfrecoProblem(InfRecoProblem, ArgMapProblem):
+
+
+class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
     """Task: Create coherent informal reco and argument map."""
 
     def __init__(self, sources: str | list[str]):
@@ -64,9 +63,9 @@ class ArgmapPlusInfrecoProblem(InfRecoProblem, ArgMapProblem):
     ) -> str:
         prompt = (
             dedent("""
-            # Assignment: Present a text's argumentation as an informal Argdown argument map, and reconstruct its arguments in standard form using Argdown syntax.
+            # Assignment: Present a text's argumentation as an informal Argdown argument map, and logically reconstruct its arguments in standard form using Argdown syntax.
                         
-            Analyse the argumentation in the following **source text**. Create two coherent Argdown code snippets: One with an informal argument map, and another one with reconstructions of all the arguments in standard form (premise-conclusion structure).
+            Analyse the argumentation in the following **source text**. Create two coherent Argdown code snippets: One with an informal argument map, and another one with logical reconstructions of all the arguments in standard form (as deductively valid inferences).
 
             ::: {{.source_text}}              
             {sources}
@@ -86,14 +85,19 @@ class ArgmapPlusInfrecoProblem(InfRecoProblem, ArgMapProblem):
 
             ## Argument Reconstruction Task Details                   
 
-            Informally analyse and reconstruct the text's arguments with Argdown. In particular, you should
+            Logically analyse and reconstruct the text's arguments with Argdown and ensuring the inferences are deductively valid.
 
-            - reconstruct *at least two arguments* in standard form (including premises, final 
+            - Reconstruct *at least two arguments* in standard form (including premises, final 
               conclusion, and possible intermediate conclusions).
-            - provide, for each conclusion in an argument, information about which previously introduced premises or 
-              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
+                   
+            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
+              syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.
+              Only declare variables that are used in the corresponding formalization and that have not been declared before.
+              Ensure that all your formalizations are consistent with each other.
+
+            - For each inference step in the argument, provide information about which previously introduced premises or 
+              conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
               where the list items refer to the respective premise or conclusion labels.
-            - ensure that every premise and intermdeiate conclusions is actually used to infer a conclusion in the argument.
                   
             Importantly, enclose your Argdown reconstructions in a fenced codeblock, starting with '```argdown {{filename="reconstructions.ad"}}' and ending with '```'. If you provide multiple argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
@@ -104,16 +108,17 @@ class ArgmapPlusInfrecoProblem(InfRecoProblem, ArgMapProblem):
                    
             1. Every argument in the argument map is reconstructed in standard form.
             2. Every reconstructed argument is present in the argument map.
-            3. Whenever a claim in the argument map supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the reconstructed argument -- and vice versa.
-            4. Whenever an argument in the argument map supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument -- and vice versa.
-            5. Whenever an argument A in the argument map supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B -- and vice versa.
+            3. Whenever a claim in the _argument map_ supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the reconstructed argument -- and vice versa.
+            4. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument -- and vice versa.
+            5. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B -- and vice versa.
+            6. Whenever a claim A, in the _argdown reconstructions_, is declared to support, attack, or contradict another claim B, then the formalizations of A and B must logically ground this relation.
                    
             Here are the specific notation instructions which help you to ensure that argument map and argument reconstructions fully cohere with each other in the above sense: 
 
             - The argument labels in the argument map must match (1-to-1) the argument labels in the argument reconstruction.
             - Re-use the labels of claims in the argument map for the corresponding premises and conclusions (if any) in the argument reconstruction. 
-            - In the argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label or, absent any label, have string-identical texts.
-            - In the argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if they have different labels, and one text prepends "NOT: " the other text. (Avoid double negations and rely on duplex negatio affirmat instead.)
+            - In the argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label.
+            - In the argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if a corresponding logical relation between them is defined in the argdown snippet (e.g., with "><" or "->" syntax).
         """)
             .strip()
             .format(sources=self.sources)
@@ -167,86 +172,57 @@ class ArgmapPlusInfrecoProblem(InfRecoProblem, ArgMapProblem):
 
 
 @dataclasses.dataclass
-class ArgmapPlusInfreco(Solution):
+class ArgmapPlusLogreco(ArgmapPlusInfreco):
     """
-    Solution to the ArgmapPlusInfreco problem: argmap and reconstructions snippet.
+    Solution to the ArgmapPlusLogreco problem: argmap and reconstructions snippet.
 
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
 
-    argdown_map_snippet: str
-    argdown_reconstructions_snippet: str
-    unparsed_solution: str | None = None
-
-    def __str__(self):
-        if self.unparsed_solution:
-            return self.unparsed_solution
-        return self.argdown_map_snippet + "\n\n" + self.argdown_reconstructions_snippet
-
-    @classmethod
-    def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusInfreco":
-        unparsed_solution = raw_answer
-        argdown_map_snippet = ""
-        argdown_reconstructions_snippet = ""
-
-        _code_label = 'argdown {filename="map.ad"}'
-        if f"\n```{_code_label}" in unparsed_solution:
-            argdown_map_snippet = unparsed_solution.split(f"\n```{_code_label}")[-1].split("\n```")[0]
-            argdown_map_snippet = f"```{_code_label}" + argdown_map_snippet + "\n```"
-
-        _code_label = 'argdown {filename="reconstructions.ad"}'
-        if f"\n```{_code_label}" in unparsed_solution:
-            argdown_reconstructions_snippet = unparsed_solution.split(f"\n```{_code_label}")[-1].split("\n```")[0]
-            argdown_reconstructions_snippet = f"```{_code_label}" + argdown_reconstructions_snippet + "\n```"
-
-        return cls(
-            argdown_map_snippet=argdown_map_snippet
-                                if argdown_map_snippet
-                                else unparsed_solution,
-            argdown_reconstructions_snippet=argdown_reconstructions_snippet
-                                if argdown_reconstructions_snippet
-                                else unparsed_solution,
-            unparsed_solution=None
-                                if argdown_map_snippet and argdown_reconstructions_snippet
-                                else unparsed_solution,
-        )
-
-    def partial_argmap(self) -> ArgumentMap:
-        """Return the argument map subsolution."""
-        return ArgumentMap(
-            argdown_snippet=self.argdown_map_snippet,
-        )
-
-    def partial_infreco(self) -> InformalReco:
+    def partial_logreco(self) -> LogicalReco:
         """Return the informal reconstruction subsolution."""
-        return InformalReco(
+        return LogicalReco(
             argdown_snippet=self.argdown_reconstructions_snippet,
         )
 
 
-class ArgmapPlusInfrecoProblemGenerator(ProblemGenerator):
+class ArgmapPlusLogrecoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
-            return ArgmapPlusInfrecoProblem(inputs)
+            return ArgmapPlusLogrecoProblem(inputs)
         raise ValueError(
             "Inputs to an annotation + infreco problem must be a string or a list of strings"
         )
 
 
-class ArgmapPlusInfrecoJudge(Judge):
+class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
     """Judge for the argmap plus infreco task."""
 
     @staticmethod
-    def are_identical(prop1: Proposition | None, prop2: Proposition | None) -> bool:
+    def are_identical(prop1: Proposition | None, prop2: Proposition | None, argdown: Argdown | None = None) -> bool:
         """Check if two propositions are identical."""
-        if prop1 is None or prop2 is None:
+        if (
+            prop1 is None or prop1.label is None
+            or prop2 is None or prop2.label is None
+        ):
             return False
-        return (
-            prop1.label == prop2.label
-            or any(text in prop2.texts for text in prop1.texts)
-        )
+
+        # equivalence via dialectical relations        
+        if argdown is not None:
+            rel1 = argdown.get_dialectical_relation(prop1.label, prop2.label)
+            rel2 = argdown.get_dialectical_relation(prop2.label, prop1.label)
+            if (
+                rel1 is not None and rel2 is not None
+                and rel1.valence == Valence.SUPPORT
+                and DialecticalType.AXIOMATIC in rel1.dialectics
+                and rel2.valence == Valence.SUPPORT
+                and DialecticalType.AXIOMATIC in rel2.dialectics
+            ):
+                return True
+
+        return prop1.label == prop2.label
 
     @staticmethod
     def are_contradictory(prop1: Proposition | None, prop2: Proposition | None, argdown: Argdown | None = None) -> bool:
@@ -257,78 +233,16 @@ class ArgmapPlusInfrecoJudge(Judge):
             return False
         if argdown is not None:
             if any(
-                drel.source in [prop1.label, prop2.label]
-                and drel.target in [prop1.label, prop2.label]
+                drel.source in [prop1, prop2]
+                and drel.target in [prop1, prop2]
                 and drel.source != drel.target
                 and drel.valence in [Valence.ATTACK, Valence.CONTRADICT]
+                and DialecticalType.AXIOMATIC in drel.dialectics
                 for drel in argdown.dialectical_relations
             ):
                 return True
-        negations_prop1 = [
-            scheme.format(text=text) for scheme in NEGATION_SCHEMES for text in prop1.texts
-        ]
-        negations_prop2 = [
-            scheme.format(text=text) for scheme in NEGATION_SCHEMES for text in prop2.texts
-        ]
-        return (
-            any(text in negations_prop2 for text in prop1.texts)
-            or any(text in negations_prop1 for text in prop2.texts)
-        )
-    
-    @staticmethod
-    def indirectly_supports(from_label: str, to_label: str, argdown_map: Argdown) -> bool:
-        """Check if one node directly or indirectly (via intermediate prop) supports another one in argument map."""
-        if from_label == to_label:
-            return True
-
-        rel_direct = argdown_map.get_dialectical_relation(from_label, to_label)
-        if (
-            rel_direct is not None
-            and rel_direct.valence == Valence.SUPPORT
-        ):
-            return True
-
-        for prop in argdown_map.propositions:
-            if prop.label is None or prop.label == from_label or prop.label == to_label:
-                continue
-            rel1 = argdown_map.get_dialectical_relation(from_label, prop.label)
-            rel2 = argdown_map.get_dialectical_relation(prop.label, to_label)
-            if rel1 is not None and rel2 is not None:
-                if (
-                    (rel1.valence == Valence.SUPPORT and rel2.valence == Valence.SUPPORT)
-                    or (rel1.valence in [Valence.ATTACK, Valence.CONTRADICT] and rel2.valence in [Valence.ATTACK, Valence.CONTRADICT]) 
-                ):
-                    return True
-
         return False
 
-
-    @staticmethod
-    def indirectly_attacks(from_label: str, to_label: str, argdown_map: Argdown) -> bool:
-        """Check if one node directly or indirectly (via intermediate prop) attacks another one in argument map."""
-        if from_label == to_label:
-            return False
-
-        rel_direct = argdown_map.get_dialectical_relation(from_label, to_label)
-        if (
-            rel_direct is not None
-            and rel_direct.valence == Valence.ATTACK
-        ):
-            return True
-
-        for prop in argdown_map.propositions:
-            if prop.label is None or prop.label == from_label or prop.label == to_label:
-                continue
-            rel1 = argdown_map.get_dialectical_relation(from_label, prop.label)
-            rel2 = argdown_map.get_dialectical_relation(prop.label, to_label)
-            if rel1 is not None and rel2 is not None:
-                if (
-                    (rel1.valence == Valence.SUPPORT and rel2.valence in [Valence.ATTACK, Valence.CONTRADICT])
-                    or (rel1.valence in [Valence.ATTACK, Valence.CONTRADICT] and rel2.valence == Valence.SUPPORT) 
-                ):
-                    return True
-
-        return False
 
     def _evaluate_coherence(self, argdown_map: Argdown, argdown_reco: Argdown) -> dict[str, str]:
         """Evaluate the coherence between the argument map and the informal reconstruction."""
@@ -355,129 +269,44 @@ class ArgmapPlusInfrecoJudge(Judge):
 
         # check relations correspondence
         msgs = []
+
         for drel in argdown_map.dialectical_relations:
-            if DialecticalType.SKETCHED not in drel.dialectics:
+            if drel.source not in reco_labels or drel.target not in reco_labels:
                 continue
-            # get matched source nodes in reco
-            source_m: Argument | Proposition | None
-            target_m: Argument | Proposition | None
-            if any(a.label==drel.source for a in argdown_map.arguments):
-                source_m =  next( 
-                    (a for a in argdown_reco.arguments if a.label==drel.source),
-                    None
-                )  
-            else:
-                source_m = next(
-                    (p for p in argdown_reco.propositions if p.label==drel.source),
-                    None
-                )
-            if any(a.label==drel.target for a in argdown_map.arguments):
-                target_m = next(
-                    (a for a in argdown_reco.arguments if a.label==drel.target),
-                    None
-                )
-            else:
-                target_m = next(
-                    (p for p in argdown_reco.propositions if p.label==drel.target),
-                    None
-                )
-            if source_m is None or target_m is None:
+            if DialecticalType.SKETCHED in drel.dialectics:
+                rel_match = argdown_reco.get_dialectical_relation(drel.source, drel.target)
+                if (
+                    rel_match is None
+                    or drel.valence != rel_match.valence
+                ):
+                    msgs.append(
+                        f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
+                        f"in argument map is not matched by any relation in the argument reconstruction."
+                    )
+                elif (
+                    DialecticalType.GROUNDED not in rel_match.dialectics
+                ):
+                    msgs.append(
+                        f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
+                        f"in argument map is not grounded in logical argument reconstructions."
+                    )
+
+        for drel in argdown_reco.dialectical_relations:
+            if drel.source not in map_labels or drel.target not in map_labels:
                 continue
-            # check if the relation is grounded in reco
-            if isinstance(source_m, Argument) and isinstance(target_m, Argument):
-                if not source_m.pcs or not target_m.pcs:
-                    continue
+            if DialecticalType.GROUNDED in drel.dialectics:
                 if drel.valence == Valence.SUPPORT:
-                    if any(
-                        self.are_identical(
-                            argdown_reco.get_proposition(pr.proposition_label),
-                            argdown_reco.get_proposition(source_m.pcs[-1].proposition_label)
+                    if not ArgmapPlusLogrecoJudge.indirectly_supports(drel.source, drel.target, argdown_map):
+                        msgs.append(
+                            f"According to the argument reconstructions, item '{drel.source}' supports item '{drel.target}', "
+                            f"but this dialectical relation is not captured in the argument map."
                         )
-                        for pr in target_m.pcs
-                        if not isinstance(pr, Conclusion)
-                    ):
-                        continue
-                    msgs.append(
-                        f"Sketched support relation from <{drel.source}> to <{drel.target}> in argument map "
-                        f"is not grounded in the argument reconstruction, conclusion of <{drel.source}> does "
-                        f"not figure as premise in <{drel.target}>."
-                    )
                 elif drel.valence == Valence.ATTACK:
-                    if any(
-                        self.are_contradictory(
-                            argdown_reco.get_proposition(pr.proposition_label),
-                            argdown_reco.get_proposition(source_m.pcs[-1].proposition_label),
-                            argdown_reco
+                    if not ArgmapPlusLogrecoJudge.indirectly_attacks(drel.source, drel.target, argdown_map):
+                        msgs.append(
+                            f"According to the argument reconstructions, item '{drel.source}' attacks item '{drel.target}', "
+                            f"but this dialectical relation is not captured in the argument map."
                         )
-                        for pr in target_m.pcs
-                        if not isinstance(pr, Conclusion)
-                    ):
-                        continue
-                    msgs.append(
-                        f"Sketched attack relation from <{drel.source}> to <{drel.target}> in argument map "
-                        f"is not grounded in the argument reconstruction, conclusion of <{drel.source}> does "
-                        f"not contradict any premise in <{drel.target}>."
-                    )
-            if isinstance(source_m, Proposition) and isinstance(target_m, Argument):
-                if not target_m.pcs:
-                    continue
-                if drel.valence == Valence.SUPPORT:
-                    if any(
-                        self.are_identical(
-                            argdown_reco.get_proposition(pr.proposition_label),
-                            source_m,
-                        )
-                        for pr in target_m.pcs
-                        if not isinstance(pr, Conclusion)
-                    ):
-                        continue
-                    msgs.append(
-                        f"Sketched support relation from [{drel.source}] to <{drel.target}> in argument map "
-                        f"is not grounded in the argument reconstruction, proposition [{drel.source}] does "
-                        f"not figure as premise in <{drel.target}>."
-                    )
-                elif drel.valence == Valence.ATTACK:
-                    if any(
-                        self.are_contradictory(
-                            argdown_reco.get_proposition(pr.proposition_label),
-                            source_m,
-                            argdown_reco
-                        )
-                        for pr in target_m.pcs
-                        if not isinstance(pr, Conclusion)
-                    ):
-                        continue
-                    msgs.append(
-                        f"Sketched attack relation from [{drel.source}] to <{drel.target}> in argument map "
-                        f"is not grounded in the argument reconstruction, proposition [{drel.source}] does "
-                        f"not contradict any premise in <{drel.target}>."
-                    )
-            if isinstance(source_m, Argument) and isinstance(target_m, Proposition):
-                if not source_m.pcs:
-                    continue
-                if drel.valence == Valence.SUPPORT:
-                    if self.are_identical(
-                        argdown_reco.get_proposition(source_m.pcs[-1].proposition_label),
-                        target_m,
-                    ):
-                        continue
-                    msgs.append(
-                        f"Sketched support relation from <{drel.source}> to [{drel.target}] in argument map "
-                        f"is not grounded in the argument reconstruction, proposition [{drel.target}] "
-                        f"does not figure as conclusion in <{drel.source}>."
-                    )
-                if drel.valence == Valence.ATTACK:
-                    if self.are_contradictory(
-                        argdown_reco.get_proposition(source_m.pcs[-1].proposition_label),
-                        target_m,
-                        argdown_reco
-                    ):
-                        continue
-                    msgs.append(
-                        f"Sketched attack relation from <{drel.source}> to [{drel.target}] in argument map "
-                        f"is not grounded in the argument reconstruction, proposition [{drel.target}] "
-                        f"does not contradict the conclusion of <{drel.source}>."
-                    )
 
         if msgs:
             eval_data["relations_correspondence"] = " - ".join(msgs)
@@ -487,6 +316,12 @@ class ArgmapPlusInfrecoJudge(Judge):
     def _evaluate_solution(
         self, problem: ArgmapPlusInfrecoProblem, reco: ArgmapPlusInfreco
     ) -> Evaluation:
+        assert isinstance(problem, ArgmapPlusLogrecoProblem), (
+            "Problem must be an ArgmapPlusLogrecoProblem"
+        )
+        assert isinstance(reco, ArgmapPlusLogreco), (
+            "Solution must be an ArgmapPlusLogreco"
+        )
         is_valid = True
         artifacts: dict[str, Any] = {}
         eval_data = {
@@ -503,6 +338,11 @@ class ArgmapPlusInfrecoJudge(Judge):
             "recos_missing_inference_info": "",
             "recos_unknown_proposition_references": "",  # in inference info
             "recos_unused_propositions": "",
+            "recos_flawed_formalizations": "",
+            "recos_invalid_inference": "",
+            "recos_redundant_premises": "",
+            "recos_inconsistent_premises": "",
+            "recos_formally_ungrounded_relations": "",
 
             "elements_correspondence": "",
             "relations_correspondence": "",
@@ -555,17 +395,32 @@ class ArgmapPlusInfrecoJudge(Judge):
             if len(argdown_reco.arguments) == 0:
                 eval_data["recos_no_arguments"] = "No argument in argdown snippet."
 
-            eval_dimensions_map = copy.deepcopy(InfRecoVerifier.default_eval_dimensions_map)        
+            eval_dimensions_map = copy.deepcopy(LogRecoVerifier.default_eval_dimensions_map)        
             print(eval_dimensions_map)    
             eval_dimensions_map["illformed_argument"].remove("has_not_multiple_gists")
             eval_dimensions_map["missing_label_gist"].remove("has_gist")
             eval_dimensions_map["disallowed_material"].remove("only_grounded_dialectical_relations")
             eval_dimensions_map["disallowed_material"].remove("no_extra_propositions")
-            reco_eval_data = InfRecoVerifier.run_battery(argdown_reco, eval_dimensions_map)
+            reco_eval_data, all_expressions, all_declarations = LogRecoVerifier.run_battery(argdown_reco, eval_dimensions_map)
             print(f"Reco eval data: {reco_eval_data}")
             for k,v in reco_eval_data.items():
                 eval_data["recos_" + k] = v
 
+            artifacts["all_expressions"] = all_expressions
+            artifacts["all_declarations"] = all_declarations
+
+            # check for formally_ungrounded_relations
+            check, msg = LogRecoVerifier._has_formally_grounded_relations(
+                argdown_reco=argdown_reco,
+                all_expressions=all_expressions,
+                all_declarations=all_declarations,
+            )
+            if check is False:
+                eval_data["recos_formally_ungrounded_relations"] = (
+                    msg
+                    if msg
+                    else "Some dialectical relations between propositions are not grounded in their logical formalizations."
+                )
 
         # evaluate coherence between argmap and reco
         if argdown_map and argdown_reco:
@@ -586,11 +441,11 @@ class ArgmapPlusInfrecoJudge(Judge):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgmapPlusInfrecoProblem), (
-            "Problem must be an ArgannoPlusInfrecoProblem"
+        assert isinstance(problem, ArgmapPlusLogrecoProblem), (
+            "Problem must be an ArgannoPlusLogRecoProblem"
         )
         assert (
-            isinstance(original_solution, ArgmapPlusInfreco)
+            isinstance(original_solution, ArgmapPlusLogreco)
             or original_solution is None
         )
         assert feedback or original_solution is None, (
@@ -599,8 +454,8 @@ class ArgmapPlusInfrecoJudge(Judge):
 
         evaluations = []
         for solution in solutions:
-            assert isinstance(solution, ArgmapPlusInfreco), (
-                "All solutions must be ArgmapPlusInfreco"
+            assert isinstance(solution, ArgmapPlusLogreco), (
+                "All solutions must be ArgmapPlusLogreco"
             )
             evaluations.append(self._evaluate_solution(problem, solution))
 
@@ -608,7 +463,7 @@ class ArgmapPlusInfrecoJudge(Judge):
 
 
 class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
-    """Generate virtue-preference pairs for the ArgmapPlusInfreco, prefering valid reconstructions
+    """Generate virtue-preference pairs for the ArgmapPlusLogreco, prefering valid reconstructions
     with succinct and simple propositions."""
 
     hints = [
@@ -647,8 +502,8 @@ class ConnectednessPreferencePairGeneratorCT(ConnectednessPreferencePairGenerato
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert isinstance(solution, ArgmapPlusLogreco), (
+            "Solution must be an ArgmapPlusLogreco"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -668,8 +523,8 @@ class MaxArgsPreferencePairGeneratorCT(MaxArgsPreferencePairGenerator):
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert isinstance(solution, ArgmapPlusLogreco), (
+            "Solution must be an ArgmapPlusLogreco"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -690,8 +545,8 @@ class MaxSupportsPreferencePairGeneratorCT(MaxSupportsPreferencePairGenerator):
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert isinstance(solution, ArgmapPlusLogreco), (
+            "Solution must be an ArgmapPlusLogreco"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -712,8 +567,8 @@ class MaxAttacksPreferencePairGeneratorCT(MaxAttacksPreferencePairGenerator):
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert isinstance(solution, ArgmapPlusLogreco), (
+            "Solution must be an ArgmapPlusLogreco"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -733,8 +588,8 @@ class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreference
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert isinstance(solution, ArgmapPlusLogreco), (
+            "Solution must be an ArgmapPlusLogreco"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -743,3 +598,52 @@ class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreference
             evaluation=Evaluation(is_valid=True, artifacts={"argdown": argdown}, metrics={}),
         )
     
+class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
+    """Global FormalizationsFaithfulnessPreferencePairGenerator"""
+    def _score(
+        self,
+        problem: Problem,
+        solution: Solution,
+        evaluation: Evaluation,
+    ) -> float:
+        argdown_reco = evaluation.artifacts.get("argdown_reco")
+        assert argdown_reco is not None and isinstance(argdown_reco, ArgdownMultiDiGraph), (
+            "Evaluation must contain argdown_reco artifact"
+        )
+        all_expressions = evaluation.artifacts.get("all_expressions")
+        assert all_expressions is not None and isinstance(all_expressions, dict), (
+            "Evaluation must contain all_expressions artifact"
+        )
+        all_declarations = evaluation.artifacts.get("all_declarations")
+        assert all_declarations is not None and isinstance(all_declarations, dict), (
+            "Evaluation must contain all_declarations artifact"
+        )
+
+        dlds: list[float] = []
+        for argument in argdown_reco.arguments:
+            if argument.label not in all_expressions:
+                continue
+            for pr in argument.pcs:
+                if pr.label not in all_expressions[argument.label]:
+                    continue
+                expression = all_expressions[argument.label][pr.label]
+
+                proposition = next(
+                    (p for p in argdown_reco.propositions if p.label == pr.proposition_label),
+                    None
+                )
+                if proposition is None:
+                    continue
+
+                text_1 = FOL2NLTranslator.translate_to_nl_sentence(
+                    expression, all_declarations
+                )
+
+                for text_2 in proposition.texts:
+                    dlds.append(
+                        textdistance.damerau_levenshtein.normalized_similarity(
+                            text_1, text_2
+                        )
+                    )
+
+        return round(sum(dlds) / len(dlds), 1) if dlds else 0

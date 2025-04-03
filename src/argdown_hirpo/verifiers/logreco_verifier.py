@@ -1,12 +1,19 @@
+from typing import Dict
 from nltk.sem.logic import Expression, NegatedExpression  # type: ignore
 from pyargdown import (
     Argdown,
     Conclusion,
+    DialecticalType,
+    Valence,
 )
 
 from .infreco_verifier import InfRecoVerifier
 from argdown_hirpo.logic.fol_parser import FOLParser
 from argdown_hirpo.logic.smtlib import check_validity_z3
+
+
+# Custom Type, maps argument.label to pcs.label to formalization
+ExpressionsStoreT = Dict[str, Dict[str, Expression]]
 
 
 DEFAULT_EVAL_DIMENSIONS_MAP = {
@@ -47,6 +54,7 @@ DEFAULT_EVAL_DIMENSIONS_MAP = {
     ],
 }
 
+
 class LogRecoVerifier(InfRecoVerifier):
     """
     LogRecoVerifier is a specialized verifier for logical reconstructions
@@ -74,6 +82,102 @@ class LogRecoVerifier(InfRecoVerifier):
         self.all_expressions = all_expressions
         self.all_declarations = all_declarations
         self.flawed_formalizations_error = flawed_formalizations_error
+
+    @classmethod
+    def run_battery(  # type: ignore[override]
+        cls, argdown: Argdown, eval_dimensions_map: dict[str, list[str]] | None = None
+    ) -> tuple[dict[str, str], ExpressionsStoreT, dict[str, str]]:
+        if eval_dimensions_map is None:
+            eval_dimensions_map = cls.default_eval_dimensions_map
+        eval_results: dict[str, str] = {k: "" for k in eval_dimensions_map}
+        all_expressions: ExpressionsStoreT = {}
+        all_declarations: dict[str, str] = {}
+        for argument_idx, argument in enumerate(argdown.arguments):
+            verifier = cls(argdown, argument_idx=argument_idx)
+            all_expressions[argument.label if argument.label else "None"] = verifier.all_expressions.copy()
+            all_declarations.update(verifier.all_declarations)
+            for eval_dim, veri_fn_names in eval_dimensions_map.items():
+                for veri_fn_name in veri_fn_names:
+                    veri_fn = getattr(verifier, veri_fn_name)
+                    check, msg = veri_fn()
+                    if check is False:
+                        msg = msg if msg else veri_fn_name
+                        eval_results[eval_dim] = (
+                            eval_results[eval_dim]
+                            + f"Error in argument <{argument.label}>: {msg} "
+                        )
+        eval_results = {k: v.strip() for k, v in eval_results.items()}
+        return eval_results, all_expressions, all_declarations
+
+    @staticmethod
+    def _has_formally_grounded_relations(
+        argdown_reco: Argdown,
+        all_expressions: ExpressionsStoreT,
+        all_declarations: dict[str, str],
+    ) -> tuple[bool | None, str | None]:
+        
+        # convenience dict
+        all_expressions_proplabels: dict[str,Expression] = {}
+        for argument in argdown_reco.arguments:
+            if argument.label in all_expressions and argument.pcs:
+                for pr in argument.pcs:
+                    if pr.label in all_expressions[argument.label]:
+                        all_expressions_proplabels[pr.proposition_label] = all_expressions[argument.label][pr.label]
+
+        msgs = []
+        for drel in argdown_reco.dialectical_relations:
+            if (
+                drel.source not in all_expressions_proplabels
+                or drel.target not in all_expressions_proplabels
+            ):
+                continue  # we're so far ignoring props that don't figure in any argument
+            if DialecticalType.AXIOMATIC in drel.dialectics:
+                if drel.valence == Valence.SUPPORT:
+                    deductively_valid, smtcode = check_validity_z3(
+                        premises_formalized_nltk={"1": all_expressions_proplabels[drel.source]},
+                        conclusion_formalized_nltk={"2": all_expressions_proplabels[drel.target]},
+                        plchd_substitutions=[[k,v] for k,v in all_declarations.items()],
+                    )
+                    if not deductively_valid:
+                        msgs.append(
+                            f"According to the provided formalizations, proposition '{drel.source}' does "
+                            f"not entail the supported proposition '{drel.target}'. (SMTLIB program used to check "
+                            f"entailment:\n {smtcode})"
+                        )
+                elif drel.valence == Valence.ATTACK:
+                    deductively_valid, smtcode = check_validity_z3(
+                        premises_formalized_nltk={"1": all_expressions_proplabels[drel.source]},
+                        conclusion_formalized_nltk={"2": NegatedExpression(all_expressions_proplabels[drel.target])},
+                        plchd_substitutions=[[k,v] for k,v in all_declarations.items()],
+                    )
+                    if not deductively_valid:
+                        msgs.append(
+                            f"According to the provided formalizations, proposition '{drel.source}' does not "
+                            f"entail the negation of the attacked proposition '{drel.target}'. (SMTLIB program used to check "
+                            f"contradiction:\n {smtcode})"
+                        )
+                elif drel.valence == Valence.CONTRADICT:
+                    deductively_valid_1, smtcode_1 = check_validity_z3(
+                        premises_formalized_nltk={"1": all_expressions_proplabels[drel.source]},
+                        conclusion_formalized_nltk={"2": NegatedExpression(all_expressions_proplabels[drel.target])},
+                        plchd_substitutions=[[k,v] for k,v in all_declarations.items()],
+                    )
+                    deductively_valid_2, smtcode_2 = check_validity_z3(
+                        premises_formalized_nltk={"1": all_expressions_proplabels[drel.target]},
+                        conclusion_formalized_nltk={"2": NegatedExpression(all_expressions_proplabels[drel.source])},
+                        plchd_substitutions=[[k,v] for k,v in all_declarations.items()],
+                    )
+                    deductively_valid = deductively_valid_1 and deductively_valid_2
+                    if not deductively_valid:
+                        msgs.append(
+                            f"According to the provided formalizations, proposition '{drel.source}' is not the "
+                            f"the negation of the proposition '{drel.target}', despite both being declared as "
+                            f"contradictory. (SMTLIB programs used to check contradiction:\n{smtcode_1}\n-----\n{smtcode_2})"
+                        )
+        if msgs:
+            return False, "\n".join(msgs)
+        return True, None
+
 
     def _parse_formalizations(
         self,

@@ -223,7 +223,8 @@ class LogRecoJudge(Judge):
 
             del verifier
 
-            eval_data.update(LogRecoVerifier.run_battery(argdown))
+            logreco_evals, _, _ = LogRecoVerifier.run_battery(argdown)
+            eval_data.update(logreco_evals)
 
             is_valid = not any(v for v in eval_data.values())
 
