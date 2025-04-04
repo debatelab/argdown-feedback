@@ -649,8 +649,8 @@ class ConnectednessPreferencePairGeneratorCT(ConnectednessPreferencePairGenerato
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert hasattr(solution, "partial_argmap"), (
+            "Solution must provide a partial_argmap method"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -670,8 +670,8 @@ class MaxArgsPreferencePairGeneratorCT(MaxArgsPreferencePairGenerator):
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert hasattr(solution, "partial_argmap"), (
+            "Solution must provide partial argmap"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -692,8 +692,8 @@ class MaxSupportsPreferencePairGeneratorCT(MaxSupportsPreferencePairGenerator):
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert hasattr(solution, "partial_argmap"), (
+            "Solution must provide a partial_argmap method"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -714,8 +714,8 @@ class MaxAttacksPreferencePairGeneratorCT(MaxAttacksPreferencePairGenerator):
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert hasattr(solution, "partial_argmap"), (
+            "Solution must provide a partial_argmap method"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
@@ -735,8 +735,8 @@ class SourceTextProximityPreferencePairGeneratorCT(SourceTextProximityPreference
         assert "argdown_map" in evaluation.artifacts, (
             "Evaluation must contain argdown_map artifact"
         )
-        assert isinstance(solution, ArgmapPlusInfreco), (
-            "Solution must be an ArgmapPlusInfreco"
+        assert hasattr(solution, "partial_argmap"), (
+            "Solution must provide a partial_argmap method"
         )
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(

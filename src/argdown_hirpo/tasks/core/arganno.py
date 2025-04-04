@@ -23,8 +23,8 @@ ANNOTATION_SCHEME = dedent("""
     <!ATTLIST proposition   id              ID      #REQUIRED   -- unique id of element -->
     <!ATTLIST proposition   supports        IDREFS  #IMPLIED    -- other (sub-)sentences supported or confirmed by this element (empty space separated) -->
     <!ATTLIST proposition   attacks         IDREFS  #IMPLIED    -- other (sub-)sentences attacked or disconfirmed by this element (empty space separated) -->
-    <!ATTLIST proposition   argument_label  CDATA   #IMPLIED    -- label of argument or thesis in external argdown document -->
-    <!ATTLIST proposition   ref_reco_label  CDATA   #IMPLIED    -- item label of premise or conclusion in external argdown argument -->
+    <!ATTLIST proposition   argument_label  CDATA   #IMPLIED    -- unique label of argument or thesis in external argdown document -->
+    <!ATTLIST proposition   ref_reco_label  CDATA   #IMPLIED    -- unique item label of premise or conclusion in external argdown argument -->
 """)
 
 

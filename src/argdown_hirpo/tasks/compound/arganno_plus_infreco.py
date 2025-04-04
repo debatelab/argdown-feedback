@@ -407,7 +407,8 @@ class ArgannoPlusInfrecoJudge(Judge):
                 ):
                     msgs.append(
                         f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to support each other, but "
-                        f"the corresponding argument <{arglabel_from}> does not support <{arglabel_to}>."
+                        f"none of the corresponding Argdown elements <{arglabel_from}>/[{proplabel_from}] supports "
+                        f"<{arglabel_to}> or [{proplabel_to}]."
                     )
                 continue
             del argument
@@ -457,7 +458,8 @@ class ArgannoPlusInfrecoJudge(Judge):
             ):
                 msgs.append(
                     f"Proposition elements {ar['from_id']} and {ar['to_id']} are annotated to attack each other, but "
-                    f"the corresponding argument <{arglabel_from}> does not attack <{arglabel_to}>."
+                    f"none of the corresponding Argdown elements <{arglabel_from}>/[{proplabel_from}] attacks "
+                    f"<{arglabel_to}> or [{proplabel_to}]."
                 )
         if msgs:
             eval_data["relations_correspondence"] = " - ".join(msgs)

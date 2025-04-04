@@ -248,14 +248,17 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
         eval_data: dict[str, str] = {}
         
         # check elements correspondence
+        #print("ARGMAP<>LOGRECO check")
         msgs = []
-        map_labels = list(set(a.label for a in argdown_map.arguments))
-        reco_labels = list(set(a.label for a in argdown_reco.arguments))
-        for label in map_labels:
-            if label not in reco_labels:
+        map_alabels = list(set(a.label for a in argdown_map.arguments))
+        reco_alabels = list(set(a.label for a in argdown_reco.arguments))
+        #print(f"Map alabels: {map_alabels}")
+        #print(f"Reco plabels: {reco_alabels}")
+        for label in map_alabels:
+            if label not in reco_alabels:
                 msgs.append(f"Argument <{label}> in map is not reconstructed (argument label mismatch).")
-        for label in reco_labels:
-            if label not in map_labels:
+        for label in reco_alabels:
+            if label not in map_alabels:
                 msgs.append(f"Reconstructed argument <{label}> is not in the map (argument label mismatch).")            
         map_prop_labels = list(set(p.label for p in argdown_map.propositions))
         reco_prop_labels = list(set(p.label for p in argdown_reco.propositions))
@@ -269,11 +272,14 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
         msgs = []
 
         for drel in argdown_map.dialectical_relations:
-            if drel.source not in reco_labels or drel.target not in reco_labels:
+            #print(f"Checking if {drel} in argmap is grounded in reco...")
+            if drel.source not in reco_alabels+reco_prop_labels or drel.target not in reco_alabels+reco_prop_labels:
+                #print(f"Skipping {drel} in argmap, labels not in reco.")
                 continue
             if DialecticalType.SKETCHED in drel.dialectics:
                 rel_matches = argdown_reco.get_dialectical_relation(drel.source, drel.target)
                 rel_matches = [] if rel_matches is None else rel_matches
+                #print(f"Found potential matches: {rel_matches}")
 
                 if any(
                     rm.valence == drel.valence
@@ -295,7 +301,7 @@ class ArgmapPlusLogrecoJudge(ArgmapPlusInfrecoJudge):
 
 
         for drel in argdown_reco.dialectical_relations:
-            if drel.source not in map_labels or drel.target not in map_labels:
+            if drel.source not in map_alabels+map_prop_labels or drel.target not in map_alabels+map_prop_labels:
                 continue
             if DialecticalType.GROUNDED in drel.dialectics:
                 if drel.valence == Valence.SUPPORT:

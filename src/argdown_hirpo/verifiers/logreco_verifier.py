@@ -213,10 +213,11 @@ class LogRecoVerifier(InfRecoVerifier):
             if declarations:
                 if isinstance(declarations, dict):
                     for k, v in declarations.items():
-                        if k in all_declarations:
+                        if k in all_declarations and all_declarations[k] != v:
                             msgs.append(
                                 f"Duplicate declaration: Variable '{k}' in the inline yaml of proposition "
-                                f"({pr.label}) has been declared before."
+                                f"({pr.label}) has been declared before and is inconsistent with the previous "
+                                f"declaration '{all_declarations[k]}'."
                             )
                         else:
                             all_declarations[k] = v

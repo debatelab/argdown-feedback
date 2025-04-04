@@ -13,6 +13,7 @@ from argdown_hirpo.base import (
     ProblemGenerator,
 )
 from argdown_hirpo.tasks.compound.arganno_plus_infreco import ArgannoPlusInfrecoJudge
+from argdown_hirpo.tasks.compound.argmap_plus_arganno import ArgmapPlusArgannoJudge
 from argdown_hirpo.tasks.core.argmap import (
     ArgumentMap,
 )
@@ -26,7 +27,6 @@ from argdown_hirpo.tasks.core.logreco import (
     LogicalReco,
 )
 from argdown_hirpo.tasks.compound.argmap_plus_logreco import (
-    ArgmapPlusLogreco,
     ArgmapPlusLogrecoJudge,
     ArgmapPlusLogrecoProblem,
 )
@@ -276,7 +276,8 @@ class ArgmapPlusArgannoPlusLogrecoJudge(ArgmapPlusLogrecoJudge):
 
         # evaluate argmap+logreco
         evaluation = super()._evaluate_solution(problem, reco)  # type: ignore
-        argdown_reco = evaluation.artifacts["argdown_reco"]
+        argdown_map = evaluation.artifacts["argdown_map"]
+        argdown_reco = evaluation.artifacts["argdown_reco"]        
         artifacts = copy.deepcopy(evaluation.artifacts)
         eval_data = evaluation.metrics.copy()
         is_valid = evaluation.is_valid
@@ -327,12 +328,14 @@ class ArgmapPlusArgannoPlusLogrecoJudge(ArgmapPlusLogrecoJudge):
         coherence_eval_data = ArgannoPlusInfrecoJudge()._evaluate_coherence(
             soup_anno = soup,
             argdown_reco = argdown_reco,
-        )
-        coherence_eval_data = {
-            "annotation_"+k: v
-            for k, v in coherence_eval_data.items()
-        }
-        eval_data.update(coherence_eval_data)
+        ) if argdown_reco is not None else None
+
+        if coherence_eval_data is not None:
+            coherence_eval_data = {
+                    "annotation_"+k: v
+                    for k,v in coherence_eval_data.items()
+                }
+            eval_data.update(coherence_eval_data)
                 
         is_valid = is_valid and not any(v for v in eval_data.values())        
 

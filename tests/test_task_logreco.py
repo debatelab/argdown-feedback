@@ -115,7 +115,17 @@ def valid_recos(solution_class) -> list[Solution]:
             ```
             """)
         ),
-    ]
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Consistent duplicate declaration>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "p | p", declarations: {"p": "some prop"}}
+            -- {from: ["1"]} --
+            (2) Eating animals is wrong. {formalization: "p", declarations: {"p": "some prop"}}
+            ```
+            """)
+        ),    ]
 
 
 @pytest.fixture
@@ -373,6 +383,17 @@ def invalid_recos(solution_class) -> list[Solution]:
             (1) Animals suffer. {formalization: "p & -p", declarations: {"p": "some prop"}}
             -- {from: ["1"]} --
             (2) Eating animals is wrong. {formalization: "p"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Inconsistent declaration>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "p | p", declarations: {"p": "some prop"}}
+            -- {from: ["1"]} --
+            (2) Eating animals is wrong. {formalization: "p", declarations: {"p": "some other prop"}}
             ```
             """)
         ),

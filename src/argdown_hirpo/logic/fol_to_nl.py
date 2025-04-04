@@ -8,6 +8,7 @@ from nltk.sem.logic import (  # type: ignore
     ApplicationExpression,
     EqualityExpression,
     FunctionVariableExpression,
+    IndividualVariableExpression,
     ConstantExpression,
     ExistsExpression,
     AllExpression,
@@ -68,6 +69,8 @@ class FOL2NLTranslator:
                         ", ".join([f"{{{o}}}" for o in objects]),
                     )
         if isinstance(expression, ConstantExpression):
+            return "{%s}" % str(expression)
+        if isinstance(expression, IndividualVariableExpression):
             return "{%s}" % str(expression)
         if isinstance(expression, EqualityExpression):
             return "{%s} is identical with {%s}" % (
