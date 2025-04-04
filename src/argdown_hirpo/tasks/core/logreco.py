@@ -315,6 +315,9 @@ class LogRecoFeedbackGenerator(FeedbackGenerator):
             n=self.n_feedbacks,
             temperature=self.temperature,
         )
+        # remove empty and duplicate answers
+        answers = [a for a in answers if a]
+        answers = list(set(answers))
 
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
