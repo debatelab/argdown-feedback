@@ -251,6 +251,10 @@ class GenericSolutionGenerator(SolutionGenerator):
             temperature=self.temperature,
         )
 
+        # remove empty and duplicate answers
+        answers = [a for a in answers if a]
+        answers = list(set(answers))
+
         recos: list[Solution] = []
 
         for answer in answers:
@@ -355,6 +359,9 @@ class GenericFeedbackGenerator(FeedbackGenerator):
             n=self.n_feedbacks,
             temperature=self.temperature,
         )
+        # remove empty and duplicate answers
+        answers = [a for a in answers if a]
+        answers = list(set(answers))
 
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
@@ -710,6 +717,8 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 candidate_revisions = await self.solution_generator.arun(
                     problem, original_solution=cs, feedback=feedback
                 )
+                if not candidate_revisions:
+                    continue
                 revision_evals = await self.judge.arun(
                     problem,
                     candidate_revisions,
@@ -729,6 +738,15 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                             )
                         )
                     continue
+
+                if all(re.is_valid for re in revision_evals):
+                    pairs.extend(
+                        await self.build_solution_pref_pair(
+                            problem,
+                            candidate_solutions=[cs, candidate_revisions[0]],
+                            evaluations=[e, revision_evals[0]],
+                        )
+                    )
 
                 pairs.extend(
                     await self.build_solution_pref_pair(
@@ -811,6 +829,8 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             pairs = await self.failure_type_preference_pair_generator.arun(
                 problem, candidate_solutions, evaluations
             )
+
+        # TODO: remove duplicates!
 
         return pairs
 
