@@ -81,7 +81,7 @@ class HirpoTester:
     async def test_judge_valid(
         problem_generator_class, judge_class, valid_recos, source_texts, argdown_artifact_keys=["argdown"], model_kwargs = None
     ):
-        source_text = source_texts[0]
+        source_text = source_texts[0] if isinstance(source_texts, list) else source_texts
         if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
             assert model_kwargs is not None, "model_kwargs must be provided for HIRAbstractGeneratorLLM"
             pg = problem_generator_class(**model_kwargs)
@@ -98,11 +98,38 @@ class HirpoTester:
                 if ad_key in ev.artifacts:
                     print(f"## {ad_key}")
                     argdown = ev.artifacts.get(ad_key)
-                    pprint(argdown.dialectical_relations)
-                    print(nx.node_link_data(argdown))
+                    #pprint(argdown.dialectical_relations)
+                    #print(nx.node_link_data(argdown))
                     assert argdown
             assert ev.is_valid
             assert not any(v for _, v in ev.metrics.items())
+
+    @staticmethod
+    async def test_judge_valid2(
+        example_problem,
+        judge_class,
+        valid_recos,
+        argdown_artifact_keys=["argdown"],
+        model_kwargs = None
+    ):
+        problem = example_problem
+        judge = judge_class()
+        evaluations = await judge.arun(problem, valid_recos)
+        assert len(evaluations) == len(valid_recos)
+        for i, ev in enumerate(evaluations):
+            print(f"## Solution {i + 1}")
+            pprint(ev)
+            for ad_key in argdown_artifact_keys:
+                if ad_key in ev.artifacts:
+                    #print(f"## {ad_key}")
+                    argdown = ev.artifacts.get(ad_key)
+                    #pprint(argdown.dialectical_relations)
+                    #print(nx.node_link_data(argdown))
+                    assert argdown
+            assert ev.is_valid
+            assert not any(v for _, v in ev.metrics.items())
+        
+
 
     @staticmethod
     async def test_judge_invalid(
@@ -125,6 +152,30 @@ class HirpoTester:
             if argdown:
                 print(argdown.propositions)
                 print(argdown.arguments)
+            assert not ev.is_valid
+            assert any(v for _, v in ev.metrics.items())
+
+    @staticmethod
+    async def test_judge_invalid2(
+        example_problem,
+        judge_class,
+        invalid_recos,
+        argdown_artifact_keys=["argdown"],
+        model_kwargs = None
+    ):
+        problem = example_problem
+        judge = judge_class()
+        evaluations = await judge.arun(problem, invalid_recos)
+        assert len(evaluations) == len(invalid_recos)
+        for i, ev in enumerate(evaluations):
+            print(f"## Solution {i + 1}")
+            pprint(ev)
+            for ad_key in argdown_artifact_keys:
+                if ad_key in ev.artifacts:
+                    #print(f"## {ad_key}")
+                    argdown = ev.artifacts.get(ad_key)
+                    #pprint(argdown.dialectical_relations)
+                    print(nx.node_link_data(argdown) if argdown else "argdown=None")
             assert not ev.is_valid
             assert any(v for _, v in ev.metrics.items())
 
@@ -205,8 +256,12 @@ class HirpoTester:
         source_texts,
         chosen,
         rejected,
+        example_problem = None,
     ):
-        problem = problem_class(source_texts[0])
+        if example_problem is not None:
+            problem = example_problem
+        else:
+            problem = problem_class(source_texts[0])
 
         judge = judge_class()
         ppg = GenericFailureDiffPreferencePairGenerator()

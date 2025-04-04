@@ -101,7 +101,7 @@ class InfRecoFromArgAnnoProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._arganno_pg = AnnotationProblemGenerator()
-        self._arganno_sg = GenericSolutionGenerator(*args, **kwargs, n_solutions=1)
+        self._arganno_sg = GenericSolutionGenerator(*args, **kwargs)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
@@ -109,7 +109,7 @@ class InfRecoFromArgAnnoProblemGenerator(ProblemGeneratorLLM):
         ):
             arganno_problem = await self._arganno_pg.arun(inputs)
             arganno_solution = await self._arganno_sg.arun(arganno_problem)
-            return InfRecoFromArgAnnoProblem(str(arganno_solution[0]))
+            return InfRecoFromArgAnnoProblem(str(arganno_solution))
         raise ValueError(
             "Inputs to an argument reconstruction problem must be a string or a list of strings"
         )

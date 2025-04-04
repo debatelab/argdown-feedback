@@ -50,11 +50,26 @@ def feedback_generator_class():
 def source_texts() -> list[str]:
     return [
         textwrap.dedent("""
-        <proposition id="1">We should stop eating meat.</proposition>
+        We should stop eating meat.
                         
-        <proposition id="2" supports=["1"]>Animals suffer.</proposition> <proposition id="3" supports=["2"]>Animal farming causes climate change.</proposition>
+        Animals suffer. Animal farming causes climate change.
         """)
     ]
+
+
+@pytest.fixture
+def example_problem() -> InfRecoFromArgAnnoProblem:
+        annotation = textwrap.dedent("""
+            ```xml
+            <proposition id="1">We should stop eating meat.</proposition>
+                            
+            <proposition id="2" supports="1">Animals suffer.</proposition> <proposition id="3" supports="2">Animal farming causes climate change.</proposition>
+            ```
+            """)
+        return InfRecoFromArgAnnoProblem(
+            annotation=annotation,
+        ) 
+
 
 
 @pytest.fixture
@@ -355,39 +370,29 @@ async def test_solution_generator(
     )
 
 
-@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 @pytest.mark.asyncio
 async def test_judge_valid(
-    problem_generator_class,
+    example_problem,
     judge_class,
     valid_recos,
-    source_texts,
-    model_kwargs
 ):
-    await HirpoTester.test_judge_valid(
-        problem_generator_class,
+    await HirpoTester.test_judge_valid2(
+        example_problem,
         judge_class,
         valid_recos,
-        source_texts,
-        model_kwargs
     )
 
 
-@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 @pytest.mark.asyncio
 async def test_judge_invalid(
-    problem_generator_class,
+    example_problem,
     judge_class,
     invalid_recos,
-    source_texts,
-    model_kwargs
 ):
-    await HirpoTester.test_judge_invalid(
-        problem_generator_class,
+    await HirpoTester.test_judge_invalid2(
+        example_problem,
         judge_class,
         invalid_recos,
-        source_texts,
-        model_kwargs
     )
 
 
@@ -468,7 +473,7 @@ class TestInfRecoPreferencePairGenerators:
     )
     async def test_preference_pair_generator(
         self,
-        problem_class,
+        example_problem,
         solution_class,
         judge_class,
         source_texts,
@@ -476,7 +481,7 @@ class TestInfRecoPreferencePairGenerators:
         chosen,
         rejected
     ):
-        problem = problem_class(annotation=source_texts[0])
+        problem = example_problem
 
         judge = judge_class()
         ppg = PPG()
@@ -535,6 +540,7 @@ class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
         source_texts,
         chosen,
         rejected,
+        example_problem
     ):
         
         await HirpoTester.test_generic_failure_type_preference_generator(
@@ -544,4 +550,5 @@ class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
             source_texts,
             chosen,
             rejected,
+            example_problem=example_problem,
         )        
