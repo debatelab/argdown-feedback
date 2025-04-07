@@ -2,7 +2,7 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.base import (
+from argdown_hirpo.tasks.base import (
     Feedback,
     Solution,
     GenericFeedbackGenerator,

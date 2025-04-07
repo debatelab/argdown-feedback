@@ -4,7 +4,7 @@ import dataclasses
 from textwrap import dedent
 from bs4 import BeautifulSoup
 
-from argdown_hirpo.base import (
+from argdown_hirpo.tasks.base import (
     Problem,
     Solution,
     Evaluation,

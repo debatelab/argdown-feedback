@@ -9,7 +9,7 @@ from pyargdown import (
 )
 import textdistance
 
-from argdown_hirpo.base import (
+from argdown_hirpo.tasks.base import (
     Problem,
     Solution,
     Evaluation,

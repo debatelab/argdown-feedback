@@ -3,7 +3,7 @@ import pytest
 import textwrap
 import warnings
 
-from argdown_hirpo.base import Evaluation, Feedback, HIRPreferencePairGenerator, GenericSolutionGenerator, Solution
+from argdown_hirpo.tasks.base import Evaluation, Feedback, HIRPreferencePairGenerator, GenericSolutionGenerator, Solution
 from argdown_hirpo.tasks.core.arganno import(
     Annotation,
     AnnotationProblem,

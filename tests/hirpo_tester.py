@@ -3,7 +3,7 @@ import textwrap
 import networkx as nx  # type: ignore
 
 
-from argdown_hirpo.base import Evaluation, Feedback, GenericFailureDiffPreferencePairGenerator, Problem, Solution, HIRAbstractGeneratorLLM
+from argdown_hirpo.tasks.base import Evaluation, Feedback, GenericFailureDiffPreferencePairGenerator, Problem, Solution, HIRAbstractGeneratorLLM
 
 
 class HirpoTester:

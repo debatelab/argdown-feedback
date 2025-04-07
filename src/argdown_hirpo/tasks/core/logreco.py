@@ -11,7 +11,7 @@ from pyargdown import (
     parse_argdown,
 )
 
-from argdown_hirpo.base import (
+from argdown_hirpo.tasks.base import (
     Problem,
     ScoringVirtuePreferencePairGenerator,
     Solution,

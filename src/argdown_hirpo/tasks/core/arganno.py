@@ -5,7 +5,7 @@ from typing import Sequence
 
 from bs4 import BeautifulSoup
 
-from argdown_hirpo.base import (
+from argdown_hirpo.tasks.base import (
     Problem,
     ScoringVirtuePreferencePairGenerator,
     Solution,

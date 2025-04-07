@@ -1,7 +1,7 @@
 from textwrap import dedent
 import textdistance
 
-from argdown_hirpo.base import (
+from argdown_hirpo.tasks.base import (
     Problem,
     Evaluation,
     ProblemGeneratorLLM,
