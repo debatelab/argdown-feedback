@@ -17,6 +17,7 @@ from argdown_hirpo.tasks.core.argmap import (
     ArgumentMap
 )
 from argdown_hirpo.tasks.core.arganno import (
+    Annotation,
     AnnotationProblemGenerator,
     AnnotationJudge,
 )
@@ -88,7 +89,7 @@ class ArgmapFromArgannoProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._arganno_pg = AnnotationProblemGenerator()        
-        self._arganno_sg = GenericSolutionGenerator(*args, **kwargs, n_solutions=1)
+        self._arganno_sg = GenericSolutionGenerator(solution_class=Annotation, *args, **kwargs, n_solutions=1)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
@@ -96,7 +97,7 @@ class ArgmapFromArgannoProblemGenerator(ProblemGeneratorLLM):
         ):
             arganno_problem = await self._arganno_pg.arun(inputs)
             arganno_solution = await self._arganno_sg.arun(arganno_problem)
-            soup_anno, _ = AnnotationJudge().parse_xml_snippet(arganno_solution[0])
+            soup_anno, _ = AnnotationJudge().parse_xml_snippet(arganno_solution[0].annotated_source_text)
             return ArgmapFromArgannoProblem(
                 annotated_text=str(arganno_solution),
                 soup_anno=soup_anno,

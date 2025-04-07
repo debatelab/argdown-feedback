@@ -19,7 +19,8 @@ from argdown_hirpo.tasks.core.arganno import (
 )
 from argdown_hirpo.tasks.core.argmap import (
     ArgMapProblemGenerator,
-    ArgMapJudge
+    ArgMapJudge,
+    ArgumentMap
 )
 
 
@@ -111,7 +112,7 @@ class ArgannoFromArgmapProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._argmap_pg = ArgMapProblemGenerator()        
-        self._argmap_sg = GenericSolutionGenerator(*args, **kwargs, n_solutions=1)
+        self._argmap_sg = GenericSolutionGenerator(solution_class=ArgumentMap, *args, **kwargs, n_solutions=1)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
@@ -119,11 +120,13 @@ class ArgannoFromArgmapProblemGenerator(ProblemGeneratorLLM):
         ):
             argmap_problem = await self._argmap_pg.arun(inputs)
             argmap_solution = await self._argmap_sg.arun(argmap_problem)
+            print("argmap_problem", argmap_problem)
+            print("argmap_solution", argmap_solution)
             argmap_evaluation = ArgMapJudge()._evaluate_argmap(argmap_problem, argmap_solution[0])
             argdown_map = argmap_evaluation.artifacts.get("argdown_map")
             return ArgannoFromArgmapProblem(
                 sources=inputs,
-                argdown_snippet=str(argmap_solution),
+                argdown_snippet=str(argmap_solution[0]),
                 argdown_map=argdown_map,
                 argmap_evaluation=argmap_evaluation,
             )

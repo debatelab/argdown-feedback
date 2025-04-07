@@ -171,6 +171,7 @@ class AnnotationJudge(Judge):
         is_valid = True
         eval_data = {
             "fenced_code_block": "",
+            "altered_source_text": "",
             "nested_propositions": "",
             "missing_id": "",
             "duplicate_id": "",
