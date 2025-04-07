@@ -21,6 +21,15 @@ from .base import BaseHandler, CompositeHandler
 class InfRecoHandler(BaseHandler):
     """Base handler interface for evaluating informal argument reconstructions."""
 
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+        from_key: str = "from",
+    ):
+        super().__init__(name, logger)
+        self.from_key = from_key
+
     @abstractmethod
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         """Evaluate the data and return a verification result."""
@@ -357,14 +366,6 @@ class HasGistHandler(InfRecoHandler):
 class HasInferenceDataHandler(InfRecoHandler):
     """Handler that checks if all arguments have inference data for all conclusions."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-        from_key: str = "from",
-    ):
-        super().__init__(name, logger)
-        self.from_key = from_key
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -421,15 +422,6 @@ class HasInferenceDataHandler(InfRecoHandler):
 class PropRefsExistHandler(InfRecoHandler):
     """Handler that checks if all proposition references in inference data exist."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-        from_key: str = "from",
-    ):
-        super().__init__(name, logger)
-        self.from_key = from_key
-
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
         if argdown is None:
@@ -474,15 +466,6 @@ class PropRefsExistHandler(InfRecoHandler):
 
 class UsesAllPropsHandler(InfRecoHandler):
     """Handler that checks if all propositions are used in inferences across all arguments."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-        from_key: str = "from",
-    ):
-        super().__init__(name, logger)
-        self.from_key = from_key
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data

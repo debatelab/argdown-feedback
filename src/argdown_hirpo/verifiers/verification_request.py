@@ -45,7 +45,7 @@ class VerificationRequest:
     verification_data: List[PrimaryVerificationData] = field(default_factory=list)
     
     # Verification state
-    results: Dict[str, VerificationResult] = field(default_factory=dict)
+    results: List[VerificationResult] = field(default_factory=list)
     artifacts: Dict[str, Any] = field(default_factory=dict)
     
     # Configuration options
@@ -62,23 +62,21 @@ class VerificationRequest:
         """Add a verification result to the request."""
         if handler_name in self.results:
             logging.warning(f"Handler {handler_name} already executed. Overwriting result.")
-        self.results[handler_name] = VerificationResult(
+        self.results.append(VerificationResult(
             verifier_id=handler_name,
             verification_data_references=verification_data_references,
             is_valid=is_valid,
             message=message,
             details=details or {}
-        )
+        ))
 
-    def add_result_record(self, handler_name: str, vresult: VerificationResult) -> None:
+    def add_result_record(self, vresult: VerificationResult) -> None:
         """Add a verification result to the request."""
-        if handler_name in self.results:
-            logging.warning(f"Handler {handler_name} already executed. Overwriting result.")
-        self.results[handler_name] = vresult 
+        self.results.append(vresult)
         
     def merge_results(self, other_request: 'VerificationRequest') -> None:
         """Merge results from another request inplace."""
-        self.results.update(other_request.results)
+        self.results.extend(other_request.results)
         self.artifacts.update(other_request.artifacts)
         self.executed_handlers.extend(other_request.executed_handlers)
         self.continue_processing = self.continue_processing and other_request.continue_processing
@@ -88,9 +86,9 @@ class VerificationRequest:
         Convert verification results to the standard evaluation format used in judges.
         Returns a dictionary mapping check names to tuples of (is_valid, message).
         """
-        return {name: (result.is_valid, result.message) 
-                for name, result in self.results.items()}
+        return {result.verifier_id: (result.is_valid, result.message) 
+                for result in self.results}
                 
     def is_valid(self) -> bool:
         """Check if all verification results are valid."""
-        return all(result.is_valid for result in self.results.values())
+        return all(result.is_valid for result in self.results)

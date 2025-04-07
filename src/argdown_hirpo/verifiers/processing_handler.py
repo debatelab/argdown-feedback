@@ -1,14 +1,18 @@
 from typing import Optional, List
 import logging
+from nltk.sem.logic import Expression  # type: ignore
 import uuid
+from pyargdown import ArgdownMultiDiGraph
 import yaml  # type: ignore[import]
 
 from .verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
+    VerificationResult,
 )
 from .base import BaseHandler, CompositeHandler
+from argdown_hirpo.logic.fol_parser import FOLParser
 
 _CODE_MARKERS = {
     VerificationDType.argdown: "```argdown",
@@ -166,24 +170,20 @@ class XMLParser(ProcessingHandler):
 
 
 class CompositeProcessingHandler(CompositeHandler):
-    """Default processing handler that does nothing."""
+    """Processing handler with default pipeline."""
 
-    # factory method
-    @classmethod
-    def create_default_pipe(cls) -> "CompositeProcessingHandler":
-        """Create a default processing handler."""
-        handler = cls(
-            name="DefaultProcessingHandler", logger=logging.getLogger(__name__)
-        )
-        handler.add_handler(
-            FencedCodeBlockExtractor(
-                name="FencedCodeBlockExtractor", logger=logging.getLogger(__name__)
-            )
-        )
-        handler.add_handler(
-            ArgdownParser(name="ArgdownParser", logger=logging.getLogger(__name__))
-        )
-        handler.add_handler(
-            XMLParser(name="XMLParser", logger=logging.getLogger(__name__))
-        )
-        return handler
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+        handlers: Optional[List[ProcessingHandler]] = None,
+    ):
+        super().__init__(name, logger)
+        if handlers is None:
+            handlers = [
+                FencedCodeBlockExtractor(
+                    name="FencedCodeBlockExtractor", logger=self.logger
+                ),
+                ArgdownParser(name="ArgdownParser", logger=self.logger),
+                XMLParser(name="XMLParser", logger=self.logger),
+            ]
