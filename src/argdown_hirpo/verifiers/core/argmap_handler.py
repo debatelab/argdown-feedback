@@ -9,13 +9,13 @@ from pyargdown import (
 )
 from pyargdown.parser.base import ArgdownParser
 
-from .verification_request import (
+from argdown_hirpo.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
     VerificationResult,
 )
-from .base import BaseHandler, CompositeHandler
+from argdown_hirpo.verifiers.base import BaseHandler, CompositeHandler
 
 
 class ArgMapHandler(BaseHandler):
@@ -36,7 +36,7 @@ class ArgMapHandler(BaseHandler):
             if self.is_applicable(vdata, request):
                 vresult = self.evaluate(vdata, request)
                 if vresult is not None:
-                    request.add_result_record(self.name, vresult)
+                    request.add_result_record(vresult)
         return request
 
 

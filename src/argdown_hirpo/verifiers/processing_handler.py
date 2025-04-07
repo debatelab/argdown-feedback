@@ -1,18 +1,14 @@
 from typing import Optional, List
 import logging
-from nltk.sem.logic import Expression  # type: ignore
 import uuid
-from pyargdown import ArgdownMultiDiGraph
 import yaml  # type: ignore[import]
 
 from .verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
-    VerificationResult,
 )
 from .base import BaseHandler, CompositeHandler
-from argdown_hirpo.logic.fol_parser import FOLParser
 
 _CODE_MARKERS = {
     VerificationDType.argdown: "```argdown",

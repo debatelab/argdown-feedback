@@ -10,19 +10,17 @@ from pyargdown import (
     Valence,
 )
 
-from .verification_request import (
+from argdown_hirpo.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
     VerificationResult,
 )
-from .base import BaseHandler, CompositeHandler
-from .infreco_handler import InfRecoHandler
+from argdown_hirpo.verifiers.base import CompositeHandler
+from argdown_hirpo.verifiers.core.infreco_handler import InfRecoHandler
 from argdown_hirpo.logic.fol_parser import FOLParser
 from argdown_hirpo.logic.smtlib import check_validity_z3
 
-# Custom Type, maps argument.label to pcs.label to formalization
-ExpressionsStoreT = Dict[str, Dict[str, Expression]]
 
 
 class LogRecoHandler(InfRecoHandler):
