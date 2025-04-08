@@ -72,7 +72,7 @@ H = TypeVar('H', bound=BaseHandler)
 
 class CompositeHandler(BaseHandler, Generic[H]):
     """
-    A composite handler that groups multiple processing handlers together.
+    A composite handler that groups multiple handlers together.
     All handlers in the group are executed in sequence.
     """
     
@@ -87,6 +87,7 @@ class CompositeHandler(BaseHandler, Generic[H]):
         """Add a handler to this composite."""
         self.handlers.append(handler)
     
+
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         """Process request through all contained handlers."""
         current_request = request

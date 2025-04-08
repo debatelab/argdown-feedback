@@ -14,6 +14,7 @@ _CODE_MARKERS = {
     VerificationDType.argdown: "```argdown",
     VerificationDType.xml: "```xml",
 }
+_MULTI_VALUED_ATTRIBUTES = {"*": {"supports", "attacks"}}
 
 
 class ProcessingHandler(BaseHandler):
@@ -37,9 +38,9 @@ class FencedCodeBlockExtractor(ProcessingHandler):
 
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         """Extract fenced code blocks of specified languages."""
-        source_text = request.sources
-        if isinstance(source_text, list):
-            source_text = "\n\n".join(source_text)
+        input_text = request.inputs
+        if isinstance(input_text, list):
+            input_text = "\n\n".join(input_text)
 
         # Process each supported language
         extracted_blocks = 0
@@ -48,7 +49,7 @@ class FencedCodeBlockExtractor(ProcessingHandler):
             code_marker = _CODE_MARKERS[language]
             close_marker = "\n```"
 
-            needs_to_be_parsed = source_text
+            needs_to_be_parsed = input_text
             if code_marker in needs_to_be_parsed:
                 splits = needs_to_be_parsed.split(code_marker)[1].split(close_marker, 1)
                 if len(splits) > 1:
@@ -151,7 +152,12 @@ class XMLParser(ProcessingHandler):
                     # remove the first line (metadata) from the code snippet, add back the code marker
                     code_snippet = code_marker + "\n" + code_snippet.split("\n", 1)[1]
                 try:
-                    soup = BeautifulSoup(code_snippet, "xml")
+                    
+                    soup = BeautifulSoup(
+                        code_snippet,
+                        "html.parser",
+                        multi_valued_attributes=_MULTI_VALUED_ATTRIBUTES,
+                    )
                     vdata.data = soup
                 except Exception as e:
                     metadata_text = f" {vdata.metadata}" if vdata.metadata else ""
@@ -174,12 +180,12 @@ class CompositeProcessingHandler(CompositeHandler):
         logger: Optional[logging.Logger] = None,
         handlers: Optional[List[ProcessingHandler]] = None,
     ):
-        super().__init__(name, logger)
         if handlers is None:
             handlers = [
                 FencedCodeBlockExtractor(
-                    name="FencedCodeBlockExtractor", logger=self.logger
+                    name="FencedCodeBlockExtractor", logger=logger
                 ),
-                ArgdownParser(name="ArgdownParser", logger=self.logger),
-                XMLParser(name="XMLParser", logger=self.logger),
+                ArgdownParser(name="ArgdownParser", logger=logger),
+                XMLParser(name="XMLParser", logger=logger),
             ]
+        super().__init__(name, logger, handlers)

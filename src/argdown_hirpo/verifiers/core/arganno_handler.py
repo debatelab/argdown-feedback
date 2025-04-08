@@ -35,6 +35,7 @@ class ArgannoHandler(BaseHandler):
                 vresult = self.evaluate(vdata, request)
                 if vresult is not None:
                     request.add_result_record(vresult)
+        return request
 
 
 class SourceTextIntegrityHandler(ArgannoHandler):
@@ -54,26 +55,21 @@ class SourceTextIntegrityHandler(ArgannoHandler):
         if not isinstance(soup, BeautifulSoup):
             raise TypeError("soup must be of type BeautifulSoup")
         msgs = []
-        sources = ctx.sources
-        if not sources:
+        source = ctx.source
+        if not source:
             return None
-        if isinstance(sources, str):
-            sources = [sources]
-        for source in sources:
-            if isinstance(source, str):
-                source = source.strip()
-            if not source:
-                continue
-            lines_o = " ".join(source.split()).splitlines(keepends=True)
-            lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
-            lines_o = [line for line in lines_o if line.strip()]
-            lines_a = [line for line in lines_a if line.strip()]
+        if isinstance(source, str):
+            source = source.strip()
+        lines_o = " ".join(source.split()).splitlines(keepends=True)
+        lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
+        lines_o = [line for line in lines_o if line.strip()]
+        lines_a = [line for line in lines_a if line.strip()]
 
-            diff = list(unified_diff(lines_o, lines_a, n=0))
-            if diff:
-                msgs.append(
-                    f"Source text '{shorten(source, 40)}' was altered. Diff:\n" + "".join(diff),
-                )
+        diff = list(unified_diff(lines_o, lines_a, n=0))
+        if diff:
+            msgs.append(
+                f"Source text '{shorten(source, 40)}' was altered. Diff:\n" + "".join(diff),
+            )
 
         is_valid = False if msgs else True
         return VerificationResult(

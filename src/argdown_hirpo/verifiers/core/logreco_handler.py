@@ -23,7 +23,7 @@ from argdown_hirpo.logic.smtlib import check_validity_z3
 
 
 
-class LogRecoHandler(InfRecoHandler):
+class BaseLogRecoHandler(InfRecoHandler):
     """Base handler interface for evaluating logical argument reconstructions."""
     
     def __init__(
@@ -57,7 +57,7 @@ class LogRecoHandler(InfRecoHandler):
         return vr_details.get("all_expressions"), vr_details.get("all_declarations")
 
 
-class WellFormedFormulasHandler(LogRecoHandler):
+class WellFormedFormulasHandler(BaseLogRecoHandler):
     """Parses and checks first-order logic formulas in argdown code snippets.
     Stores the artifacts in the verification result object (details)."""
 
@@ -118,21 +118,24 @@ class WellFormedFormulasHandler(LogRecoHandler):
 
                         if declarations and isinstance(declarations, dict):
                             for k, _ in declarations.items():
-                                if k not in [str(v) for v in expr.variables()]:  # very hacky check here
+                                if k not in [str(v) for v in expr.variables() | expr.predicates() | expr.constants()]:  # very hacky check here
                                     msgs.append(
                                         f"Variable '{k}' declared with proposition ({pr.label}) in argument <{argument.label}> is not used "
                                         f"in the corresponding formalization '{formalization}'."
                                     )
         # Check if all free variables have been declared
         for prop_label, expr in all_expressions.items():
-            for v in expr.variables():
+            for v in expr.variables() | expr.predicates() | expr.constants():
                 if str(v) not in all_declarations:
                     msgs.append(
                         f"Variable '{v}' in formalization '{str(expr)}' of proposition [{prop_label}] is not declared anywhere."
                     )
         # Check if all declared variables are used in the formalization
         for k, v in all_declarations.items():
-            if k not in [str(v) for v in all_expressions.keys()]:
+            if not any(
+                k in [str(v) for v in expr.variables() | expr.predicates() | expr.constants()]
+                for expr in all_expressions.values()
+            ):
                 msgs.append(
                     f"Variable '{k}' declared is not used in any formalization."
                 )
@@ -154,7 +157,7 @@ class WellFormedFormulasHandler(LogRecoHandler):
 
 
 
-class GlobalDeductiveValidityHandler(LogRecoHandler):
+class GlobalDeductiveValidityHandler(BaseLogRecoHandler):
     """Handler that checks if all arguments are globally deductively valid."""
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
@@ -229,7 +232,7 @@ class GlobalDeductiveValidityHandler(LogRecoHandler):
         )
 
 
-class LocalDeductiveValidityHandler(LogRecoHandler):
+class LocalDeductiveValidityHandler(BaseLogRecoHandler):
     """Handler that checks if all sub-arguments are locally deductively valid."""
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
@@ -309,7 +312,7 @@ class LocalDeductiveValidityHandler(LogRecoHandler):
         )
 
 
-class AllPremisesRelevantHandler(LogRecoHandler):
+class AllPremisesRelevantHandler(BaseLogRecoHandler):
     """Handler that checks if all premises are relevant to the argument."""
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
@@ -394,7 +397,7 @@ class AllPremisesRelevantHandler(LogRecoHandler):
         )
 
 
-class PremisesConsistentHandler(LogRecoHandler):
+class PremisesConsistentHandler(BaseLogRecoHandler):
     """Handler that checks if the premises are consistent."""
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
@@ -462,7 +465,7 @@ class PremisesConsistentHandler(LogRecoHandler):
         )
 
 
-class FormallyGroundedRelationsHandler(LogRecoHandler):
+class FormallyGroundedRelationsHandler(BaseLogRecoHandler):
     """Handler that checks if dialectical relations are formally grounded."""
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
@@ -566,14 +569,14 @@ class FormallyGroundedRelationsHandler(LogRecoHandler):
         )
 
 
-class LogRecoCompositeHandler(CompositeHandler[LogRecoHandler]):
+class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
     """A composite handler that groups all logical reconstruction verification handlers together."""
     
     def __init__(
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        handlers: List[LogRecoHandler] | None = None,
+        handlers: List[BaseLogRecoHandler] | None = None,
         from_key: str = "from",
         formalization_key: str = "formalization",
         declarations_key: str = "declarations",

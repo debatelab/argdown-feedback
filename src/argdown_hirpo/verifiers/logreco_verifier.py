@@ -241,14 +241,14 @@ class LogRecoVerifier(InfRecoVerifier):
 
                     if declarations and isinstance(declarations, dict):
                         for k, _ in declarations.items():
-                            if k not in [str(v) for v in expr.variables()]:
+                            if k not in [str(v) for v in expr.variables() | expr.predicates() | expr.constants()]:
                                 msgs.append(
                                     f"Variable '{k}' declared with proposition ({pr.label}) is not used "
                                     f"in the corresponding formalization '{formalization}'."
                                 )
 
         for k, expr in all_expressions.items():
-            for v in expr.variables():
+            for v in expr.variables() | expr.predicates() | expr.constants():
                 if str(v) not in all_declarations:
                     msgs.append(
                         f"Variable '{v}' in formalization of proposition ({k}) is not declared anywhere."

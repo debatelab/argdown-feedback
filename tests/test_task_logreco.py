@@ -82,10 +82,34 @@ def valid_recos(solution_class) -> list[Solution]:
             ```argdown
             <Argument 1>: Animals suffer.
 
+            (1) Animals suffer. {formalization: "pp", declarations: {"pp": "Animals suffer."}}
+            (2) If animals suffer, eating them is wrong. {formalization: "pp -> q", declarations: {"q": "Eating animals is wrong."}}
+            -- {from: ["1", "2"]} --
+            (3) Eating animals is wrong. {formalization: "q"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Argument 1>: Animals suffer.
+
             (1) Animals suffer. {formalization: "all x.(F(x) -> G(x))", declarations: {"F": "is animal", "G": "can suffer"}}
             (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
             -- {from: ["1", "2"]} --
             (3) Eating animals is wrong. {formalization: "all x.(F(x) -> H(x))"}
+            ```
+            """)
+        ),
+        solution_class(
+            argdown_snippet=textwrap.dedent("""
+            ```argdown
+            <Argument 1>: Animals suffer.
+
+            (1) Animals suffer. {formalization: "all x.(Animal(x) -> G(x))", declarations: {"Animal": "is animal", "G": "can suffer"}}
+            (2) Eating what can suffer is wrong. {formalization: "all x.(G(x) -> H(x))", declarations: {"H": "eating it is wrong"}}
+            -- {from: ["1", "2"]} --
+            (3) Eating animals is wrong. {formalization: "all x.(Animal(x) -> H(x))"}
             ```
             """)
         ),

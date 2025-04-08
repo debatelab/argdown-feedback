@@ -38,10 +38,13 @@ class VerificationRequest:
     Standard request format for verification handlers.
     Contains all data needed for verification operations.
     """
-    # Raw input data
-    sources: str | List[str]
+    # Raw input data, will be evaluated
+    inputs: str
 
-    # Primary verification data (parsed from sources)
+    # Original source text against which the verification is performed
+    source: str | None = None
+
+    # Primary verification data (parsed from inputs)
     verification_data: List[PrimaryVerificationData] = field(default_factory=list)
     
     # Verification state
@@ -80,15 +83,7 @@ class VerificationRequest:
         self.artifacts.update(other_request.artifacts)
         self.executed_handlers.extend(other_request.executed_handlers)
         self.continue_processing = self.continue_processing and other_request.continue_processing
-        
-    def get_evaluation(self) -> Dict[str, Tuple[bool, Optional[str]]]:
-        """
-        Convert verification results to the standard evaluation format used in judges.
-        Returns a dictionary mapping check names to tuples of (is_valid, message).
-        """
-        return {result.verifier_id: (result.is_valid, result.message) 
-                for result in self.results}
-                
+                        
     def is_valid(self) -> bool:
         """Check if all verification results are valid."""
         return all(result.is_valid for result in self.results)
