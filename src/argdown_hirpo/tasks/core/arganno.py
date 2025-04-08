@@ -18,6 +18,11 @@ from argdown_hirpo.tasks.base import (
 )
 from argdown_hirpo.verifiers.arganno_verifier import ArgAnnoVerifier
 
+from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_hirpo.verifiers.verification_request import VerificationRequest
+from argdown_hirpo.verifiers.processing_handler import CompositeProcessingHandler
+from argdown_hirpo.verifiers.base import CompositeHandler
+
 ANNOTATION_SCHEME = dedent("""
     <!ELEMENT proposition   (#PC-DATA)                          -- single element marking a (sub-)sentence involved in the argumentation -->
     <!ATTLIST proposition   id              ID      #REQUIRED   -- unique id of element -->
@@ -168,6 +173,13 @@ class AnnotationJudge(Judge):
     def _evaluate_annotation(
         self, problem: AnnotationProblem, annotation: Annotation
     ) -> Evaluation:
+
+        #handler = CompositeHandler(handlers=[CompositeProcessingHandler(), ArgannoCompositeHandler()])
+        #request = VerificationRequest(inputs=solution.annotated_source_text, source=problem.sources)
+        #result = handler.handle(request)
+        #evaluation = Evaluation.from_verification_request(result)
+
+
         is_valid = True
         eval_data = {
             "fenced_code_block": "",

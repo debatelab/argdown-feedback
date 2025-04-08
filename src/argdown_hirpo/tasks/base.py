@@ -9,8 +9,12 @@ from statistics import mean
 from textwrap import dedent
 from typing import Any, Sequence, TypedDict
 
+from bs4 import BeautifulSoup
 from openai import AsyncOpenAI, OpenAI
+from pyargdown import Argdown
 import tenacity
+
+from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
 
 logger = logging.getLogger(__name__)
 
@@ -77,8 +81,90 @@ class Evaluation:
     """
 
     is_valid: bool
-    artifacts: dict[str, Any]
+    artifacts: dict[str, Any]  # global artifacts
     metrics: dict[str, Any]
+
+    @classmethod
+    def from_verification_request(
+        cls,
+        request: VerificationRequest,
+    ) -> "Evaluation":
+        """
+        Create an Evaluation from a VerificationRequest.
+        """
+
+        metrics = {result.verifier_id: result.message for result in request.results}
+
+        artifacts = {}
+
+        last_soup = next(
+            (
+                data for data in reversed(request.verification_data)
+                if data.dtype == VerificationDType.xml and data.data is not None
+                and isinstance(data.data, BeautifulSoup)
+            ),
+            None,
+        )
+        if last_soup is not None:
+            artifacts["soup"] = last_soup.data
+
+        last_argdown = next(
+            (
+                data for data in reversed(request.verification_data)
+                if data.dtype == VerificationDType.argdown and data.data is not None
+                and isinstance(data.data, Argdown)
+            ),
+            None,
+        )
+        if last_argdown is not None:
+            artifacts["argdown"] = last_argdown.data
+
+        # argdown_map
+        last_argdown_map = next(
+            (
+                data for data in reversed(request.verification_data)
+                if data.dtype == VerificationDType.argdown and data.data is not None
+                and isinstance(data.data, Argdown) 
+                and data.metadata and data.metadata.get("filename")=="map.ad"
+            ),
+            None,
+        )
+        if last_argdown_map is not None:
+            artifacts["argdown_map"] = last_argdown_map.data
+
+        # argdown_reco
+        last_argdown_reco = next(
+            (
+                data for data in reversed(request.verification_data)
+                if data.dtype == VerificationDType.argdown and data.data is not None
+                and isinstance(data.data, Argdown) 
+                and data.metadata and data.metadata.get("filename")=="reconstructions.ad"
+            ),
+            None,
+        )
+        if last_argdown_reco is not None:
+            artifacts["argdown_reco"] = last_argdown_reco.data
+
+        # formalizations are stored as details in result of WellFormedFormulasHandler
+        if last_argdown_reco is not None:
+            wff_result = next(
+                (
+                    result for result in request.results
+                    if result.verifier_id == "WellFormedFormulasHandler" and result.verification_data_references==[last_argdown_reco.id]),
+                None,
+            )
+            if wff_result is not None:
+                all_expressions = wff_result.details.get("all_expressions")
+                all_declarations = wff_result.details.get("all_declarations")
+                if all_expressions and all_declarations:
+                    artifacts["all_expressions"] = all_expressions
+                    artifacts["all_declarations"] = all_declarations
+
+        return cls(
+            is_valid=request.is_valid(),
+            artifacts=artifacts,
+            metrics=metrics,
+        )
 
 
 @dataclasses.dataclass
