@@ -35,9 +35,9 @@ def get_propositional_variables(expression: Expression) -> list[str]:
 
     def visit(subexpression: Expression):
         """recursively visits the expression tree and analyse IndividualVariableExpressions"""
-        if isinstance(subexpression, IndividualVariableExpression):
+        if isinstance(subexpression, IndividualVariableExpression) or isinstance(subexpression, ConstantExpression):
             variables.extend(
-                [str(v) for v in subexpression.variables()]
+                [str(v) for v in subexpression.variables() | subexpression.constants()]
             )
         elif not isinstance(
             subexpression,
@@ -51,7 +51,7 @@ def get_propositional_variables(expression: Expression) -> list[str]:
 
 def get_arities(expression: Expression) -> dict[str, int]:
     """returns a dictionary of variables and their arity"""
-    variables = {k: 0 for k in expression.variables()}
+    variables = {k: 0 for k in expression.variables() | expression.predicates()}
 
     def visit(subexpression: Expression):
         """recursively visits the expression tree and analyse ApplicationExpressions"""
