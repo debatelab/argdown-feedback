@@ -18,8 +18,8 @@ from argdown_hirpo.tasks.base import (
 
 from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_hirpo.verifiers.core.content_check_handler import HasAnnotationsHandler
-from argdown_hirpo.verifiers.verification_request import VerificationRequest
-from argdown_hirpo.verifiers.processing_handler import CompositeProcessingHandler
+from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
+from argdown_hirpo.verifiers.processing_handler import CompositeProcessingHandler, FencedCodeBlockExtractor
 from argdown_hirpo.verifiers.base import CompositeHandler
 
 ANNOTATION_SCHEME = dedent("""
@@ -124,10 +124,21 @@ class Annotation(Solution):
     @classmethod
     def from_raw_answer(cls, answer) -> "Annotation":
         """Extract the annotated source text from the answer."""
-        if answer.count("```xml") == 1:
-            if answer.split("```xml")[1].count("\n```") == 1:
-                answer = answer.split("```xml")[1].split("\n```")[0]
-                answer = "```xml" + answer + "\n```"
+        handler = FencedCodeBlockExtractor()
+        request = VerificationRequest(inputs=answer)
+        result = handler.handle(request)
+        code_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.xml and vr.code_snippet
+            ),
+            None,
+        )
+        code_snippet = code_snippet if code_snippet is not None else answer 
+        #if answer.count("```xml") == 1:
+        #    if answer.split("```xml")[1].count("\n```") == 1:
+        #        answer = answer.split("```xml")[1].split("\n```")[0]
+        #        answer = "```xml" + answer + "\n```"
         return cls(annotated_source_text=answer)
 
 
