@@ -15,9 +15,9 @@ from argdown_hirpo.tasks.base import (
     Judge,
     FeedbackGenerator,
 )
-from argdown_hirpo.verifiers.arganno_verifier import ArgAnnoVerifier
 
-from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler, HasAnnotationsHandler
+from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_hirpo.verifiers.core.content_check_handler import HasAnnotationsHandler
 from argdown_hirpo.verifiers.verification_request import VerificationRequest
 from argdown_hirpo.verifiers.processing_handler import CompositeProcessingHandler
 from argdown_hirpo.verifiers.base import CompositeHandler
