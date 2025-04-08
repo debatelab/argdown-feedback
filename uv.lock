@@ -297,7 +297,7 @@ wheels = [
 [[package]]
 name = "pyargdown"
 version = "0.1.0"
-source = { git = "https://github.com/ggbetz/pyargdown.git#897279be09f41c018fa476089dafa0b3c06874a9" }
+source = { git = "https://github.com/ggbetz/pyargdown.git#79f50cadcc1d3987ff11379163636d7e4328acf9" }
 dependencies = [
     { name = "lark" },
     { name = "networkx" },
