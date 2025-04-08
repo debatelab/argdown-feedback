@@ -12,13 +12,12 @@ from argdown_hirpo.tasks.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
     Judge,
     FeedbackGenerator,
 )
 from argdown_hirpo.verifiers.arganno_verifier import ArgAnnoVerifier
 
-from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler, HasAnnotationsHandler
 from argdown_hirpo.verifiers.verification_request import VerificationRequest
 from argdown_hirpo.verifiers.processing_handler import CompositeProcessingHandler
 from argdown_hirpo.verifiers.base import CompositeHandler
@@ -173,89 +172,96 @@ class AnnotationJudge(Judge):
     def _evaluate_annotation(
         self, problem: AnnotationProblem, annotation: Annotation
     ) -> Evaluation:
-
-        #handler = CompositeHandler(handlers=[CompositeProcessingHandler(), ArgannoCompositeHandler()])
-        #request = VerificationRequest(inputs=solution.annotated_source_text, source=problem.sources)
-        #result = handler.handle(request)
-        #evaluation = Evaluation.from_verification_request(result)
-
-
-        is_valid = True
-        eval_data = {
-            "fenced_code_block": "",
-            "altered_source_text": "",
-            "nested_propositions": "",
-            "missing_id": "",
-            "duplicate_id": "",
-            "invalid_support_ids": "",
-            "invalid_attack_ids": "",
-            "unknown_attributes": "",
-        }
-
-        # parse xml
-        soup, error_msg = self.parse_xml_snippet(annotation.annotated_source_text)
-        if error_msg:
-            is_valid = False
-            eval_data["fenced_code_block"] = error_msg
-        del error_msg
-
-        verifier = ArgAnnoVerifier(problem.sources, soup)
-
-        # Source text must not be altered
-        check, error_msg = verifier.source_text_not_altered()
-        if check is False:
-            is_valid = False
-            eval_data["altered_source_text"] = error_msg if error_msg else "Source text was altered"
-
-        # No nested proposition annotations
-        check, error_msg = verifier.no_nested_proposition_annotations()
-        if check is False:
-            is_valid = False
-            eval_data["nested_propositions"] = error_msg if error_msg else "Nested proposition annotations"
-
-        # Every proposition must have an id
-        check, error_msg = verifier.every_proposition_has_id()
-        if check is False:
-            is_valid = False
-            eval_data["missing_id"] = error_msg if error_msg else "Missing id in proposition"
-
-        # Every proposition must have a unique id
-        check, error_msg = verifier.every_proposition_has_unique_id()
-        if check is False:
-            is_valid = False
-            eval_data["duplicate_id"] = error_msg if error_msg else "Duplicate ids"
-
-        # Every "supports" reference must be a valid id
-        check, error_msg = verifier.every_support_reference_is_valid()
-        if check is False:
-            is_valid = False
-            eval_data["invalid_support_ids"] = error_msg if error_msg else "Invalid support ids"
-
-        # Every "attacks" reference must be a valid id
-        check, error_msg = verifier.every_attack_reference_is_valid()
-        if check is False:
-            is_valid = False
-            eval_data["invalid_attack_ids"] = error_msg if error_msg else "Invalid attack ids"
-
-        # No unknown attributes
-        check, error_msg = verifier.no_unknown_attributes()
-        if check is False:
-            is_valid = False
-            eval_data["unknown_attributes"] = error_msg if error_msg else "Unknown attributes"
-
-        # No unknown elements
-        check, error_msg = verifier.no_unknown_elements()
-        if check is False:
-            is_valid = False
-            eval_data["unknown_elements"] = error_msg if error_msg else "Unknown elements"
-
-        return Evaluation(
-            is_valid=is_valid,
-            artifacts={
-                "soup": soup,
-            },
-            metrics=eval_data,
+        handler = CompositeHandler(
+            handlers=[
+                CompositeProcessingHandler(),
+                HasAnnotationsHandler(),
+                ArgannoCompositeHandler(),
+            ]
         )
+        request = VerificationRequest(
+            inputs=annotation.annotated_source_text, source=problem.sources
+        )
+        result = handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        return evaluation
+
+        # is_valid = True
+        # eval_data = {
+        #     "fenced_code_block": "",
+        #     "altered_source_text": "",
+        #     "nested_propositions": "",
+        #     "missing_id": "",
+        #     "duplicate_id": "",
+        #     "invalid_support_ids": "",
+        #     "invalid_attack_ids": "",
+        #     "unknown_attributes": "",
+        # }
+
+        # # parse xml
+        # soup, error_msg = self.parse_xml_snippet(annotation.annotated_source_text)
+        # if error_msg:
+        #     is_valid = False
+        #     eval_data["fenced_code_block"] = error_msg
+        # del error_msg
+
+        # verifier = ArgAnnoVerifier(problem.sources, soup)
+
+        # # Source text must not be altered
+        # check, error_msg = verifier.source_text_not_altered()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["altered_source_text"] = error_msg if error_msg else "Source text was altered"
+
+        # # No nested proposition annotations
+        # check, error_msg = verifier.no_nested_proposition_annotations()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["nested_propositions"] = error_msg if error_msg else "Nested proposition annotations"
+
+        # # Every proposition must have an id
+        # check, error_msg = verifier.every_proposition_has_id()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["missing_id"] = error_msg if error_msg else "Missing id in proposition"
+
+        # # Every proposition must have a unique id
+        # check, error_msg = verifier.every_proposition_has_unique_id()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["duplicate_id"] = error_msg if error_msg else "Duplicate ids"
+
+        # # Every "supports" reference must be a valid id
+        # check, error_msg = verifier.every_support_reference_is_valid()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["invalid_support_ids"] = error_msg if error_msg else "Invalid support ids"
+
+        # # Every "attacks" reference must be a valid id
+        # check, error_msg = verifier.every_attack_reference_is_valid()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["invalid_attack_ids"] = error_msg if error_msg else "Invalid attack ids"
+
+        # # No unknown attributes
+        # check, error_msg = verifier.no_unknown_attributes()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["unknown_attributes"] = error_msg if error_msg else "Unknown attributes"
+
+        # # No unknown elements
+        # check, error_msg = verifier.no_unknown_elements()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["unknown_elements"] = error_msg if error_msg else "Unknown elements"
+
+        # return Evaluation(
+        #     is_valid=is_valid,
+        #     artifacts={
+        #         "soup": soup,
+        #     },
+        #     metrics=eval_data,
+        # )
 
     async def arun(
         self,

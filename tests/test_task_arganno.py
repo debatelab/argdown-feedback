@@ -1,3 +1,4 @@
+from pprint import pprint
 from openai import OpenAI
 import pytest
 import textwrap
@@ -315,7 +316,7 @@ async def test_annotation_judge_valid(valid_annotations1, source_texts):
     assert len(evaluations) == len(valid_annotations1)
     for i, ev in enumerate(evaluations):
         print(f"## Annotation {i+1}")
-        print(ev)
+        pprint(ev)
         assert ev.is_valid
         assert not any(v for _, v in ev.metrics.items())
         assert ev.artifacts["soup"]
@@ -336,7 +337,6 @@ async def test_annotation_judge_invalid(invalid_annotations1, source_texts):
         print(ev)
         assert not ev.is_valid
         assert any(v for _, v in ev.metrics.items())
-        assert ev.artifacts["soup"]
 
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")

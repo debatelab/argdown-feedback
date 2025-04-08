@@ -148,9 +148,9 @@ class XMLParser(ProcessingHandler):
                 code_snippet = vdata.code_snippet
                 code_marker = _CODE_MARKERS[vdata.dtype]
                 # remove metadata from code snippet
-                if "\n" in code_snippet and code_snippet.startswith(code_marker):
-                    # remove the first line (metadata) from the code snippet, add back the code marker
-                    code_snippet = code_marker + "\n" + code_snippet.split("\n", 1)[1]
+                if "\n" in code_snippet and code_snippet.startswith(code_marker) and code_snippet.endswith("```"):
+                    # remove the first and last line 
+                    code_snippet = "\n".join(code_snippet.split("\n")[1:-1])
                 try:
                     
                     soup = BeautifulSoup(

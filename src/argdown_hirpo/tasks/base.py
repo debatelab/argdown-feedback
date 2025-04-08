@@ -105,8 +105,7 @@ class Evaluation:
             ),
             None,
         )
-        if last_soup is not None:
-            artifacts["soup"] = last_soup.data
+        artifacts["soup"] = last_soup.data if last_soup is not None else None
 
         last_argdown = next(
             (
@@ -116,8 +115,7 @@ class Evaluation:
             ),
             None,
         )
-        if last_argdown is not None:
-            artifacts["argdown"] = last_argdown.data
+        artifacts["argdown"] = last_argdown.data if last_argdown is not None else None
 
         # argdown_map
         last_argdown_map = next(
@@ -129,8 +127,7 @@ class Evaluation:
             ),
             None,
         )
-        if last_argdown_map is not None:
-            artifacts["argdown_map"] = last_argdown_map.data
+        artifacts["argdown_map"] = last_argdown_map.data if last_argdown_map is not None else None
 
         # argdown_reco
         last_argdown_reco = next(
@@ -142,10 +139,11 @@ class Evaluation:
             ),
             None,
         )
-        if last_argdown_reco is not None:
-            artifacts["argdown_reco"] = last_argdown_reco.data
+        artifacts["argdown_reco"] = last_argdown_reco.data if last_argdown_reco is not None else None
 
         # formalizations are stored as details in result of WellFormedFormulasHandler
+        all_expressions = None
+        all_declarations = None
         if last_argdown_reco is not None:
             wff_result = next(
                 (
@@ -156,9 +154,8 @@ class Evaluation:
             if wff_result is not None:
                 all_expressions = wff_result.details.get("all_expressions")
                 all_declarations = wff_result.details.get("all_declarations")
-                if all_expressions and all_declarations:
-                    artifacts["all_expressions"] = all_expressions
-                    artifacts["all_declarations"] = all_declarations
+        artifacts["all_expressions"] = all_expressions
+        artifacts["all_declarations"] = all_declarations
 
         return cls(
             is_valid=request.is_valid(),
