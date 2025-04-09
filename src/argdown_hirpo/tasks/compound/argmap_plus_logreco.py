@@ -26,6 +26,7 @@ from argdown_hirpo.tasks.compound.argmap_plus_infreco import (
 )
 from argdown_hirpo.verifiers.base import BaseHandler, CompositeHandler
 from argdown_hirpo.verifiers.coherence.argmap_logreco_handler import ArgmapLogrecoCoherenceHandler
+from argdown_hirpo.verifiers.coherence.argmap_infreco_handler import ArgmapInfrecoCoherenceHandler
 from argdown_hirpo.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_hirpo.verifiers.core.content_check_handler import (
     HasArgdownHandler,
@@ -40,6 +41,7 @@ from argdown_hirpo.verifiers.core.infreco_handler import (
     NoDuplicatePCSLabelsHandler,
     PropRefsExistHandler,
     StartsWithPremiseHandler,
+    NoExtraPropositionsHandler,
     UsesAllPropsHandler,
 )
 from argdown_hirpo.verifiers.core.logreco_handler import LogRecoCompositeHandler
@@ -362,6 +364,8 @@ class ArgmapPlusLogrecoJudge(Judge):
                 HasInferenceDataHandler(filter=reco_filter),
                 PropRefsExistHandler(filter=reco_filter),
                 UsesAllPropsHandler(filter=reco_filter),
+                # Extra material handlers
+                NoExtraPropositionsHandler(filter=reco_filter),
             ]    
         )
         main_handler = CompositeHandler(
@@ -372,6 +376,7 @@ class ArgmapPlusLogrecoJudge(Judge):
                 ArgMapCompositeHandler(filter=map_filter),
                 infreco_handler,
                 LogRecoCompositeHandler(filter=reco_filter),
+                ArgmapInfrecoCoherenceHandler(),
                 ArgmapLogrecoCoherenceHandler(),
             ]
         )
@@ -564,18 +569,13 @@ class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePrefe
 
         dlds: list[float] = []
         for argument in argdown_reco.arguments:
-            if argument.label not in all_expressions:
-                continue
             print(f"Argument: {argument.label}")
             for pr in argument.pcs:
-                if pr.label not in all_expressions[argument.label]:
+                expression = all_expressions.get(pr.proposition_label)
+                if expression is None:
                     continue
-                expression = all_expressions[argument.label][pr.label]
 
-                proposition = next(
-                    (p for p in argdown_reco.propositions if p.label == pr.proposition_label),
-                    None
-                )
+                proposition = argdown_reco.get_proposition(pr.proposition_label)
                 if proposition is None:
                     continue
 

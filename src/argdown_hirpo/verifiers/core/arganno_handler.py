@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 
 
 from argdown_hirpo.verifiers.verification_request import (
+    VDFilter,
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
@@ -19,13 +20,22 @@ from argdown_hirpo.verifiers.base import BaseHandler, CompositeHandler
 class ArgannoHandler(BaseHandler):
     """Base handler interface for evaluating individual argumentative annotations."""
 
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+        filter: Optional[VDFilter] = None,
+    ):
+        super().__init__(name, logger)
+        self.filter = filter if filter else (lambda vdata: True)
+
     @abstractmethod
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         """Evaluate the data and return a verification result."""
 
     def is_applicable(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> bool:
         """Check if the handler is applicable to the given data. Can be customized in subclasses."""
-        return vdata.dtype == VerificationDType.xml
+        return vdata.dtype == VerificationDType.xml and self.filter(vdata)
 
     def handle(self, request: VerificationRequest):
         for vdata in request.verification_data:
@@ -40,13 +50,6 @@ class ArgannoHandler(BaseHandler):
 
 class SourceTextIntegrityHandler(ArgannoHandler):
     """Handler that checks if the source text has been altered."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
@@ -84,13 +87,6 @@ class SourceTextIntegrityHandler(ArgannoHandler):
 class NestedPropositionHandler(ArgannoHandler):
     """Handler that checks for nested proposition annotations."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
-
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
         if soup is None:
@@ -119,13 +115,6 @@ class NestedPropositionHandler(ArgannoHandler):
 
 class PropositionIdPresenceHandler(ArgannoHandler):
     """Handler that checks that every proposition has an id."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
@@ -156,13 +145,6 @@ class PropositionIdPresenceHandler(ArgannoHandler):
 class PropositionIdUniquenessHandler(ArgannoHandler):
     """Handler that checks that every proposition has a unique id."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
-
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
         if soup is None:
@@ -191,13 +173,6 @@ class PropositionIdUniquenessHandler(ArgannoHandler):
 
 class SupportReferenceValidityHandler(ArgannoHandler):
     """Handler that checks that every "supports" reference is a valid id."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
@@ -232,13 +207,6 @@ class SupportReferenceValidityHandler(ArgannoHandler):
 class AttackReferenceValidityHandler(ArgannoHandler):
     """Handler that checks that every "attacks" reference is a valid id."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
-
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
         if soup is None:
@@ -271,13 +239,6 @@ class AttackReferenceValidityHandler(ArgannoHandler):
 
 class AttributeValidityHandler(ArgannoHandler):
     """Handler that checks for unknown attributes in propositions."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
@@ -313,13 +274,6 @@ class AttributeValidityHandler(ArgannoHandler):
 
 class ElementValidityHandler(ArgannoHandler):
     """Handler that checks for unknown elements in the soup."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
@@ -447,19 +401,21 @@ class ArgannoCompositeHandler(CompositeHandler[ArgannoHandler]):
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
         handlers: list[ArgannoHandler] | None = None,
+        filter: Optional[VDFilter] = None,
     ):
         super().__init__(name, logger, handlers)
-        
+        filter = filter if filter else (lambda x: True)
+
         # Initialize with default handlers if none provided
         if not handlers:
             self.handlers = [
-                SourceTextIntegrityHandler(),
-                NestedPropositionHandler(),
-                PropositionIdPresenceHandler(),
-                PropositionIdUniquenessHandler(),
-                SupportReferenceValidityHandler(),
-                AttackReferenceValidityHandler(),
-                AttributeValidityHandler(),
-                ElementValidityHandler(),
+                SourceTextIntegrityHandler(filter=filter),
+                NestedPropositionHandler(filter=filter),
+                PropositionIdPresenceHandler(filter=filter),
+                PropositionIdUniquenessHandler(filter=filter),
+                SupportReferenceValidityHandler(filter=filter),
+                AttackReferenceValidityHandler(filter=filter),
+                AttributeValidityHandler(filter=filter),
+                ElementValidityHandler(filter=filter),
             ]
             

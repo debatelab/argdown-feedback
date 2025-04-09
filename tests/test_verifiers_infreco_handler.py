@@ -423,7 +423,7 @@ def test_ends_with_conclusion_handler_invalid(valid_infreco_graph):
     pprint(result)
     assert result is not None
     assert result.is_valid is False
-    assert "do not start with a premise" in result.message  # The message in EndsWithConclusionHandler seems incorrect
+    assert "following arguments do end with a conclusion" in result.message  # The message in EndsWithConclusionHandler seems incorrect
 
 
 def test_no_duplicate_pcs_labels_handler_valid(valid_infreco_graph):

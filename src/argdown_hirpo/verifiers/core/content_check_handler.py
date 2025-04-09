@@ -20,13 +20,16 @@ class HasAnnotationsHandler(BaseHandler):
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
+        filter: Optional[VDFilter] = None,
     ):
         super().__init__(name, logger)
+        self.filter = filter if filter else (lambda x: True)
 
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         message = None
         if not any(
-            vdata.dtype == VerificationDType.xml and vdata.code_snippet
+            self.filter(vdata)
+            and vdata.dtype == VerificationDType.xml and vdata.code_snippet
             for vdata in request.verification_data
         ):
             error_msg = "Input data has no properly formatted fenced codeblocks with annotations."

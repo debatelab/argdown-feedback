@@ -11,7 +11,7 @@ from argdown_hirpo.verifiers.processing_handler import (
     FencedCodeBlockExtractor,
     ArgdownParser,
     XMLParser,
-    CompositeProcessingHandler,
+    DefaultProcessingHandler,
 )
 from argdown_hirpo.verifiers.verification_request import (
     VerificationRequest,
@@ -264,7 +264,7 @@ def test_parsers_skip_already_parsed():
 def test_composite_processing_handler(mixed_input_text):
     request = VerificationRequest(inputs=mixed_input_text, source=None)
 
-    composite = CompositeProcessingHandler()
+    composite = DefaultProcessingHandler()
     result_request = composite.handle(request)
 
     # Should have extracted and parsed both code blocks
@@ -296,7 +296,7 @@ def test_composite_processing_handler(mixed_input_text):
 def test_composite_processing_handler_with_errors(invalid_argdown_input):
     request = VerificationRequest(inputs=invalid_argdown_input, source=None)
 
-    composite = CompositeProcessingHandler()
+    composite = DefaultProcessingHandler()
     result_request = composite.handle(request)
 
     # Should have extracted but failed to parse
@@ -315,7 +315,7 @@ def test_composite_handler_with_custom_handlers():
             return request
 
     custom_handler = CustomHandler()
-    composite = CompositeProcessingHandler(handlers=[custom_handler])
+    composite = DefaultProcessingHandler(handlers=[custom_handler])
 
     request = VerificationRequest(inputs="test", source=None)
     result_request = composite.handle(request)

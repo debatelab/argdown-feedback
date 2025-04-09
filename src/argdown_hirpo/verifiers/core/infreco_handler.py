@@ -210,7 +210,7 @@ class EndsWithConclusionHandler(InfRecoHandler):
         
         msg = None
         if invalid_args:
-            msg = f"The following arguments do not start with a premise: {', '.join(invalid_args)}"
+            msg = f"The following arguments do end with a conclusion: {', '.join(invalid_args)}"
         return VerificationResult(
             verifier_id=self.name,
             verification_data_references=[vdata.id],
@@ -238,7 +238,7 @@ class NotMultipleGistsHandler(InfRecoHandler):
         
         msg = None
         if invalid_args:
-            msg = f"The following arguments do not start with a premise: {', '.join(invalid_args)}"
+            msg = f"The following arguments have alternative gists (and are declared multiple times): {', '.join(invalid_args)}"
         return VerificationResult(
             verifier_id=self.name,
             verification_data_references=[vdata.id],
@@ -274,7 +274,7 @@ class NoDuplicatePCSLabelsHandler(InfRecoHandler):
         
         msg = None
         if invalid_args:
-            msg = f"The following arguments do not start with a premise: {', '.join(invalid_args)}"
+            msg = f"The following arguments have duplicate premise/conclusion labels: {', '.join(invalid_args)}"
         return VerificationResult(
             verifier_id=self.name,
             verification_data_references=[vdata.id],

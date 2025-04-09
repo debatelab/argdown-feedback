@@ -639,6 +639,60 @@ class TestInfRecoFromArgannoFailureTypePreferencePairGenerator:
                     [No meat]: We should stop eating meat.
                         <+ <Suffering>: Animals suffer.
                         <+ <Climate Change>: Animal farming causes climate change.
+
+                    Some totally disallowed sentence.
+                    ```
+
+                    ```argdown {filename="reconstructions.ad"}
+                    <Suffering>
+                                    
+                    (1) Animals suffer. {formalization: "p", declarations: {p: "Animals suffer."}}
+                    (2) If they suffer, we should not eat them. {formalization: "p -> q", declarations: {q: "We should not eat animals."}}
+                    -- {from: ["1","2"]} --
+                    (2) [No meat]: We should stop eating meat. {formalization: "q"}
+                                    
+                    <Climate Change>
+                                    
+                    (1) Animal farming causes climate change. {formalization: "r", declarations: {r: "Animal farming causes climate change."}}
+                    (2) If animal farming causes climate change, we should not eat them. {formalization: "r -> q", declarations: {q: "We should not eat animals."}}
+                    -- {from: ["1","2"]} --
+                    (3) [No meat]
+                    ```
+                    """)
+                ),
+            ),
+            (
+                ArgmapPlusLogreco.from_raw_answer(
+                    textwrap.dedent("""
+                    ```argdown {filename="map.ad"}
+                    [No meat]: We should stop eating meat.
+                        <+ <Suffering>: Animals suffer.
+                        <+ <Climate Change>: Animal farming causes climate change.
+                    ```
+
+                    ```argdown {filename="reconstructions.ad"}
+                    <Suffering>
+                                    
+                    (1) Animals suffer. {formalization: "p", declarations: {p: "Animals suffer."}}
+                    (2) If they suffer, we should not eat them. {formalization: "p -> q", declarations: {q: "We should not eat animals."}}
+                    -- {from: ["1","2"]} --
+                    (2) [No meat]: We should stop eating meat. {formalization: "q"}
+                                    
+                    <Climate Change>
+                                    
+                    (1) Animal farming causes climate change. {formalization: "r", declarations: {r: "Animal farming causes climate change."}}
+                    (2) If animal farming causes climate change, we should not eat them. {formalization: "r -> q", declarations: {q: "We should not eat animals."}}
+                    -- {from: ["1","2"]} --
+                    (3) [No meat]
+                    ```
+                    """)
+                ),
+                ArgmapPlusLogreco.from_raw_answer(
+                    textwrap.dedent("""
+                    ```argdown {filename="map.ad"}
+                    [No meat]: We should stop eating meat.
+                        <+ <Suffering>: Animals suffer.
+                        <+ <Climate Change>: Animal farming causes climate change.
                     ```
 
                     ```argdown {filename="reconstructions.ad"}

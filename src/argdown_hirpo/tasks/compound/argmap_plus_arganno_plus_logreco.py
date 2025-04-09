@@ -1,4 +1,3 @@
-import copy
 import dataclasses
 from typing import Sequence
 
@@ -6,20 +5,18 @@ from textwrap import dedent
 from bs4 import BeautifulSoup
 
 from argdown_hirpo.tasks.base import (
+    Judge,
     Problem,
     Solution,
     Evaluation,
     Feedback,
     ProblemGenerator,
 )
-from argdown_hirpo.tasks.compound.arganno_plus_infreco import ArgannoPlusInfrecoJudge
-from argdown_hirpo.tasks.compound.argmap_plus_arganno import ArgmapPlusArgannoJudge
 from argdown_hirpo.tasks.core.argmap import (
     ArgumentMap,
 )
 from argdown_hirpo.tasks.core.arganno import (
     Annotation,
-    AnnotationJudge,
     AnnotationProblem,
     ANNOTATION_SCHEME,
 )
@@ -27,8 +24,39 @@ from argdown_hirpo.tasks.core.logreco import (
     LogicalReco,
 )
 from argdown_hirpo.tasks.compound.argmap_plus_logreco import (
-    ArgmapPlusLogrecoJudge,
     ArgmapPlusLogrecoProblem,
+)
+from argdown_hirpo.verifiers.base import BaseHandler, CompositeHandler
+from argdown_hirpo.verifiers.coherence.arganno_infreco_handler import ArgannoInfrecoCoherenceHandler
+from argdown_hirpo.verifiers.coherence.argmap_logreco_handler import ArgmapLogrecoCoherenceHandler
+from argdown_hirpo.verifiers.coherence.argmap_infreco_handler import ArgmapInfrecoCoherenceHandler
+from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_hirpo.verifiers.core.argmap_handler import ArgMapCompositeHandler
+from argdown_hirpo.verifiers.core.content_check_handler import (
+    HasAnnotationsHandler,
+    HasArgdownHandler,
+)
+from argdown_hirpo.verifiers.core.infreco_handler import (
+    EndsWithConclusionHandler,
+    HasAtLeastNArgumentsHandler,
+    HasInferenceDataHandler,
+    HasLabelHandler,
+    HasPCSHandler,
+    InfRecoCompositeHandler,
+    NoDuplicatePCSLabelsHandler,
+    PropRefsExistHandler,
+    StartsWithPremiseHandler,
+    NoExtraPropositionsHandler,
+    UsesAllPropsHandler,
+)
+from argdown_hirpo.verifiers.core.logreco_handler import LogRecoCompositeHandler
+from argdown_hirpo.verifiers.processing_handler import (
+    DefaultProcessingHandler,
+    FencedCodeBlockExtractor,
+)
+from argdown_hirpo.verifiers.verification_request import (
+    VerificationDType,
+    VerificationRequest,
 )
 
 
@@ -199,40 +227,79 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
 
     @classmethod
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusArgannoPlusLogreco":
-        unparsed_solution = raw_answer
-        annotated_source_text = ""
-        argdown_map_snippet = ""
-        argdown_reconstructions_snippet = ""
 
-        _code_label = 'xml {filename="annotation.txt"}'
-        if f'```{_code_label}' in unparsed_solution:
-            annotated_source_text = unparsed_solution.split("```xml")[-1].split("\n```")[0]
-            annotated_source_text = f"```{_code_label}" + annotated_source_text + "\n```"
+        handler = FencedCodeBlockExtractor()
+        request = VerificationRequest(inputs=raw_answer)
+        result = handler.handle(request)
 
-        _code_label = 'argdown {filename="map.ad"}'
-        if f"```{_code_label}" in unparsed_solution:
-            argdown_map_snippet = unparsed_solution.split(f"```{_code_label}")[-1].split("\n```")[0]
-            argdown_map_snippet = f"```{_code_label}" + argdown_map_snippet + "\n```"
-
-        _code_label = 'argdown {filename="reconstructions.ad"}'
-        if f"```{_code_label}" in unparsed_solution:
-            argdown_reconstructions_snippet = unparsed_solution.split(f"```{_code_label}")[-1].split("\n```")[0]
-            argdown_reconstructions_snippet = f"```{_code_label}" + argdown_reconstructions_snippet + "\n```"
+        anno_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.xml and vr.code_snippet
+                and vr.metadata and vr.metadata.get("filename") == "annotation.txt"
+            ),
+            None
+        )
+        map_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+                and vr.metadata and vr.metadata.get("filename") == "map.ad"
+            ),
+            None
+        )
+        reco_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+                and vr.metadata and vr.metadata.get("filename") == "reconstructions.ad"
+            ),
+            None
+        )
 
         return cls(
-            annotated_source_text=annotated_source_text
-                                if annotated_source_text
-                                else unparsed_solution,
-            argdown_map_snippet=argdown_map_snippet
-                                if argdown_map_snippet
-                                else unparsed_solution,
-            argdown_reconstructions_snippet=argdown_reconstructions_snippet
-                                if argdown_reconstructions_snippet
-                                else unparsed_solution,
-            unparsed_solution=None
-                                if argdown_map_snippet and argdown_reconstructions_snippet
-                                else unparsed_solution,
+            annotated_source_text=anno_snippet if anno_snippet else raw_answer,
+            argdown_map_snippet=map_snippet if map_snippet else raw_answer,
+            argdown_reconstructions_snippet=reco_snippet if reco_snippet else raw_answer,
+            unparsed_solution=None if map_snippet and reco_snippet else raw_answer,
         )
+          
+        # TODO remove
+        # 
+        # unparsed_solution = raw_answer
+        # annotated_source_text = ""
+        # argdown_map_snippet = ""
+        # argdown_reconstructions_snippet = ""
+
+        # _code_label = 'xml {filename="annotation.txt"}'
+        # if f'```{_code_label}' in unparsed_solution:
+        #     annotated_source_text = unparsed_solution.split("```xml")[-1].split("\n```")[0]
+        #     annotated_source_text = f"```{_code_label}" + annotated_source_text + "\n```"
+
+        # _code_label = 'argdown {filename="map.ad"}'
+        # if f"```{_code_label}" in unparsed_solution:
+        #     argdown_map_snippet = unparsed_solution.split(f"```{_code_label}")[-1].split("\n```")[0]
+        #     argdown_map_snippet = f"```{_code_label}" + argdown_map_snippet + "\n```"
+
+        # _code_label = 'argdown {filename="reconstructions.ad"}'
+        # if f"```{_code_label}" in unparsed_solution:
+        #     argdown_reconstructions_snippet = unparsed_solution.split(f"```{_code_label}")[-1].split("\n```")[0]
+        #     argdown_reconstructions_snippet = f"```{_code_label}" + argdown_reconstructions_snippet + "\n```"
+
+        # return cls(
+        #     annotated_source_text=annotated_source_text
+        #                         if annotated_source_text
+        #                         else unparsed_solution,
+        #     argdown_map_snippet=argdown_map_snippet
+        #                         if argdown_map_snippet
+        #                         else unparsed_solution,
+        #     argdown_reconstructions_snippet=argdown_reconstructions_snippet
+        #                         if argdown_reconstructions_snippet
+        #                         else unparsed_solution,
+        #     unparsed_solution=None
+        #                         if argdown_map_snippet and argdown_reconstructions_snippet
+        #                         else unparsed_solution,
+        # )
 
     def partial_annotation(self) -> Annotation:
         """Return the annotation subsolution."""
@@ -264,82 +331,137 @@ class ArgmapPlusArgannoPlusLogrecoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgmapPlusArgannoPlusLogrecoJudge(ArgmapPlusLogrecoJudge):
+class ArgmapPlusArgannoPlusLogrecoJudge(Judge):
     """Judge for the argmap plus infreco task."""
 
     def _evaluate_solution(
-        self, problem: Problem, reco: Solution
+        self, problem: ArgmapPlusArgannoPlusLogrecoProblem, solution: ArgmapPlusArgannoPlusLogreco
     ) -> Evaluation:
         
-        # check that solution has required fields
-        assert hasattr(reco, "annotated_source_text")
-
-        # evaluate argmap+logreco
-        evaluation = super()._evaluate_solution(problem, reco)  # type: ignore
-        argdown_map = evaluation.artifacts["argdown_map"]
-        argdown_reco = evaluation.artifacts["argdown_reco"]        
-        artifacts = copy.deepcopy(evaluation.artifacts)
-        eval_data = evaluation.metrics.copy()
-        is_valid = evaluation.is_valid
-
-        eval_data["argdown_elements_correspondence"] = eval_data.pop("elements_correspondence", "")
-        eval_data["argdown_relations_correspondence"] = eval_data.pop("relations_correspondence", "")
-
-        eval_data.update({
-            "annotation_empty": "",
-            "annotation_nested_propositions": "",
-            "annotation_missing_id": "",
-            "annotation_duplicate_id": "",
-            "annotation_invalid_support_ids": "",
-            "annotation_invalid_attack_ids": "",
-            "annotation_unknown_attributes": "",
-            "annotation_elements_correspondence": "",
-            "annotation_relations_correspondence": "",
-        })
-
-        # check fenced annotation codeblocks
-        msgs = [eval_data["fenced_code_blocks"]]
-        _code_label = 'xml {filename="annotation.txt"}'
-        ast = reco.annotated_source_text.strip("\n ")  # type: ignore
-        if not (ast.startswith(f"```{_code_label}") and ast.endswith("```")):
-            msgs.append('Failed to extract fenced xml block with annotation.')
-            if ast.count(f"```{_code_label}") == 0:
-                msgs.append(f"No fenced code block starting with '```{_code_label}'.")
-        if msgs:
-            eval_data["fenced_code_blocks"] = " ".join(msgs)
-        del msgs
-
-        # evaluate anno
-        evaluation_anno = AnnotationJudge()._evaluate_annotation(
-            problem=AnnotationProblem(problem.sources, strip_html=False),  # type: ignore
-            annotation=Annotation(ast),
+        anno_filter = BaseHandler.create_metadata_filter(
+            "filename", ["annotation.txt"]
         )
-        if evaluation_anno.is_valid is False:
-            is_valid = False
-        soup: BeautifulSoup = evaluation_anno.artifacts["soup"]
-        artifacts["soup"] = soup
-        for k, v in evaluation_anno.metrics.items():
-            if k != "fenced_code_block":
-                eval_data["annotation_" + k] = v
-        if not list(soup.find_all("proposition")):
-            eval_data["annotation_empty"] = "No proposition elements in the annotation."
+        map_filter = BaseHandler.create_metadata_filter(
+            "filename", ["map.ad"]
+        )
+        reco_filter = BaseHandler.create_metadata_filter(
+            "filename", ["reconstructions.ad"]
+        )
 
-        # evaluate coherence annotation<>reco
-        coherence_eval_data = ArgannoPlusInfrecoJudge()._evaluate_coherence(
-            soup_anno = soup,
-            argdown_reco = argdown_reco,
-        ) if argdown_reco is not None else None
+        infreco_handler = InfRecoCompositeHandler(
+            handlers = [
+                # Argument existence handlers
+                HasAtLeastNArgumentsHandler(filter=reco_filter,N=2),
+                HasPCSHandler(filter=reco_filter),
+                # Argument form handlers
+                StartsWithPremiseHandler(filter=reco_filter),
+                EndsWithConclusionHandler(filter=reco_filter),
+                NoDuplicatePCSLabelsHandler(filter=reco_filter),
+                # Label and gist handlers
+                HasLabelHandler(filter=reco_filter),
+                # Inference data handlers
+                HasInferenceDataHandler(filter=reco_filter),
+                PropRefsExistHandler(filter=reco_filter),
+                UsesAllPropsHandler(filter=reco_filter),
+                # Extra material handlers
+                NoExtraPropositionsHandler(filter=reco_filter),
+            ]    
+        )
+        main_handler = CompositeHandler(
+            handlers=[
+                # Processing
+                DefaultProcessingHandler(),
+                HasAnnotationsHandler(filter=anno_filter),
+                HasArgdownHandler(filter=map_filter),
+                HasArgdownHandler(filter=reco_filter),
+                # Core
+                ArgannoCompositeHandler(filter=anno_filter),
+                ArgMapCompositeHandler(filter=map_filter),
+                infreco_handler,
+                LogRecoCompositeHandler(filter=reco_filter),
+                # Coherence
+                ArgannoInfrecoCoherenceHandler(),                
+                ArgmapInfrecoCoherenceHandler(),
+                ArgmapLogrecoCoherenceHandler(),
+            ]
+        )
+        request = VerificationRequest(
+            inputs=str(solution), source=problem.sources
+        )
+        result = main_handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        return evaluation
 
-        if coherence_eval_data is not None:
-            coherence_eval_data = {
-                    "annotation_"+k: v
-                    for k,v in coherence_eval_data.items()
-                }
-            eval_data.update(coherence_eval_data)
+        # TODO remove
+        # # check that solution has required fields
+        # assert hasattr(reco, "annotated_source_text")
+
+        # # evaluate argmap+logreco
+        # evaluation = super()._evaluate_solution(problem, reco)  # type: ignore
+        # argdown_map = evaluation.artifacts["argdown_map"]
+        # argdown_reco = evaluation.artifacts["argdown_reco"]        
+        # artifacts = copy.deepcopy(evaluation.artifacts)
+        # eval_data = evaluation.metrics.copy()
+        # is_valid = evaluation.is_valid
+
+        # eval_data["argdown_elements_correspondence"] = eval_data.pop("elements_correspondence", "")
+        # eval_data["argdown_relations_correspondence"] = eval_data.pop("relations_correspondence", "")
+
+        # eval_data.update({
+        #     "annotation_empty": "",
+        #     "annotation_nested_propositions": "",
+        #     "annotation_missing_id": "",
+        #     "annotation_duplicate_id": "",
+        #     "annotation_invalid_support_ids": "",
+        #     "annotation_invalid_attack_ids": "",
+        #     "annotation_unknown_attributes": "",
+        #     "annotation_elements_correspondence": "",
+        #     "annotation_relations_correspondence": "",
+        # })
+
+        # # check fenced annotation codeblocks
+        # msgs = [eval_data["fenced_code_blocks"]]
+        # _code_label = 'xml {filename="annotation.txt"}'
+        # ast = reco.annotated_source_text.strip("\n ")  # type: ignore
+        # if not (ast.startswith(f"```{_code_label}") and ast.endswith("```")):
+        #     msgs.append('Failed to extract fenced xml block with annotation.')
+        #     if ast.count(f"```{_code_label}") == 0:
+        #         msgs.append(f"No fenced code block starting with '```{_code_label}'.")
+        # if msgs:
+        #     eval_data["fenced_code_blocks"] = " ".join(msgs)
+        # del msgs
+
+        # # evaluate anno
+        # evaluation_anno = AnnotationJudge()._evaluate_annotation(
+        #     problem=AnnotationProblem(problem.sources, strip_html=False),  # type: ignore
+        #     annotation=Annotation(ast),
+        # )
+        # if evaluation_anno.is_valid is False:
+        #     is_valid = False
+        # soup: BeautifulSoup = evaluation_anno.artifacts["soup"]
+        # artifacts["soup"] = soup
+        # for k, v in evaluation_anno.metrics.items():
+        #     if k != "fenced_code_block":
+        #         eval_data["annotation_" + k] = v
+        # if not list(soup.find_all("proposition")):
+        #     eval_data["annotation_empty"] = "No proposition elements in the annotation."
+
+        # # evaluate coherence annotation<>reco
+        # coherence_eval_data = ArgannoPlusInfrecoJudge()._evaluate_coherence(
+        #     soup_anno = soup,
+        #     argdown_reco = argdown_reco,
+        # ) if argdown_reco is not None else None
+
+        # if coherence_eval_data is not None:
+        #     coherence_eval_data = {
+        #             "annotation_"+k: v
+        #             for k,v in coherence_eval_data.items()
+        #         }
+        #     eval_data.update(coherence_eval_data)
                 
-        is_valid = is_valid and not any(v for v in eval_data.values())        
+        # is_valid = is_valid and not any(v for v in eval_data.values())        
 
-        return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
+        # return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
 
 
     async def arun(
