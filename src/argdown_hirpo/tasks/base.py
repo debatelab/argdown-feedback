@@ -908,8 +908,6 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 problem, candidate_solutions, evaluations
             )
 
-        # TODO: remove duplicates!
-
         return pairs
 
 

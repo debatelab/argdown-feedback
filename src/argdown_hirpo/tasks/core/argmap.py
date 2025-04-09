@@ -26,8 +26,14 @@ from argdown_hirpo.tasks.base import (
 from argdown_hirpo.verifiers.base import CompositeHandler
 from argdown_hirpo.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_hirpo.verifiers.core.content_check_handler import HasArgdownHandler
-from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
-from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
+from argdown_hirpo.verifiers.processing_handler import (
+    DefaultProcessingHandler,
+    FencedCodeBlockExtractor,
+)
+from argdown_hirpo.verifiers.verification_request import (
+    VerificationDType,
+    VerificationRequest,
+)
 
 
 class ArgMapProblem(Problem):
@@ -74,9 +80,9 @@ class ArgMapProblem(Problem):
 
         if ask_for_invalid:
             prompt += (
-              "\n\n"
-              "> [!WARNING]\n"
-              "> For didactic purposes, I want you to make mistakes in your answer.\n"
+                "\n\n"
+                "> [!WARNING]\n"
+                "> For didactic purposes, I want you to make mistakes in your answer.\n"
             )
 
             if evaluation:
@@ -85,7 +91,6 @@ class ArgMapProblem(Problem):
                     prompt += "> Expected errors:\n"
                     for k, v in metrics.items():
                         prompt += f"> - {k}: {v}\n"
-
 
         return prompt
 
@@ -102,9 +107,9 @@ class ArgMapProblem(Problem):
 
         if ask_for_invalid:
             prompt += (
-              "\n\n"
-              "> [!WARNING]\n"
-              "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
+                "\n\n"
+                "> [!WARNING]\n"
+                "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
             )
 
             if evaluation:
@@ -125,7 +130,7 @@ class ArgumentMap(Solution):
 
     def __str__(self):
         return self.argdown_snippet
-    
+
     @classmethod
     def from_raw_answer(cls, answer) -> "ArgumentMap":
         # extract fenced code block
@@ -134,20 +139,14 @@ class ArgumentMap(Solution):
         result = handler.handle(request)
         code_snippet = next(
             (
-                vr.code_snippet for vr in reversed(result.verification_data)
+                vr.code_snippet
+                for vr in reversed(result.verification_data)
                 if vr.dtype == VerificationDType.argdown and vr.code_snippet
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else answer 
+        code_snippet = code_snippet if code_snippet is not None else answer
         return cls(argdown_snippet=code_snippet)
-        # TODO remove
-        #if answer.count("```argdown") == 1:
-        #    if answer.split("```argdown")[1].count("\n```") == 1:
-        #        answer = answer.split("```argdown")[1].split("\n```")[0]
-        #        answer = "```argdown" + answer + "\n```"
-        #return cls(argdown_snippet=answer)
-
 
 
 class ArgMapProblemGenerator(ProblemGenerator):
@@ -167,7 +166,6 @@ class ArgMapJudge(Judge):
     def _evaluate_argmap(
         self, problem: ArgMapProblem, argmap: ArgumentMap
     ) -> Evaluation:
-
         handler = CompositeHandler(
             handlers=[
                 DefaultProcessingHandler(),
@@ -183,68 +181,6 @@ class ArgMapJudge(Judge):
         if evaluation.artifacts.get("argdown_map") is None:
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
         return evaluation
-
-
-        # TODO remove
-        # is_valid = True
-        # eval_data = {
-        #     "fenced_code_block": "",
-        #     "invalid_argdown_syntax": "",
-        #     "missing_labels": "",
-        #     "duplicate_labels": "",
-        #     "premise_conclusion_structures": "",
-        # }
-
-        # ads = argmap.argdown_snippet.strip("\n ")
-        # if ads.startswith("```argdown") and ads.endswith("```"):
-        #     ads = "\n".join(ads.splitlines()[1:-1])
-        # else:  # no fenced code block
-        #     is_valid = False
-        #     error_msg = "Failed to extract single fenced argdown block:"
-        #     if ads.count("```argdown") == 0:
-        #         error_msg += " No fenced code block starting with '```argdown'."
-        #     if ads.count("```argdown") > 1:
-        #         error_msg += (
-        #             " More than one fenced code block starting with '```argdown'."
-        #         )
-        #     if "```\n" not in ads:
-        #         error_msg += " No closing '```'."
-        #     eval_data["fenced_code_block"] = error_msg
-
-        # try:
-        #     argdown = parse_argdown(ads)
-        # except Exception as e:
-        #     argdown = None
-        #     is_valid = False
-        #     eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
-
-        # if not argdown:
-        #     return Evaluation(
-        #         is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
-        #     )
-
-        # verifier = ArgMapVerifier(argdown)
-
-        # check, msg = verifier.has_complete_claims()
-        # if check is False:
-        #     is_valid = False
-        #     eval_data["missing_claim_labels"] = msg if msg else "Missing claim labels"
-
-        # check, msg = verifier.has_no_duplicate_labels()
-        # if check is False:
-        #     is_valid = False
-        #     eval_data["duplicate_labels"] = msg if msg else "Has duplicate labels"
-
-        # check, msg = verifier.has_no_pcs()
-        # if check is False:
-        #     is_valid = False
-        #     eval_data["premise_conclusion_structures"] = (
-        #         msg if msg else "Found detailed reconstruction of individual arguments as premise-conclusion-structures."
-        #     )
-
-        # return Evaluation(
-        #     is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
-        # )
 
     async def arun(
         self,
@@ -289,9 +225,7 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
         )
 
         evaluation_issues = "\n".join(
-            f"- **{k}**: {v}"
-            for k, v in evaluation.metrics.items()
-            if v
+            f"- **{k}**: {v}" for k, v in evaluation.metrics.items() if v
         )
         prompt = dedent("""
             Assignment: Give feedback and provide instructions for how to improve a given argument map.
@@ -338,7 +272,6 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-
 class ConnectednessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid argument maps
     with smaller number of weakly conncted components."""
@@ -353,7 +286,6 @@ class ConnectednessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
         argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-        
         argdown = evaluation.artifacts.get("argdown_map")
         assert argdown is not None and isinstance(argdown, ArgdownMultiDiGraph), (
             "Evaluation must contain a valid ArgdownMultiDiGraph artifact."
@@ -419,7 +351,6 @@ class MaxSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         return sum(1 for dr in drs if dr.valence == Valence.SUPPORT)
@@ -437,7 +368,6 @@ class MaxAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argmap: Solution,
         evaluation: Evaluation,
     ) -> float:
-
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
         return sum(1 for dr in drs if dr.valence == Valence.ATTACK)
@@ -618,7 +548,7 @@ class ShortLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         ll = [len(a.label) if a.label else 0 for a in arguments] + [
             len(c.label) if c.label else 0 for c in claims
         ]
-        return (round(sum(ll),-1) / len(ll)) ** -1 if ll else 0
+        return (round(sum(ll), -1) / len(ll)) ** -1 if ll else 0
 
 
 class DiverseLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
@@ -651,7 +581,7 @@ class DiverseLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
                 l2 = l2 if l2 else ""
                 lds.append(textdistance.levenshtein.normalized_distance(l1, l2))
 
-        return round(min(lds),2) if lds else 0
+        return round(min(lds), 2) if lds else 0
 
 
 class ShortClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
@@ -674,7 +604,7 @@ class ShortClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
-        return round(sum(ll) / len(ll),-1) ** -1 if ll else 0
+        return round(sum(ll) / len(ll), -1) ** -1 if ll else 0
 
 
 class LongClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
@@ -697,7 +627,7 @@ class LongClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         claims: list[Proposition] = argdown.propositions
         ll = [len(c.texts[0]) if c.texts else 0 for c in claims]
-        return round(sum(ll) / len(ll),-1) if ll else 0
+        return round(sum(ll) / len(ll), -1) if ll else 0
 
 
 class ArgumentClaimSizePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
@@ -772,7 +702,7 @@ class IndependentWordingPreferencePairGenerator(ScoringVirtuePreferencePairGener
                     )
                 )
 
-        return round(sum(dlds) / len(dlds),1) if dlds else 0
+        return round(sum(dlds) / len(dlds), 1) if dlds else 0
 
 
 class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
@@ -795,5 +725,5 @@ class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
             textdistance.damerau_levenshtein.normalized_similarity(
                 problem.sources, argmap.argdown_snippet
             ),
-            1
+            1,
         )

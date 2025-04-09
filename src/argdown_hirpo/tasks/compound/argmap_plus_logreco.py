@@ -25,8 +25,12 @@ from argdown_hirpo.tasks.compound.argmap_plus_infreco import (
     ArgmapPlusInfrecoProblem,
 )
 from argdown_hirpo.verifiers.base import BaseHandler, CompositeHandler
-from argdown_hirpo.verifiers.coherence.argmap_logreco_handler import ArgmapLogrecoCoherenceHandler
-from argdown_hirpo.verifiers.coherence.argmap_infreco_handler import ArgmapInfrecoCoherenceHandler
+from argdown_hirpo.verifiers.coherence.argmap_logreco_handler import (
+    ArgmapLogrecoCoherenceHandler,
+)
+from argdown_hirpo.verifiers.coherence.argmap_infreco_handler import (
+    ArgmapInfrecoCoherenceHandler,
+)
 from argdown_hirpo.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_hirpo.verifiers.core.content_check_handler import (
     HasArgdownHandler,
@@ -51,8 +55,6 @@ from argdown_hirpo.verifiers.processing_handler import (
 from argdown_hirpo.verifiers.verification_request import (
     VerificationRequest,
 )
-
-
 
 
 class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
@@ -219,7 +221,7 @@ class ArgmapPlusLogrecoJudge(Judge):
     #     ):
     #         return False
 
-    #     # equivalence via dialectical relations        
+    #     # equivalence via dialectical relations
     #     if argdown is not None:
     #         rels1 = argdown.get_dialectical_relation(prop1.label, prop2.label)
     #         rels2 = argdown.get_dialectical_relation(prop2.label, prop1.label)
@@ -256,12 +258,11 @@ class ArgmapPlusLogrecoJudge(Judge):
     #             return True
     #     return False
 
-
     # def _evaluate_coherence(self, argdown_map: Argdown, argdown_reco: Argdown) -> dict[str, str]:
     #     """Evaluate the coherence between the argument map and the informal reconstruction."""
 
     #     eval_data: dict[str, str] = {}
-        
+
     #     # check elements correspondence
     #     #print("ARGMAP<>LOGRECO check")
     #     msgs = []
@@ -274,7 +275,7 @@ class ArgmapPlusLogrecoJudge(Judge):
     #             msgs.append(f"Argument <{label}> in map is not reconstructed (argument label mismatch).")
     #     for label in reco_alabels:
     #         if label not in map_alabels:
-    #             msgs.append(f"Reconstructed argument <{label}> is not in the map (argument label mismatch).")            
+    #             msgs.append(f"Reconstructed argument <{label}> is not in the map (argument label mismatch).")
     #     map_prop_labels = list(set(p.label for p in argdown_map.propositions))
     #     reco_prop_labels = list(set(p.label for p in argdown_reco.propositions))
     #     for label in map_prop_labels:
@@ -314,7 +315,6 @@ class ArgmapPlusLogrecoJudge(Judge):
     #                 f"in argument map is not grounded in logical argument reconstructions."
     #             )
 
-
     #     for drel in argdown_reco.dialectical_relations:
     #         if drel.source not in map_alabels+map_prop_labels or drel.target not in map_alabels+map_prop_labels:
     #             continue
@@ -340,19 +340,15 @@ class ArgmapPlusLogrecoJudge(Judge):
     def _evaluate_solution(
         self, problem: ArgmapPlusLogrecoProblem, solution: ArgmapPlusLogreco
     ) -> Evaluation:
-        
-
-        map_filter = BaseHandler.create_metadata_filter(
-            "filename", ["map.ad"]
-        )
+        map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
         reco_filter = BaseHandler.create_metadata_filter(
             "filename", ["reconstructions.ad"]
         )
 
         infreco_handler = InfRecoCompositeHandler(
-            handlers = [
+            handlers=[
                 # Argument existence handlers
-                HasAtLeastNArgumentsHandler(filter=reco_filter,N=2),
+                HasAtLeastNArgumentsHandler(filter=reco_filter, N=2),
                 HasPCSHandler(filter=reco_filter),
                 # Argument form handlers
                 StartsWithPremiseHandler(filter=reco_filter),
@@ -366,7 +362,7 @@ class ArgmapPlusLogrecoJudge(Judge):
                 UsesAllPropsHandler(filter=reco_filter),
                 # Extra material handlers
                 NoExtraPropositionsHandler(filter=reco_filter),
-            ]    
+            ]
         )
         main_handler = CompositeHandler(
             handlers=[
@@ -380,143 +376,10 @@ class ArgmapPlusLogrecoJudge(Judge):
                 ArgmapLogrecoCoherenceHandler(),
             ]
         )
-        request = VerificationRequest(
-            inputs=str(solution), source=problem.sources
-        )
+        request = VerificationRequest(inputs=str(solution), source=problem.sources)
         result = main_handler.handle(request)
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
-
-
-        # TODO remove
-        # assert isinstance(problem, ArgmapPlusLogrecoProblem), (
-        #     "Problem must be an ArgmapPlusLogrecoProblem"
-        # )
-        # # check that reco has 'argdown_map_snippet' and 'argdown_reconstructions_snippet' attributes
-        # assert hasattr(reco, "argdown_map_snippet"), (
-        #     "Solution must have 'argdown_map_snippet' attribute"
-        # )
-        # assert hasattr(reco, "argdown_reconstructions_snippet"), (
-        #     "Solution must have 'argdown_reconstructions_snippet' attribute"
-        # )
-        # is_valid = True
-        # artifacts: dict[str, Any] = {}
-        # eval_data = {
-        #     "fenced_code_blocks": "",
-
-        #     "argmap_invalid_argdown_syntax": "",
-        #     "argmap_missing_labels": "",
-        #     "argmap_duplicate_labels": "",
-        #     "argmap_premise_conclusion_structures": "",
-
-        #     "recos_invalid_argdown_syntax": "",
-        #     "recos_too_few_arguments": "",
-        #     "recos_illformed_arguments": "",  # starts with conclusion / ends with premise / no pcs
-        #     "recos_missing_inference_info": "",
-        #     "recos_unknown_proposition_references": "",  # in inference info
-        #     "recos_unused_propositions": "",
-        #     "recos_disallowed_material": "",  # more propositions
-        #     "recos_flawed_formalizations": "",
-        #     "recos_invalid_inference": "",
-        #     "recos_redundant_premises": "",
-        #     "recos_inconsistent_premises": "",
-        #     "recos_formally_ungrounded_relations": "",
-
-        #     "elements_correspondence": "",
-        #     "relations_correspondence": "",
-        # }
-
-        # # check fenced codeblocks
-        # msgs = []
-        # _code_label = 'argdown {filename="map.ad"}'
-        # ad_map = reco.argdown_map_snippet.strip("\n ")
-        # if not (ad_map.startswith(f"```{_code_label}") and ad_map.endswith("```")):
-        #     msgs.append("Failed to extract fenced xml block with annotation.")
-        #     if ad_map.count(f"```{_code_label}") == 0:
-        #         msgs.append(f"No fenced code block starting with '```{_code_label}'.")
-        # _code_label = 'argdown {filename="reconstructions.ad"}'
-        # ad_reco = reco.argdown_reconstructions_snippet.strip("\n ")
-        # if not (ad_reco.startswith(f"```{_code_label}") and ad_reco.endswith("```")):
-        #     msgs.append("Failed to extract fenced argdown block.")
-        #     if ad_reco.count(f"```{_code_label}") == 0:
-        #         msgs.append(f"No fenced code block starting with '```{_code_label}'.")
-        # if msgs:
-        #     eval_data["fenced_code_blocks"] = " ".join(msgs)
-        # del msgs
-
-        # # evaluate argmap
-        # evaluation_argmap = ArgMapJudge()._evaluate_argmap(
-        #     problem=ArgMapProblem(sources=problem.sources),
-        #     argmap=ArgumentMap(ad_map.replace('```argdown {filename="map.ad"}', '```argdown')),
-        # )
-        # argdown_map: ArgdownMultiDiGraph = evaluation_argmap.artifacts["argdown_map"]
-        # artifacts["argdown_map"] = argdown_map
-        # for k, v in evaluation_argmap.metrics.items():
-        #     if k != "fenced_code_block":
-        #         eval_data["argmap_" + k] = v
-
-
-        # # evaluate argdown reco
-        # if ad_reco.startswith("```argdown") and ad_reco.endswith("```"):
-        #     ad_reco = "\n".join(ad_reco.splitlines()[1:-1])
-        # try:
-        #     argdown_reco = parse_argdown(ad_reco)
-        # except Exception as e:
-        #     argdown_reco = None
-        #     eval_data["recos_invalid_argdown_syntax"] = (
-        #         f"Failed to parse argdown: {str(e)}"
-        #     )
-
-        # artifacts["argdown_reco"] = argdown_reco
-        # if argdown_reco:
-
-        #     if len(argdown_reco.arguments) < 2:
-        #         eval_data["recos_too_few_arguments"] = "Too few arguments in argdown snippet (at least 2 required)."
-
-        #     eval_dimensions_map = copy.deepcopy(LogRecoVerifier.default_eval_dimensions_map)        
-        #     print(eval_dimensions_map)    
-        #     eval_dimensions_map["missing_label_gist"].remove("has_gist")
-        #     eval_dimensions_map.pop("disallowed_material")
-        #     reco_eval_data, all_expressions, all_declarations = LogRecoVerifier.run_battery(argdown_reco, eval_dimensions_map)
-        #     print(f"Reco eval data: {reco_eval_data}")
-        #     for k,v in reco_eval_data.items():
-        #         eval_data["recos_" + k] = v
-
-        #     check, msg = LogRecoVerifier._no_extra_propositions(argdown_reco)
-        #     if check is False:
-        #         eval_data["recos_disallowed_material"] = (
-        #             msg
-        #             if msg
-        #             else "Some propositions are not used as premise and/or conclusion."
-        #         )
-
-        #     artifacts["all_expressions"] = all_expressions
-        #     artifacts["all_declarations"] = all_declarations
-
-        #     # check for formally_ungrounded_relations
-        #     check, msg = LogRecoVerifier._has_formally_grounded_relations(
-        #         argdown_reco=argdown_reco,
-        #         all_expressions=all_expressions,
-        #         all_declarations=all_declarations,
-        #     )
-        #     if check is False:
-        #         eval_data["recos_formally_ungrounded_relations"] = (
-        #             msg
-        #             if msg
-        #             else "Some dialectical relations between propositions are not grounded in their logical formalizations."
-        #         )
-
-        # # evaluate coherence between argmap and reco
-        # if argdown_map and argdown_reco:
-        #     coherence_eval_data = self._evaluate_coherence(
-        #         argdown_map = argdown_map,
-        #         argdown_reco = argdown_reco,
-        #     )
-        #     eval_data.update(coherence_eval_data)
-                
-        # is_valid = not any(v for v in eval_data.values())
-
-        # return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
 
     async def arun(
         self,
@@ -546,8 +409,11 @@ class ArgmapPlusLogrecoJudge(Judge):
         return evaluations
 
 
-class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
+class GlobalFormalizationsFaithfulnessPreferencePairGenerator(
+    ScoringVirtuePreferencePairGenerator
+):
     """Global FormalizationsFaithfulnessPreferencePairGenerator"""
+
     def _score(
         self,
         problem: Problem,
@@ -555,9 +421,9 @@ class GlobalFormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePrefe
         evaluation: Evaluation,
     ) -> float:
         argdown_reco = evaluation.artifacts.get("argdown_reco")
-        assert argdown_reco is not None and isinstance(argdown_reco, ArgdownMultiDiGraph), (
-            "Evaluation must contain argdown_reco artifact"
-        )
+        assert argdown_reco is not None and isinstance(
+            argdown_reco, ArgdownMultiDiGraph
+        ), "Evaluation must contain argdown_reco artifact"
         all_expressions = evaluation.artifacts.get("all_expressions")
         assert all_expressions is not None and isinstance(all_expressions, dict), (
             "Evaluation must contain all_expressions artifact"

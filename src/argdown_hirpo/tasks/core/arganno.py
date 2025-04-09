@@ -1,5 +1,4 @@
 import dataclasses
-from pprint import pprint
 from textwrap import dedent
 from typing import Sequence
 
@@ -18,8 +17,14 @@ from argdown_hirpo.tasks.base import (
 
 from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_hirpo.verifiers.core.content_check_handler import HasAnnotationsHandler
-from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
-from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
+from argdown_hirpo.verifiers.verification_request import (
+    VerificationDType,
+    VerificationRequest,
+)
+from argdown_hirpo.verifiers.processing_handler import (
+    DefaultProcessingHandler,
+    FencedCodeBlockExtractor,
+)
 from argdown_hirpo.verifiers.base import CompositeHandler
 
 ANNOTATION_SCHEME = dedent("""
@@ -46,9 +51,13 @@ class AnnotationProblem(Problem):
         self.sources = sources
 
     def instruct_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation: Evaluation | None = None
+        self,
+        ask_for_invalid=False,
+        hints: list[str] | None = None,
+        evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = dedent("""
+        prompt = (
+            dedent("""
             Assignment: Apply a given annotation scheme to a source text.
                         
             Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
@@ -64,16 +73,19 @@ class AnnotationProblem(Problem):
             Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way.
                         
             Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
-        """).strip().format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
+        """)
+            .strip()
+            .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
+        )
 
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)
 
         if ask_for_invalid:
             prompt += (
-              "\n\n"
-              "> [!WARNING]\n"
-              "> For didactic purposes, I want you to make mistakes in your answer.\n"
+                "\n\n"
+                "> [!WARNING]\n"
+                "> For didactic purposes, I want you to make mistakes in your answer.\n"
             )
 
             if evaluation:
@@ -86,7 +98,10 @@ class AnnotationProblem(Problem):
         return prompt
 
     def revise_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation: Evaluation | None = None
+        self,
+        ask_for_invalid=False,
+        hints: list[str] | None = None,
+        evaluation: Evaluation | None = None,
     ) -> str:
         prompt = (
             "Revise your previous annotation given the above evaluation and feedback."
@@ -97,9 +112,9 @@ class AnnotationProblem(Problem):
 
         if ask_for_invalid:
             prompt += (
-              "\n\n"
-              "> [!WARNING]\n"
-              "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
+                "\n\n"
+                "> [!WARNING]\n"
+                "> For didactic purposes, I still want you to make mistakes in your revised answer.\n"
             )
 
             if evaluation:
@@ -120,7 +135,7 @@ class Annotation(Solution):
 
     def __str__(self):
         return self.annotated_source_text
-    
+
     @classmethod
     def from_raw_answer(cls, answer) -> "Annotation":
         """Extract the annotated source text from the answer."""
@@ -129,16 +144,13 @@ class Annotation(Solution):
         result = handler.handle(request)
         code_snippet = next(
             (
-                vr.code_snippet for vr in reversed(result.verification_data)
+                vr.code_snippet
+                for vr in reversed(result.verification_data)
                 if vr.dtype == VerificationDType.xml and vr.code_snippet
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else answer 
-        #if answer.count("```xml") == 1:
-        #    if answer.split("```xml")[1].count("\n```") == 1:
-        #        answer = answer.split("```xml")[1].split("\n```")[0]
-        #        answer = "```xml" + answer + "\n```"
+        code_snippet = code_snippet if code_snippet is not None else answer
         return cls(annotated_source_text=code_snippet)
 
 
@@ -157,13 +169,14 @@ class AnnotationProblemGenerator(ProblemGenerator):
 class AnnotationJudge(Judge):
     """Judge for the annotation task."""
 
-    def parse_xml_snippet(self, annotated_source_text: str) -> tuple[BeautifulSoup, str | None]:
-
+    def parse_xml_snippet(
+        self, annotated_source_text: str
+    ) -> tuple[BeautifulSoup, str | None]:
         error_msg: str | None = None
         ast = annotated_source_text.strip("\n ")
         if ast.startswith("```xml") and ast.endswith("```"):
             ast = "\n".join(ast.splitlines()[1:-1])
-        else: # no fenced code block
+        else:  # no fenced code block
             error_msg = "Failed to extract single fenced annotation block:"
             if ast.count("```xml") == 0:
                 error_msg += " No fenced code block starting with '```xml'."
@@ -284,18 +297,14 @@ class AnnotationJudge(Judge):
         assert isinstance(problem, AnnotationProblem), (
             "Problem must be an AnnotationProblem"
         )
-        assert (
-            isinstance(original_solution, Annotation) or original_solution is None
-        )
+        assert isinstance(original_solution, Annotation) or original_solution is None
         assert feedback or original_solution is None, (
             "Feedback is required for evaluating revised solutions"
         )
 
         evaluations = []
         for solution in solutions:
-            assert isinstance(solution, Annotation), (
-                "All solutions must be Annotations"
-            )
+            assert isinstance(solution, Annotation), "All solutions must be Annotations"
             evaluations.append(self._evaluate_annotation(problem, solution))
 
         return evaluations
@@ -323,9 +332,7 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
         )
 
         evaluation_issues = "\n".join(
-            f"- **{k}**: {v}"
-            for k, v in evaluation.metrics.items()
-            if v
+            f"- **{k}**: {v}" for k, v in evaluation.metrics.items() if v
         )
         prompt = dedent("""
             Assignment: Give feedback and provide instructions for how to improve a given annotation.
@@ -348,7 +355,11 @@ class AnnotationFeedbackGenerator(FeedbackGenerator):
 
             
             Given this information, provide feedback to the student and clear instructions for how to improve the solution.
-        """).format(problem=problem.instruct_prompt(), solution=str(solution), evaluation_issues=evaluation_issues)
+        """).format(
+            problem=problem.instruct_prompt(),
+            solution=str(solution),
+            evaluation_issues=evaluation_issues,
+        )
 
         answers = await self._generate(
             messages=[
@@ -374,7 +385,9 @@ class AnnotationScopePreferencePairGenerator(ScoringVirtuePreferencePairGenerato
 
     hints = ["Try to identify as many proposition elements as possible"]
 
-    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(
+        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+    ) -> float:
         return len(evaluation.artifacts["soup"].find_all("proposition"))
 
 
@@ -384,11 +397,12 @@ class AnnotationSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGener
 
     hints = ["Try to identify as many support relations as possible"]
 
-    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(
+        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+    ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         supports = sum(
-            len(proposition.get("supports", []))
-            for proposition in propositions
+            len(proposition.get("supports", [])) for proposition in propositions
         )
         return supports
 
@@ -399,11 +413,12 @@ class AnnotationAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenera
 
     hints = ["Try to identify as many attack / disconfirmation relations as possible"]
 
-    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(
+        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+    ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         attacks = sum(
-            len(proposition.get("attacks", []))
-            for proposition in propositions
+            len(proposition.get("attacks", [])) for proposition in propositions
         )
         return attacks
 
@@ -414,13 +429,15 @@ class AnnotationNoAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGene
 
     hints = ["Avoid using attack / disconfirmation relations"]
 
-    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(
+        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+    ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         attacks = sum(
-            len(proposition.get("attacks", []))
-            for proposition in propositions
+            len(proposition.get("attacks", [])) for proposition in propositions
         )
-        return 1/(1+attacks)
+        return 1 / (1 + attacks)
+
 
 class AnnotationCoveragePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the annotation task, prefering valid annotations
@@ -428,10 +445,9 @@ class AnnotationCoveragePreferencePairGenerator(ScoringVirtuePreferencePairGener
 
     hints = ["Try to cover as much of the source text as possible"]
 
-    def _score(self, problem: Problem, annotation: Solution, evaluation: Evaluation) -> float:
+    def _score(
+        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+    ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
-        coverage = sum(
-            len(proposition.get_text())
-            for proposition in propositions
-        )
+        coverage = sum(len(proposition.get_text()) for proposition in propositions)
         return coverage

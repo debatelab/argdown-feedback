@@ -22,14 +22,24 @@ from argdown_hirpo.verifiers.core.infreco_handler import InfRecoHandler
 
 class CoherenceHandler(BaseHandler):
     """Base handler interface for evaluating coherence of different primary data instances."""
-    
+
     @abstractmethod
-    def evaluate(self, vdata1: PrimaryVerificationData, vdata2: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
+    def evaluate(
+        self,
+        vdata1: PrimaryVerificationData,
+        vdata2: PrimaryVerificationData,
+        ctx: VerificationRequest,
+    ) -> VerificationResult | None:
         """Evaluate the data and return a verification result."""
 
     @abstractmethod
-    def is_applicable(self, vdata1: PrimaryVerificationData, vdata2: PrimaryVerificationData, ctx: VerificationRequest) -> bool:
-        """Check if the handler is applicable to the given data pair. Needs to be customized in subclasses."""        
+    def is_applicable(
+        self,
+        vdata1: PrimaryVerificationData,
+        vdata2: PrimaryVerificationData,
+        ctx: VerificationRequest,
+    ) -> bool:
+        """Check if the handler is applicable to the given data pair. Needs to be customized in subclasses."""
 
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         for i in range(len(request.verification_data)):
@@ -43,19 +53,3 @@ class CoherenceHandler(BaseHandler):
                     if vresult is not None:
                         request.add_result_record(vresult)
         return request
-
-
-# Coherene Arganno <> Argmap
-# TODO 
-
-# Coherence Arganno <> Infreco
-# TODO
-
-# Coherence Arganno <> Logreco
-# TODO
-
-# Coherenve Argmap <> Infreco
-# TODO
-
-# Coherence Argmap <> Logreco
-# TODO

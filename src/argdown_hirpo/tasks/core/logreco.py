@@ -162,13 +162,6 @@ class LogicalReco(Solution):
         code_snippet = code_snippet if code_snippet is not None else answer 
         return cls(argdown_snippet=code_snippet)
     
-        # TODO remove    
-        if answer.count("```argdown") == 1:
-            if answer.split("```argdown")[1].count("\n```") == 1:
-                answer = answer.split("```argdown")[1].split("\n```")[0]
-                answer = "```argdown" + answer + "\n```"
-        return cls(argdown_snippet=answer)
-
 
 class LogRecoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
@@ -210,69 +203,7 @@ class LogRecoJudge(Judge):
             evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")
         return evaluation
 
-        # TODO remove
-        # is_valid = True
-        # artifacts: dict[str, Any] = {}
-        # eval_data = {
-        #     "fenced_code_block": "",
-        #     "invalid_argdown_syntax": "",
-        #     "no_unique_argument": "",
-        #     "illformed_argument": "",  # no pcs
-        #     "missing_label_gist": "",
-        #     "missing_inference_info": "",
-        #     "unknown_proposition_references": "",  # in inference info
-        #     "unused_propositions": "",  # unused propositions
-        #     "disallowed_material": "", # more propositions
-        #     "flawed_formalizations": "",  # missing, duplicate declarations etc. etc.
-        #     "invalid_inference": "",  # invalid inference
-        #     "redundant_premises": "",  # redundant premises
-        #     "inconsistent_premises": "",  # inconsistent premises
-        # }
 
-        # ads = reco.argdown_snippet.strip("\n ")
-        # if ads.startswith("```argdown") and ads.endswith("```"):
-        #     ads = "\n".join(ads.splitlines()[1:-1])
-        # else:  # no fenced code block
-        #     is_valid = False
-        #     error_msg = "Failed to extract single fenced argdown block:"
-        #     if ads.count("```argdown") == 0:
-        #         error_msg += " No fenced code block starting with '```argdown'."
-        #     if ads.count("```argdown") > 1:
-        #         error_msg += (
-        #             " More than one fenced code block starting with '```argdown'."
-        #         )
-        #     if "```\n" not in ads:
-        #         error_msg += " No closing '```'."
-        #     eval_data["fenced_code_block"] = error_msg
-
-        # try:
-        #     argdown = parse_argdown(ads)
-        # except Exception as e:
-        #     argdown = None
-        #     is_valid = False
-        #     eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
-
-        # artifacts["argdown"] = argdown
-
-        # if argdown:
-
-        #     verifier = LogRecoVerifier(argdown)
-        #     artifacts["all_expressions"] = verifier.all_expressions
-        #     artifacts["all_declarations"] = verifier.all_declarations
-        #     check, msg = verifier.has_unique_argument()
-        #     if check is False:
-        #         eval_data["no_unique_argument"] = msg if msg else "No unique argument."
-
-        #     del verifier
-
-        #     logreco_evals, _, _ = LogRecoVerifier.run_battery(argdown)
-        #     eval_data.update(logreco_evals)
-
-        #     is_valid = not any(v for v in eval_data.values())
-
-        # return Evaluation(
-        #     is_valid=is_valid, artifacts=artifacts, metrics=eval_data
-        # )
 
     async def arun(
         self,
@@ -547,13 +478,6 @@ class FormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferenceP
 
         dlds: list[float] = []
         for pr in argument.pcs:
-            # TODO remove this
-            # expression = next(
-            #     expr for exprl, expr in all_expressions.items() if exprl == pr.label
-            # )
-            # proposition = next(
-            #     p for p in argdown.propositions if p.label == pr.proposition_label
-            # )
             expression = all_expressions.get(pr.proposition_label)
             proposition = argdown.get_proposition(pr.proposition_label)
 
