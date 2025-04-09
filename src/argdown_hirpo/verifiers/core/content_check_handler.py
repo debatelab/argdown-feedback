@@ -4,6 +4,7 @@ import logging
 
 
 from argdown_hirpo.verifiers.verification_request import (
+    PrimaryVerificationData,
     VerificationRequest,
     VerificationDType,
     VerificationResult,
@@ -60,7 +61,7 @@ class HasArgdownHandler(BaseHandler):
         if filter is None:
             filter = lambda x: True  # noqa: E731
         self.filter = filter
-        
+
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         message = None
         if not any(

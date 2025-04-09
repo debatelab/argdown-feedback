@@ -1,5 +1,4 @@
-from abc import abstractmethod
-from typing import Dict, List, Optional, Tuple
+from typing import Dict, List, Optional
 import logging
 
 from nltk.sem.logic import Expression, NegatedExpression  # type: ignore
@@ -11,6 +10,7 @@ from pyargdown import (
 )
 
 from argdown_hirpo.verifiers.verification_request import (
+    VDFilter,
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
@@ -33,11 +33,13 @@ class BaseLogRecoHandler(InfRecoHandler):
         from_key: str = "from",
         formalization_key: str = "formalization",
         declarations_key: str = "declarations",
+        filter: Optional[VDFilter] = None,
     ):
-        super().__init__(name, logger, from_key)
+        super().__init__(name, logger, from_key, filter)
         self.from_key = from_key
         self.formalization_key = formalization_key
         self.declarations_key = declarations_key
+        self.filter = filter if filter else lambda vdata: True
         
     def cached_formalizations(
         self, vdata_id: str, request: VerificationRequest
@@ -587,9 +589,10 @@ class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
         from_key: str = "from",
         formalization_key: str = "formalization",
         declarations_key: str = "declarations",
+        filter: Optional[VDFilter] = None,
     ):
         super().__init__(name, logger, handlers)
-        
+            
         # Initialize with default handlers if none provided
         if not handlers:
             self.handlers = [
@@ -597,37 +600,43 @@ class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
                 WellFormedFormulasHandler(
                     from_key=from_key,
                     formalization_key=formalization_key,
-                    declarations_key=declarations_key
+                    declarations_key=declarations_key,
+                    filter=filter,
                 ),
                 
                 # Deductive validity handlers
                 GlobalDeductiveValidityHandler(
                     from_key=from_key,
                     formalization_key=formalization_key,
-                    declarations_key=declarations_key
+                    declarations_key=declarations_key,
+                    filter=filter,
                 ),
                 LocalDeductiveValidityHandler(
                     from_key=from_key,
                     formalization_key=formalization_key,
-                    declarations_key=declarations_key
+                    declarations_key=declarations_key,
+                    filter=filter,
                 ),
                 
                 # Logical analysis handlers
                 AllPremisesRelevantHandler(
                     from_key=from_key,
                     formalization_key=formalization_key,
-                    declarations_key=declarations_key
+                    declarations_key=declarations_key,
+                    filter=filter,
                 ),
                 PremisesConsistentHandler(
                     from_key=from_key,
                     formalization_key=formalization_key,
-                    declarations_key=declarations_key
+                    declarations_key=declarations_key,
+                    filter=filter,
                 ),
                 
                 # Dialectical relation handlers
                 FormallyGroundedRelationsHandler(
                     from_key=from_key,
                     formalization_key=formalization_key,
-                    declarations_key=declarations_key
+                    declarations_key=declarations_key,
+                    filter=filter,
                 ),
             ]

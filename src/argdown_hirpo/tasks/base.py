@@ -92,8 +92,8 @@ class Evaluation:
         Create an Evaluation from a VerificationRequest.
         """
 
-        metrics = {result.verifier_id: result.message for result in request.results}
-
+        metrics = dict((f"{e+1:02d}_{result.verifier_id}", result.message) for e, result in enumerate(request.results))
+        
         artifacts = {}
 
         last_soup = next(

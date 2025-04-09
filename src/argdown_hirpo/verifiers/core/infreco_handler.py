@@ -10,6 +10,7 @@ from pyargdown import (
 from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.verifiers.verification_request import (
+    VDFilter,
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
@@ -26,9 +27,11 @@ class InfRecoHandler(BaseHandler):
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
         from_key: str = "from",
+        filter: Optional[VDFilter] = None,
     ):
         super().__init__(name, logger)
         self.from_key = from_key
+        self.filter = filter if filter else lambda vdata: True
 
     @abstractmethod
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
@@ -36,7 +39,7 @@ class InfRecoHandler(BaseHandler):
 
     def is_applicable(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> bool:
         """Check if the handler is applicable to the given data."""
-        return vdata.dtype == VerificationDType.argdown
+        return vdata.dtype == VerificationDType.argdown and self.filter(vdata)
 
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         for vdata in request.verification_data:
@@ -51,13 +54,6 @@ class InfRecoHandler(BaseHandler):
 
 class HasArgumentsHandler(InfRecoHandler):
     """Handler that checks if there are any arguments in the argdown data."""
-
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -84,13 +80,6 @@ class HasArgumentsHandler(InfRecoHandler):
 class HasUniqueArgumentHandler(InfRecoHandler):
     """Handler that checks that there is a unique argument in the Argdown document."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
-
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
         if argdown is None:
@@ -112,15 +101,43 @@ class HasUniqueArgumentHandler(InfRecoHandler):
             message=msg,
         )
 
-class HasPCSHandler(InfRecoHandler):
-    """Handler that checks if all arguments have premise conclusion structures."""
+class HasAtLeastNArgumentsHandler(InfRecoHandler):
+    """Handler that checks that there are more than N arguments in the Argdown document."""
 
     def __init__(
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
+        from_key: str = "from",
+        filter: Optional[VDFilter] = None,
+        N: int = 1,
     ):
-        super().__init__(name, logger)
+        super().__init__(name, logger, from_key, filter)
+        self.N = N
+
+    def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
+        argdown = vdata.data
+        if argdown is None:
+            return None
+        if not isinstance(argdown, ArgdownMultiDiGraph):
+            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+
+        msg = None
+
+        size = len(argdown.arguments)
+        if size < self.N:
+            msg = f"Not enough arguments (found {size}, expected ≥{self.N})."
+            
+        return VerificationResult(
+            verifier_id=self.name,
+            verification_data_references=[vdata.id],
+            is_valid=msg is None,
+            message=msg,
+        )
+
+
+class HasPCSHandler(InfRecoHandler):
+    """Handler that checks if all arguments have premise conclusion structures."""
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -151,12 +168,6 @@ class HasPCSHandler(InfRecoHandler):
 class StartsWithPremiseHandler(InfRecoHandler):
     """Handler that checks if all arguments start with a premise."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -184,12 +195,6 @@ class StartsWithPremiseHandler(InfRecoHandler):
 class EndsWithConclusionHandler(InfRecoHandler):
     """Handler that checks if all arguments end with a conclusion."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -218,12 +223,6 @@ class EndsWithConclusionHandler(InfRecoHandler):
 class NotMultipleGistsHandler(InfRecoHandler):
     """Handler that checks if all arguments have at most one gist."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -251,12 +250,6 @@ class NotMultipleGistsHandler(InfRecoHandler):
 class NoDuplicatePCSLabelsHandler(InfRecoHandler):
     """Handler that checks if all arguments have no duplicate labels in their premise-conclusion structure."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -294,12 +287,6 @@ class NoDuplicatePCSLabelsHandler(InfRecoHandler):
 class HasLabelHandler(InfRecoHandler):
     """Handler that checks if all arguments have labels."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -329,12 +316,6 @@ class HasLabelHandler(InfRecoHandler):
 class HasGistHandler(InfRecoHandler):
     """Handler that checks if all arguments have gists."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -514,12 +495,6 @@ class UsesAllPropsHandler(InfRecoHandler):
 class NoExtraPropositionsHandler(InfRecoHandler):
     """Handler that checks if there are no extra propositions outside of arguments."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -556,12 +531,6 @@ class NoExtraPropositionsHandler(InfRecoHandler):
 class OnlyGroundedDialecticalRelationsHandler(InfRecoHandler):
     """Handler that checks if only grounded dialectical relations are used."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -592,12 +561,6 @@ class OnlyGroundedDialecticalRelationsHandler(InfRecoHandler):
 class NoPropInlineDataHandler(InfRecoHandler):
     """Handler that checks if no propositions have inline data."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -625,12 +588,6 @@ class NoPropInlineDataHandler(InfRecoHandler):
 class NoArgInlineDataHandler(InfRecoHandler):
     """Handler that checks if no arguments have inline data."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -664,6 +621,7 @@ class InfRecoCompositeHandler(CompositeHandler[InfRecoHandler]):
         logger: Optional[logging.Logger] = None,
         handlers: list[InfRecoHandler] | None = None,
         from_key: str = "from",
+        filter: Optional[VDFilter] = None,
     ):
         super().__init__(name, logger, handlers)
         
@@ -671,28 +629,28 @@ class InfRecoCompositeHandler(CompositeHandler[InfRecoHandler]):
         if not handlers:
             self.handlers = [
                 # Argument existence handlers
-                HasArgumentsHandler(),
-                HasUniqueArgumentHandler(),
-                HasPCSHandler(),
+                HasArgumentsHandler(filter=filter),
+                HasUniqueArgumentHandler(filter=filter),
+                HasPCSHandler(filter=filter),
 
                 # Argument form handlers
-                StartsWithPremiseHandler(),
-                EndsWithConclusionHandler(),
-                NotMultipleGistsHandler(),
-                NoDuplicatePCSLabelsHandler(),
+                StartsWithPremiseHandler(filter=filter),
+                EndsWithConclusionHandler(filter=filter),
+                NotMultipleGistsHandler(filter=filter),
+                NoDuplicatePCSLabelsHandler(filter=filter),
                 
                 # Label and gist handlers
-                HasLabelHandler(),
-                HasGistHandler(),
+                HasLabelHandler(filter=filter),
+                HasGistHandler(filter=filter),
                 
                 # Inference data handlers
-                HasInferenceDataHandler(from_key=from_key),
-                PropRefsExistHandler(from_key=from_key),
-                UsesAllPropsHandler(from_key=from_key),
+                HasInferenceDataHandler(from_key=from_key, filter=filter),
+                PropRefsExistHandler(from_key=from_key, filter=filter),
+                UsesAllPropsHandler(from_key=from_key, filter=filter),
                 
                 # Content restriction handlers
-                NoExtraPropositionsHandler(),
-                OnlyGroundedDialecticalRelationsHandler(),
-                NoPropInlineDataHandler(),
-                NoArgInlineDataHandler(),
+                NoExtraPropositionsHandler(filter=filter),
+                OnlyGroundedDialecticalRelationsHandler(filter=filter),
+                NoPropInlineDataHandler(filter=filter),
+                NoArgInlineDataHandler(filter=filter),
             ]

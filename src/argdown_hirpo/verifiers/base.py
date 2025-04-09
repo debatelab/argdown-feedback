@@ -6,14 +6,23 @@ from typing import Generic, Optional, TypeVar
 from pyargdown import Argdown
 
 
-from .verification_request import VerificationRequest
+from .verification_request import VerificationRequest, VDFilter, PrimaryVerificationData, VerificationDType, VerificationResult
 
 
 
 
 class BaseHandler(ABC):
     """Base handler interface for the Chain of Responsibility pattern."""
-    
+            
+    @staticmethod
+    def create_metadata_filter(key: str, values: list) -> VDFilter:
+        """Creates a filter that checks if the metadata of the verification data contains the given key and values."""
+        def filter(vdata: PrimaryVerificationData) -> bool:
+            if vdata.metadata is None:
+                return False
+            return vdata.metadata.get(key) in values
+        return filter
+
     def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None):
         self._next_handler: Optional['BaseHandler'] = None
         self.name = name or self.__class__.__name__

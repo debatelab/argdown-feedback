@@ -59,7 +59,7 @@ class FencedCodeBlockExtractor(ProcessingHandler):
                     # try to parse yaml code metadata after code marker
                     try:
                         lines = splits[0].split("\n")
-                        metadata = yaml.safe_load(lines[0]) if lines else None
+                        metadata = yaml.safe_load(lines[0].strip().replace("=", ": ")) if lines else None
                     except (IndexError, yaml.YAMLError) as e:
                         self.logger.debug(f"No metadata found in code snippet {lines[0] if lines else ''} ({e})")
                         metadata = None

@@ -10,6 +10,7 @@ from pyargdown import (
 from pyargdown.parser.base import ArgdownParser
 
 from argdown_hirpo.verifiers.verification_request import (
+    VDFilter,
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
@@ -21,13 +22,22 @@ from argdown_hirpo.verifiers.base import BaseHandler, CompositeHandler
 class ArgMapHandler(BaseHandler):
     """Base handler interface for evaluating argument maps."""
 
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+        filter: Optional[VDFilter] = None,
+    ):
+        super().__init__(name, logger)
+        self.filter = filter if filter else lambda vdata: True
+
     @abstractmethod
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         """Evaluate the data and return a verification result."""
 
     def is_applicable(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> bool:
         """Check if the handler is applicable to the given data. Can be customized in subclasses."""
-        return vdata.dtype == VerificationDType.argdown
+        return vdata.dtype == VerificationDType.argdown and self.filter(vdata)
 
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         for vdata in request.verification_data:
@@ -43,12 +53,6 @@ class ArgMapHandler(BaseHandler):
 class CompleteClaimsHandler(ArgMapHandler):
     """Handler that checks if all claims have labels and are not empty."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -82,12 +86,6 @@ class CompleteClaimsHandler(ArgMapHandler):
 class NoDuplicateLabelsHandler(ArgMapHandler):
     """Handler that checks for duplicate labels in claims and arguments."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -120,12 +118,6 @@ class NoDuplicateLabelsHandler(ArgMapHandler):
 class NoPCSHandler(ArgMapHandler):
     """Handler that checks if any argument has a premise-conclusion structure."""
 
-    def __init__(
-        self,
-        name: Optional[str] = None,
-        logger: Optional[logging.Logger] = None,
-    ):
-        super().__init__(name, logger)
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         argdown = vdata.data
@@ -163,13 +155,14 @@ class ArgMapCompositeHandler(CompositeHandler[ArgMapHandler]):
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
         handlers: list[ArgMapHandler] | None = None,
+        filter: Optional[VDFilter] = None,
     ):
         super().__init__(name, logger, handlers)
         
         # Initialize with default handlers if none provided
         if not handlers:
             self.handlers = [
-                CompleteClaimsHandler(),
-                NoDuplicateLabelsHandler(),
-                NoPCSHandler(),
+                CompleteClaimsHandler(filter=filter),
+                NoDuplicateLabelsHandler(filter=filter),
+                NoPCSHandler(filter=filter),
             ]
