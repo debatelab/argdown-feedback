@@ -11,7 +11,6 @@ from pyargdown import (
     Argument,
     Proposition,
     Valence,
-    parse_argdown,
 )
 
 from argdown_hirpo.tasks.base import (
@@ -21,11 +20,14 @@ from argdown_hirpo.tasks.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    SolutionGenerator,
     Judge,
     FeedbackGenerator,
 )
-from argdown_hirpo.verifiers.argmap_verifier import ArgMapVerifier
+from argdown_hirpo.verifiers.base import CompositeHandler
+from argdown_hirpo.verifiers.core.argmap_handler import ArgMapCompositeHandler
+from argdown_hirpo.verifiers.core.content_check_handler import HasArgdownHandler
+from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
+from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
 
 
 class ArgMapProblem(Problem):
@@ -127,11 +129,24 @@ class ArgumentMap(Solution):
     @classmethod
     def from_raw_answer(cls, answer) -> "ArgumentMap":
         # extract fenced code block
-        if answer.count("```argdown") == 1:
-            if answer.split("```argdown")[1].count("\n```") == 1:
-                answer = answer.split("```argdown")[1].split("\n```")[0]
-                answer = "```argdown" + answer + "\n```"
-        return cls(argdown_snippet=answer)
+        handler = FencedCodeBlockExtractor()
+        request = VerificationRequest(inputs=answer)
+        result = handler.handle(request)
+        code_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+            ),
+            None,
+        )
+        code_snippet = code_snippet if code_snippet is not None else answer 
+        return cls(argdown_snippet=code_snippet)
+        # TODO remove
+        #if answer.count("```argdown") == 1:
+        #    if answer.split("```argdown")[1].count("\n```") == 1:
+        #        answer = answer.split("```argdown")[1].split("\n```")[0]
+        #        answer = "```argdown" + answer + "\n```"
+        #return cls(argdown_snippet=answer)
 
 
 
@@ -152,65 +167,84 @@ class ArgMapJudge(Judge):
     def _evaluate_argmap(
         self, problem: ArgMapProblem, argmap: ArgumentMap
     ) -> Evaluation:
-        is_valid = True
-        eval_data = {
-            "fenced_code_block": "",
-            "invalid_argdown_syntax": "",
-            "missing_labels": "",
-            "duplicate_labels": "",
-            "premise_conclusion_structures": "",
-        }
 
-        ads = argmap.argdown_snippet.strip("\n ")
-        if ads.startswith("```argdown") and ads.endswith("```"):
-            ads = "\n".join(ads.splitlines()[1:-1])
-        else:  # no fenced code block
-            is_valid = False
-            error_msg = "Failed to extract single fenced argdown block:"
-            if ads.count("```argdown") == 0:
-                error_msg += " No fenced code block starting with '```argdown'."
-            if ads.count("```argdown") > 1:
-                error_msg += (
-                    " More than one fenced code block starting with '```argdown'."
-                )
-            if "```\n" not in ads:
-                error_msg += " No closing '```'."
-            eval_data["fenced_code_block"] = error_msg
-
-        try:
-            argdown = parse_argdown(ads)
-        except Exception as e:
-            argdown = None
-            is_valid = False
-            eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
-
-        if not argdown:
-            return Evaluation(
-                is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
-            )
-
-        verifier = ArgMapVerifier(argdown)
-
-        check, msg = verifier.has_complete_claims()
-        if check is False:
-            is_valid = False
-            eval_data["missing_claim_labels"] = msg if msg else "Missing claim labels"
-
-        check, msg = verifier.has_no_duplicate_labels()
-        if check is False:
-            is_valid = False
-            eval_data["duplicate_labels"] = msg if msg else "Has duplicate labels"
-
-        check, msg = verifier.has_no_pcs()
-        if check is False:
-            is_valid = False
-            eval_data["premise_conclusion_structures"] = (
-                msg if msg else "Found detailed reconstruction of individual arguments as premise-conclusion-structures."
-            )
-
-        return Evaluation(
-            is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
+        handler = CompositeHandler(
+            handlers=[
+                DefaultProcessingHandler(),
+                HasArgdownHandler(),
+                ArgMapCompositeHandler(),
+            ]
         )
+        request = VerificationRequest(
+            inputs=argmap.argdown_snippet, source=problem.sources
+        )
+        result = handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        if evaluation.artifacts.get("argdown_map") is None:
+            evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
+        return evaluation
+
+
+        # TODO remove
+        # is_valid = True
+        # eval_data = {
+        #     "fenced_code_block": "",
+        #     "invalid_argdown_syntax": "",
+        #     "missing_labels": "",
+        #     "duplicate_labels": "",
+        #     "premise_conclusion_structures": "",
+        # }
+
+        # ads = argmap.argdown_snippet.strip("\n ")
+        # if ads.startswith("```argdown") and ads.endswith("```"):
+        #     ads = "\n".join(ads.splitlines()[1:-1])
+        # else:  # no fenced code block
+        #     is_valid = False
+        #     error_msg = "Failed to extract single fenced argdown block:"
+        #     if ads.count("```argdown") == 0:
+        #         error_msg += " No fenced code block starting with '```argdown'."
+        #     if ads.count("```argdown") > 1:
+        #         error_msg += (
+        #             " More than one fenced code block starting with '```argdown'."
+        #         )
+        #     if "```\n" not in ads:
+        #         error_msg += " No closing '```'."
+        #     eval_data["fenced_code_block"] = error_msg
+
+        # try:
+        #     argdown = parse_argdown(ads)
+        # except Exception as e:
+        #     argdown = None
+        #     is_valid = False
+        #     eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
+
+        # if not argdown:
+        #     return Evaluation(
+        #         is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
+        #     )
+
+        # verifier = ArgMapVerifier(argdown)
+
+        # check, msg = verifier.has_complete_claims()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["missing_claim_labels"] = msg if msg else "Missing claim labels"
+
+        # check, msg = verifier.has_no_duplicate_labels()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["duplicate_labels"] = msg if msg else "Has duplicate labels"
+
+        # check, msg = verifier.has_no_pcs()
+        # if check is False:
+        #     is_valid = False
+        #     eval_data["premise_conclusion_structures"] = (
+        #         msg if msg else "Found detailed reconstruction of individual arguments as premise-conclusion-structures."
+        #     )
+
+        # return Evaluation(
+        #     is_valid=is_valid, artifacts={"argdown_map": argdown}, metrics=eval_data
+        # )
 
     async def arun(
         self,

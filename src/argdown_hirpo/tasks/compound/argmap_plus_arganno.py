@@ -1,11 +1,10 @@
-from typing import Any, Sequence
+from typing import Sequence
 
 import dataclasses
 from textwrap import dedent
 from bs4 import BeautifulSoup
 from pyargdown import (
     ArgdownMultiDiGraph,
-    Valence,
 )
 import textdistance
 
@@ -21,14 +20,19 @@ from argdown_hirpo.tasks.base import (
 from argdown_hirpo.tasks.core.arganno import (
     ANNOTATION_SCHEME,
     Annotation,
-    AnnotationJudge,
     AnnotationProblem,
 )
 from argdown_hirpo.tasks.core.argmap import (
-    ArgMapJudge,
     ArgMapProblem,
     ArgumentMap,
 )
+from argdown_hirpo.verifiers.base import CompositeHandler
+from argdown_hirpo.verifiers.core.content_check_handler import HasArgdownHandler, HasAnnotationsHandler
+from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
+from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
+from argdown_hirpo.verifiers.core.argmap_handler import ArgMapCompositeHandler
+from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_hirpo.verifiers.coherence.arganno_argmap_handler import ArgannoArgmapCoherenceHandler
 
 
 class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
@@ -162,21 +166,45 @@ class ArgmapPlusArganno(Annotation, ArgumentMap):
     def from_raw_answer(
         cls, raw_answer: str
     ) -> "ArgmapPlusArganno":
-        unparsed_solution = raw_answer
-        annotated_source_text = ""
-        argdown_snippet = ""
-        if "```xml" in unparsed_solution:
-            annotated_source_text = unparsed_solution.split("```xml")[-1].split("\n```")[0]
-            annotated_source_text = "```xml" + annotated_source_text + "\n```"
-        if "```argdown" in unparsed_solution:
-            argdown_snippet = unparsed_solution.split("```argdown")[-1].split("\n```")[0]
-            argdown_snippet = "```argdown" + argdown_snippet + "\n```"                
+
+        handler = FencedCodeBlockExtractor()
+        request = VerificationRequest(inputs=raw_answer)
+        result = handler.handle(request)
+
+        annotated_source_text = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.xml and vr.code_snippet
+            ),
+            None,
+        )
+        argdown_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+            ),
+            None,
+        )
 
         return cls(
-            annotated_source_text=annotated_source_text if annotated_source_text else unparsed_solution,
-            argdown_snippet=argdown_snippet if argdown_snippet else unparsed_solution,
-            unparsed_solution=None if annotated_source_text and argdown_snippet else unparsed_solution,
+            annotated_source_text=annotated_source_text if annotated_source_text else raw_answer,
+            argdown_snippet=argdown_snippet if argdown_snippet else raw_answer,
+            unparsed_solution=None if annotated_source_text and argdown_snippet else raw_answer,
         )
+
+        # TODO remove this
+        # if "```xml" in unparsed_solution:
+        #     annotated_source_text = unparsed_solution.split("```xml")[-1].split("\n```")[0]
+        #     annotated_source_text = "```xml" + annotated_source_text + "\n```"
+        # if "```argdown" in unparsed_solution:
+        #     argdown_snippet = unparsed_solution.split("```argdown")[-1].split("\n```")[0]
+        #     argdown_snippet = "```argdown" + argdown_snippet + "\n```"                
+        # 
+        # return cls(
+        #     annotated_source_text=annotated_source_text if annotated_source_text else unparsed_solution,
+        #     argdown_snippet=argdown_snippet if argdown_snippet else unparsed_solution,
+        #     unparsed_solution=None if annotated_source_text and argdown_snippet else unparsed_solution,
+        # )
 
 class ArgmapPlusArgannoProblemGenerator(ProblemGenerator):
     async def arun(self, inputs) -> Problem:
@@ -193,183 +221,206 @@ class ArgmapPlusArgannoJudge(Judge):
     """Judge for the anno plus argument mapping task."""
 
 
-    def _evaluate_coherence(self, soup_anno: BeautifulSoup, argdown_map: ArgdownMultiDiGraph) -> dict[str, str]:
-        eval_data = {
-            "elements_correspondence": "",
-            "relations_correspondence": "",
-        }
+    # def _evaluate_coherence(self, soup_anno: BeautifulSoup, argdown_map: ArgdownMultiDiGraph) -> dict[str, str]:
+    #     eval_data = {
+    #         "elements_correspondence": "",
+    #         "relations_correspondence": "",
+    #     }
 
-        # check correspondence between annotation and argmap elements
-        msgs = []
-        all_argmap_labels = [node.label for node in argdown_map.propositions + argdown_map.arguments if node.label]
-        all_annotation_ids = [
-            a.get("id") for a in soup_anno.find_all("proposition") if a.get("id")  # type: ignore
-        ]
-        argument_label_map: dict[str,str] = {}
-        for a in soup_anno.find_all("proposition"):
-            a_label = a.get("argument_label")  # type: ignore
-            a_id = a.get("id")  # type: ignore
-            if a_label not in all_argmap_labels:
-                msgs.append(
-                    f"Illegal 'argument_label' reference of proposition element with id={a_id}: "
-                    f"No node with label '{a_label}' in the Argdown argument map."
-                )
-            else:
-                argument_label_map[str(a_id)] = str(a_label)        
+    #     # check correspondence between annotation and argmap elements
+    #     msgs = []
+    #     all_argmap_labels = [node.label for node in argdown_map.propositions + argdown_map.arguments if node.label]
+    #     all_annotation_ids = [
+    #         a.get("id") for a in soup_anno.find_all("proposition") if a.get("id")  # type: ignore
+    #     ]
+    #     argument_label_map: dict[str,str] = {}
+    #     for a in soup_anno.find_all("proposition"):
+    #         a_label = a.get("argument_label")  # type: ignore
+    #         a_id = a.get("id")  # type: ignore
+    #         if a_label not in all_argmap_labels:
+    #             msgs.append(
+    #                 f"Illegal 'argument_label' reference of proposition element with id={a_id}: "
+    #                 f"No node with label '{a_label}' in the Argdown argument map."
+    #             )
+    #         else:
+    #             argument_label_map[str(a_id)] = str(a_label)        
 
-        for node in argdown_map.propositions + argdown_map.arguments:
-            id_refs = node.data.get("annotation_ids", [])
-            if not id_refs:
-                msgs.append(
-                    f"Missing 'annotation_ids' attribute of node with label '{node.label}'."
-                )
-                continue
-            for id_ref in id_refs:
-                if id_ref not in all_annotation_ids:
-                    msgs.append(
-                        f"Illegal 'annotation_ids' reference of node with label '{node.label}': "
-                        f"No proposition element with id='{id_ref}' in the annotation."
-                    )
-                elif argument_label_map.get(id_ref) != node.label:
-                    msgs.append(
-                        f"Label reference mismatch: argument map node with label '{node.label}' "
-                        f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
-                        f"with id={id_ref} in the annotation has a different argument_label"
-                        f"{': '+argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
-                    )
-        if msgs:
-            eval_data["elements_correspondence"] = " - ".join(msgs)
-        del msgs
+    #     for node in argdown_map.propositions + argdown_map.arguments:
+    #         id_refs = node.data.get("annotation_ids", [])
+    #         if not id_refs:
+    #             msgs.append(
+    #                 f"Missing 'annotation_ids' attribute of node with label '{node.label}'."
+    #             )
+    #             continue
+    #         for id_ref in id_refs:
+    #             if id_ref not in all_annotation_ids:
+    #                 msgs.append(
+    #                     f"Illegal 'annotation_ids' reference of node with label '{node.label}': "
+    #                     f"No proposition element with id='{id_ref}' in the annotation."
+    #                 )
+    #             elif argument_label_map.get(id_ref) != node.label:
+    #                 msgs.append(
+    #                     f"Label reference mismatch: argument map node with label '{node.label}' "
+    #                     f"has annotation_ids={str(id_refs)}, but the corresponding proposition element "
+    #                     f"with id={id_ref} in the annotation has a different argument_label"
+    #                     f"{': '+argument_label_map[id_ref] if id_ref in argument_label_map else ''}."
+    #                 )
+    #     if msgs:
+    #         eval_data["elements_correspondence"] = " - ".join(msgs)
+    #     del msgs
 
-        # check support/attack relations correspondence
-        msgs = []
-        annotated_relations: list[dict] = []
-        for a in soup_anno.find_all("proposition"):
-            from_id = a.get("id")  # type: ignore
-            for support in a.get("supports", []):  # type: ignore
-                if support in all_annotation_ids:
-                    annotated_relations.append(
-                        {
-                            "from_id": from_id,
-                            "to_id": support,
-                            "valence": Valence.SUPPORT,
-                        }
-                    )
-            for attacks in a.get("attacks", []):  # type: ignore
-                if attacks in all_annotation_ids:
-                    annotated_relations.append(
-                        {
-                            "from_id": from_id,
-                            "to_id": attacks,
-                            "valence": Valence.ATTACK,
-                        }
-                    )
+    #     # check support/attack relations correspondence
+    #     msgs = []
+    #     annotated_relations: list[dict] = []
+    #     for a in soup_anno.find_all("proposition"):
+    #         from_id = a.get("id")  # type: ignore
+    #         for support in a.get("supports", []):  # type: ignore
+    #             if support in all_annotation_ids:
+    #                 annotated_relations.append(
+    #                     {
+    #                         "from_id": from_id,
+    #                         "to_id": support,
+    #                         "valence": Valence.SUPPORT,
+    #                     }
+    #                 )
+    #         for attacks in a.get("attacks", []):  # type: ignore
+    #             if attacks in all_annotation_ids:
+    #                 annotated_relations.append(
+    #                     {
+    #                         "from_id": from_id,
+    #                         "to_id": attacks,
+    #                         "valence": Valence.ATTACK,
+    #                     }
+    #                 )
 
-        for ar in annotated_relations:
-            if not any(
-                dr.source == argument_label_map.get(ar["from_id"])
-                and dr.target == argument_label_map.get(ar["to_id"])
-                and dr.valence == ar["valence"]
-                for dr in argdown_map.dialectical_relations
-            ):
-                msgs.append(
-                    f"Annotated {str(ar['valence'])} relation {ar['from_id']} -> {ar['to_id']} is not "
-                    f"matched by any relation in the argument map."
-                )
+    #     for ar in annotated_relations:
+    #         if not any(
+    #             dr.source == argument_label_map.get(ar["from_id"])
+    #             and dr.target == argument_label_map.get(ar["to_id"])
+    #             and dr.valence == ar["valence"]
+    #             for dr in argdown_map.dialectical_relations
+    #         ):
+    #             msgs.append(
+    #                 f"Annotated {str(ar['valence'])} relation {ar['from_id']} -> {ar['to_id']} is not "
+    #                 f"matched by any relation in the argument map."
+    #             )
 
-        for dr in argdown_map.dialectical_relations:
-            if not any(
-                dr.source == argument_label_map.get(ar["from_id"])
-                and dr.target == argument_label_map.get(ar["to_id"])
-                and dr.valence == ar["valence"]
-                for ar in annotated_relations
-            ):
-                msgs.append(
-                    f"Dialectical {dr.valence.name} relation {dr.source} -> {dr.target} is not matched by any "
-                    f"relation in the text annotation."
-                )
+    #     for dr in argdown_map.dialectical_relations:
+    #         if not any(
+    #             dr.source == argument_label_map.get(ar["from_id"])
+    #             and dr.target == argument_label_map.get(ar["to_id"])
+    #             and dr.valence == ar["valence"]
+    #             for ar in annotated_relations
+    #         ):
+    #             msgs.append(
+    #                 f"Dialectical {dr.valence.name} relation {dr.source} -> {dr.target} is not matched by any "
+    #                 f"relation in the text annotation."
+    #             )
 
-        if msgs:
-            eval_data["relations_correspondence"] = " - ".join(msgs)            
+    #     if msgs:
+    #         eval_data["relations_correspondence"] = " - ".join(msgs)            
 
-        return eval_data
+    #     return eval_data
 
-    def _evaluate_argmap(
-        self, problem: ArgmapPlusArgannoProblem, reco: ArgmapPlusArganno
+    def _evaluate_solution(
+        self, problem: ArgmapPlusArgannoProblem, solution: ArgmapPlusArganno
     ) -> Evaluation:
-        is_valid = True
-        artifacts: dict[str, Any] = {}
-        eval_data = {
-            "fenced_code_blocks": "",
-            "annotation_nested_propositions": "",
-            "annotation_missing_id": "",
-            "annotation_duplicate_id": "",
-            "annotation_invalid_support_ids": "",
-            "annotation_invalid_attack_ids": "",
-            "annotation_unknown_attributes": "",
-            "argmap_invalid_argdown_syntax": "",
-            "argmap_missing_labels": "",
-            "argmap_duplicate_labels": "",
-            "argmap_premise_conclusion_structures": "",
-            "elements_correspondence": "",
-            "relations_correspondence": "",
-        }
-
-        # check fenced codeblocks
-        msgs = []
-        ast = reco.annotated_source_text.strip("\n ")
-        if not (ast.startswith("```xml") and ast.endswith("```")):
-            msgs.append("Failed to extract fenced xml block with annotation.")
-            if ast.count("```xml") == 0:
-                msgs.append("No fenced code block starting with '```xml'.")
-        ads = reco.argdown_snippet.strip("\n ")
-        if not (ads.startswith("```argdown") and ads.endswith("```")):
-            msgs.append("Failed to extract fenced argdown block.")
-            if ads.count("```argdown") == 0:
-                msgs.append("No fenced code block starting with '```argdown'.")
-        if msgs:
-            is_valid = False
-            eval_data["fenced_code_blocks"] = " ".join(msgs)
-
-        # evaluate anno
-        evaluation_anno = AnnotationJudge()._evaluate_annotation(
-            problem=AnnotationProblem(problem.sources, strip_html=False),
-            annotation=Annotation(ast),
-        )
-        if evaluation_anno.is_valid is False:
-            is_valid = False
-        soup: BeautifulSoup = evaluation_anno.artifacts["soup"]
-        artifacts["soup"] = soup
-        for k, v in evaluation_anno.metrics.items():
-            if k != "fenced_code_block":
-                eval_data["annotation_" + k] = v
-
-        # evaluate argmap
-        evaluation_argmap = ArgMapJudge()._evaluate_argmap(
-            problem=ArgMapProblem(problem.sources),
-            argmap=ArgumentMap(ads),
-        )
-        if evaluation_argmap.is_valid is False:
-            is_valid = False
-        argdown: ArgdownMultiDiGraph = evaluation_argmap.artifacts["argdown_map"]
-        artifacts["argdown_map"] = argdown
-        for k, v in evaluation_argmap.metrics.items():
-            if k != "fenced_code_block":
-                eval_data["argmap_" + k] = v
-
-        if argdown is None:
-            return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
         
-        # evaluate coherence between argmap and reco
-        coherence_eval_data = self._evaluate_coherence(
-            soup_anno=soup,
-            argdown_map = argdown,
-        )
-        eval_data.update(coherence_eval_data)
-                
-        is_valid = not any(v for v in eval_data.values())
 
-        return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
+        handler = CompositeHandler(
+            handlers=[
+                DefaultProcessingHandler(),
+                HasAnnotationsHandler(),
+                HasArgdownHandler(),
+                ArgannoCompositeHandler(),
+                ArgMapCompositeHandler(),
+                ArgannoArgmapCoherenceHandler(),
+            ]
+        )
+        request = VerificationRequest(
+            inputs=str(solution), source=problem.sources
+        )
+        result = handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        if evaluation.artifacts.get("argdown_map") is None:
+            evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
+        return evaluation
+
+
+        # TODO remove
+        # is_valid = True
+        # artifacts: dict[str, Any] = {}
+        # eval_data = {
+        #     "fenced_code_blocks": "",
+        #     "annotation_nested_propositions": "",
+        #     "annotation_missing_id": "",
+        #     "annotation_duplicate_id": "",
+        #     "annotation_invalid_support_ids": "",
+        #     "annotation_invalid_attack_ids": "",
+        #     "annotation_unknown_attributes": "",
+        #     "argmap_invalid_argdown_syntax": "",
+        #     "argmap_missing_labels": "",
+        #     "argmap_duplicate_labels": "",
+        #     "argmap_premise_conclusion_structures": "",
+        #     "elements_correspondence": "",
+        #     "relations_correspondence": "",
+        # }
+
+        # # check fenced codeblocks
+        # msgs = []
+        # ast = reco.annotated_source_text.strip("\n ")
+        # if not (ast.startswith("```xml") and ast.endswith("```")):
+        #     msgs.append("Failed to extract fenced xml block with annotation.")
+        #     if ast.count("```xml") == 0:
+        #         msgs.append("No fenced code block starting with '```xml'.")
+        # ads = reco.argdown_snippet.strip("\n ")
+        # if not (ads.startswith("```argdown") and ads.endswith("```")):
+        #     msgs.append("Failed to extract fenced argdown block.")
+        #     if ads.count("```argdown") == 0:
+        #         msgs.append("No fenced code block starting with '```argdown'.")
+        # if msgs:
+        #     is_valid = False
+        #     eval_data["fenced_code_blocks"] = " ".join(msgs)
+
+        # # evaluate anno
+        # evaluation_anno = AnnotationJudge()._evaluate_annotation(
+        #     problem=AnnotationProblem(problem.sources, strip_html=False),
+        #     annotation=Annotation(ast),
+        # )
+        # if evaluation_anno.is_valid is False:
+        #     is_valid = False
+        # soup: BeautifulSoup = evaluation_anno.artifacts["soup"]
+        # artifacts["soup"] = soup
+        # for k, v in evaluation_anno.metrics.items():
+        #     if k != "fenced_code_block":
+        #         eval_data["annotation_" + k] = v
+
+        # # evaluate argmap
+        # evaluation_argmap = ArgMapJudge()._evaluate_argmap(
+        #     problem=ArgMapProblem(problem.sources),
+        #     argmap=ArgumentMap(ads),
+        # )
+        # if evaluation_argmap.is_valid is False:
+        #     is_valid = False
+        # argdown: ArgdownMultiDiGraph = evaluation_argmap.artifacts["argdown_map"]
+        # artifacts["argdown_map"] = argdown
+        # for k, v in evaluation_argmap.metrics.items():
+        #     if k != "fenced_code_block":
+        #         eval_data["argmap_" + k] = v
+
+        # if argdown is None:
+        #     return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
+        
+        # # evaluate coherence between argmap and reco
+        # coherence_eval_data = self._evaluate_coherence(
+        #     soup_anno=soup,
+        #     argdown_map = argdown,
+        # )
+        # eval_data.update(coherence_eval_data)
+                
+        # is_valid = not any(v for v in eval_data.values())
+
+        # return Evaluation(is_valid=is_valid, artifacts=artifacts, metrics=eval_data)
 
     async def arun(
         self,
@@ -389,7 +440,7 @@ class ArgmapPlusArgannoJudge(Judge):
             assert isinstance(solution, ArgmapPlusArganno), (
                 "All solutions must be ArgmapPlusArganno"
             )
-            evaluations.append(self._evaluate_argmap(problem, solution))
+            evaluations.append(self._evaluate_solution(problem, solution))
 
         return evaluations
 

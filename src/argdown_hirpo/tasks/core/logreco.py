@@ -1,4 +1,4 @@
-from typing import Any, Sequence
+from typing import Sequence
 
 import dataclasses
 from textwrap import dedent
@@ -8,7 +8,6 @@ from pyargdown import (
     ArgdownMultiDiGraph,
     Conclusion,
     Proposition,
-    parse_argdown,
 )
 
 from argdown_hirpo.tasks.base import (
@@ -23,8 +22,13 @@ from argdown_hirpo.tasks.base import (
 )
 
 from argdown_hirpo.logic.logic import get_propositional_variables
-from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier, DEFAULT_EVAL_DIMENSIONS_MAP
 from argdown_hirpo.logic.fol_to_nl import FOL2NLTranslator
+from argdown_hirpo.verifiers.base import CompositeHandler
+from argdown_hirpo.verifiers.core.infreco_handler import InfRecoCompositeHandler, NoPropInlineDataHandler
+from argdown_hirpo.verifiers.core.logreco_handler import LogRecoCompositeHandler
+from argdown_hirpo.verifiers.core.content_check_handler import HasArgdownHandler
+from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
+from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
     
 
 
@@ -145,6 +149,20 @@ class LogicalReco(Solution):
     @classmethod
     def from_raw_answer(cls, answer) -> "LogicalReco":
         """Extract a LogicalReco from a raw answer string."""
+        handler = FencedCodeBlockExtractor()
+        request = VerificationRequest(inputs=answer)
+        result = handler.handle(request)
+        code_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+            ),
+            None,
+        )
+        code_snippet = code_snippet if code_snippet is not None else answer 
+        return cls(argdown_snippet=code_snippet)
+    
+        # TODO remove    
         if answer.count("```argdown") == 1:
             if answer.split("```argdown")[1].count("\n```") == 1:
                 answer = answer.split("```argdown")[1].split("\n```")[0]
@@ -169,68 +187,92 @@ class LogRecoJudge(Judge):
     def _evaluate_logreco(
         self, problem: LogRecoProblem, reco: LogicalReco
     ) -> Evaluation:
-        is_valid = True
-        artifacts: dict[str, Any] = {}
-        eval_data = {
-            "fenced_code_block": "",
-            "invalid_argdown_syntax": "",
-            "no_unique_argument": "",
-            "illformed_argument": "",  # no pcs
-            "missing_label_gist": "",
-            "missing_inference_info": "",
-            "unknown_proposition_references": "",  # in inference info
-            "unused_propositions": "",  # unused propositions
-            "disallowed_material": "", # more propositions
-            "flawed_formalizations": "",  # missing, duplicate declarations etc. etc.
-            "invalid_inference": "",  # invalid inference
-            "redundant_premises": "",  # redundant premises
-            "inconsistent_premises": "",  # inconsistent premises
-        }
 
-        ads = reco.argdown_snippet.strip("\n ")
-        if ads.startswith("```argdown") and ads.endswith("```"):
-            ads = "\n".join(ads.splitlines()[1:-1])
-        else:  # no fenced code block
-            is_valid = False
-            error_msg = "Failed to extract single fenced argdown block:"
-            if ads.count("```argdown") == 0:
-                error_msg += " No fenced code block starting with '```argdown'."
-            if ads.count("```argdown") > 1:
-                error_msg += (
-                    " More than one fenced code block starting with '```argdown'."
-                )
-            if "```\n" not in ads:
-                error_msg += " No closing '```'."
-            eval_data["fenced_code_block"] = error_msg
+        infreco_handler = InfRecoCompositeHandler()
+        infreco_handler.handlers = [
+            h for h in infreco_handler.handlers if not isinstance(h, NoPropInlineDataHandler)
+        ]
 
-        try:
-            argdown = parse_argdown(ads)
-        except Exception as e:
-            argdown = None
-            is_valid = False
-            eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
-
-        artifacts["argdown"] = argdown
-
-        if argdown:
-
-            verifier = LogRecoVerifier(argdown)
-            artifacts["all_expressions"] = verifier.all_expressions
-            artifacts["all_declarations"] = verifier.all_declarations
-            check, msg = verifier.has_unique_argument()
-            if check is False:
-                eval_data["no_unique_argument"] = msg if msg else "No unique argument."
-
-            del verifier
-
-            logreco_evals, _, _ = LogRecoVerifier.run_battery(argdown)
-            eval_data.update(logreco_evals)
-
-            is_valid = not any(v for v in eval_data.values())
-
-        return Evaluation(
-            is_valid=is_valid, artifacts=artifacts, metrics=eval_data
+        handler = CompositeHandler(
+            handlers=[
+                DefaultProcessingHandler(),
+                HasArgdownHandler(),
+                infreco_handler,
+                LogRecoCompositeHandler(),
+            ]
         )
+        request = VerificationRequest(
+            inputs=reco.argdown_snippet, source=problem.sources
+        )
+        result = handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        if evaluation.artifacts.get("argdown_reco") is None:
+            evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")
+        return evaluation
+
+        # TODO remove
+        # is_valid = True
+        # artifacts: dict[str, Any] = {}
+        # eval_data = {
+        #     "fenced_code_block": "",
+        #     "invalid_argdown_syntax": "",
+        #     "no_unique_argument": "",
+        #     "illformed_argument": "",  # no pcs
+        #     "missing_label_gist": "",
+        #     "missing_inference_info": "",
+        #     "unknown_proposition_references": "",  # in inference info
+        #     "unused_propositions": "",  # unused propositions
+        #     "disallowed_material": "", # more propositions
+        #     "flawed_formalizations": "",  # missing, duplicate declarations etc. etc.
+        #     "invalid_inference": "",  # invalid inference
+        #     "redundant_premises": "",  # redundant premises
+        #     "inconsistent_premises": "",  # inconsistent premises
+        # }
+
+        # ads = reco.argdown_snippet.strip("\n ")
+        # if ads.startswith("```argdown") and ads.endswith("```"):
+        #     ads = "\n".join(ads.splitlines()[1:-1])
+        # else:  # no fenced code block
+        #     is_valid = False
+        #     error_msg = "Failed to extract single fenced argdown block:"
+        #     if ads.count("```argdown") == 0:
+        #         error_msg += " No fenced code block starting with '```argdown'."
+        #     if ads.count("```argdown") > 1:
+        #         error_msg += (
+        #             " More than one fenced code block starting with '```argdown'."
+        #         )
+        #     if "```\n" not in ads:
+        #         error_msg += " No closing '```'."
+        #     eval_data["fenced_code_block"] = error_msg
+
+        # try:
+        #     argdown = parse_argdown(ads)
+        # except Exception as e:
+        #     argdown = None
+        #     is_valid = False
+        #     eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
+
+        # artifacts["argdown"] = argdown
+
+        # if argdown:
+
+        #     verifier = LogRecoVerifier(argdown)
+        #     artifacts["all_expressions"] = verifier.all_expressions
+        #     artifacts["all_declarations"] = verifier.all_declarations
+        #     check, msg = verifier.has_unique_argument()
+        #     if check is False:
+        #         eval_data["no_unique_argument"] = msg if msg else "No unique argument."
+
+        #     del verifier
+
+        #     logreco_evals, _, _ = LogRecoVerifier.run_battery(argdown)
+        #     eval_data.update(logreco_evals)
+
+        #     is_valid = not any(v for v in eval_data.values())
+
+        # return Evaluation(
+        #     is_valid=is_valid, artifacts=artifacts, metrics=eval_data
+        # )
 
     async def arun(
         self,
@@ -503,15 +545,20 @@ class FormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferenceP
         all_expressions = evaluation.artifacts["all_expressions"]
         all_declarations = evaluation.artifacts["all_declarations"]
 
-
         dlds: list[float] = []
         for pr in argument.pcs:
-            expression = next(
-                expr for exprl, expr in all_expressions.items() if exprl == pr.label
-            )
-            proposition = next(
-                p for p in argdown.propositions if p.label == pr.proposition_label
-            )
+            # TODO remove this
+            # expression = next(
+            #     expr for exprl, expr in all_expressions.items() if exprl == pr.label
+            # )
+            # proposition = next(
+            #     p for p in argdown.propositions if p.label == pr.proposition_label
+            # )
+            expression = all_expressions.get(pr.proposition_label)
+            proposition = argdown.get_proposition(pr.proposition_label)
+
+            if expression is None or proposition is None:
+                continue 
 
             text_1 = FOL2NLTranslator.translate_to_nl_sentence(
                 expression, all_declarations

@@ -37,6 +37,7 @@ class LogrecoFromInfrecoProblem(LogRecoProblem):
         self.argdown_snippet = argdown_snippet
         self.argdown_infreco = argdown_infreco
         self.infreco_evaluation = infreco_evaluation
+        self.sources = argdown_snippet
 
 
     def instruct_prompt(

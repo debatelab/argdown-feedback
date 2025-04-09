@@ -194,6 +194,7 @@ async def test_judge_valid(
         example_problem,
         judge_class,
         valid_recos,
+        argdown_artifact_keys=[],
     )
 
 
@@ -207,6 +208,7 @@ async def test_judge_invalid(
         example_problem,
         judge_class,
         invalid_recos,
+        argdown_artifact_keys=[],
     )
 
 

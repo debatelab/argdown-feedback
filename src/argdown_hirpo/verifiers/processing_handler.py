@@ -50,8 +50,8 @@ class FencedCodeBlockExtractor(ProcessingHandler):
             close_marker = "\n```"
 
             needs_to_be_parsed = input_text
-            if code_marker in needs_to_be_parsed:
-                splits = needs_to_be_parsed.split(code_marker)[1].split(close_marker, 1)
+            while code_marker in needs_to_be_parsed:
+                splits = needs_to_be_parsed.split(code_marker, 1)[1].split(close_marker, 1)
                 if len(splits) > 1:
                     snippet = code_marker + splits[0] + close_marker
                     needs_to_be_parsed = splits[1]
@@ -103,12 +103,17 @@ class ArgdownParser(ProcessingHandler):
                 self.logger.debug(f"Code snippet for {vdata.id} is None. Skipping.")
                 continue
             if vdata.dtype == VerificationDType.argdown:
-                code_snippet = vdata.code_snippet
+                code_snippet = vdata.code_snippet.strip("\n ")
                 code_marker = _CODE_MARKERS[vdata.dtype]
-                # remove metadata from code snippet
+                close_marker = "\n```"
+                # remove code markers from code snippet before parsing
                 if "\n" in code_snippet and code_snippet.startswith(code_marker):
-                    # remove the first line (metadata) from the code snippet, add back the code marker
-                    code_snippet = code_marker + "\n" + code_snippet.split("\n", 1)[1]
+                    # remove the first line from the code snippet
+                    code_snippet = code_snippet.split("\n", 1)[1]
+                if "\n" in code_snippet and code_snippet.endswith(close_marker):
+                    # remove the last line from the code snippet
+                    code_snippet = code_snippet.rsplit("\n", 1)[0]
+
                 try:
                     argdown = parse_argdown(code_snippet)
                     vdata.data = argdown
@@ -171,7 +176,7 @@ class XMLParser(ProcessingHandler):
         return request
 
 
-class CompositeProcessingHandler(CompositeHandler):
+class DefaultProcessingHandler(CompositeHandler):
     """Processing handler with default pipeline."""
 
     def __init__(

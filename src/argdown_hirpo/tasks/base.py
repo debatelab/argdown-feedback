@@ -3,7 +3,6 @@
 from abc import ABC, abstractmethod
 import dataclasses
 import logging
-from pprint import pprint
 import random
 from statistics import mean
 from textwrap import dedent
@@ -107,35 +106,30 @@ class Evaluation:
         )
         artifacts["soup"] = last_soup.data if last_soup is not None else None
 
-        last_argdown = next(
-            (
-                data for data in reversed(request.verification_data)
-                if data.dtype == VerificationDType.argdown and data.data is not None
-                and isinstance(data.data, Argdown)
-            ),
-            None,
-        )
+        verification_data_argdown = [
+            data for data in request.verification_data
+            if data.dtype == VerificationDType.argdown and data.data is not None
+            and isinstance(data.data, Argdown)
+        ]
+
+        last_argdown = next(reversed(verification_data_argdown), None)
         artifacts["argdown"] = last_argdown.data if last_argdown is not None else None
 
         # argdown_map
         last_argdown_map = next(
             (
-                data for data in reversed(request.verification_data)
-                if data.dtype == VerificationDType.argdown and data.data is not None
-                and isinstance(data.data, Argdown) 
-                and data.metadata and data.metadata.get("filename")=="map.ad"
+                data for data in reversed(verification_data_argdown)
+                if data.metadata and data.metadata.get("filename")=="map.ad"
             ),
             None,
         )
         artifacts["argdown_map"] = last_argdown_map.data if last_argdown_map is not None else None
 
-        # argdown_reco
+        # argdown_reco        
         last_argdown_reco = next(
             (
-                data for data in reversed(request.verification_data)
-                if data.dtype == VerificationDType.argdown and data.data is not None
-                and isinstance(data.data, Argdown) 
-                and data.metadata and data.metadata.get("filename")=="reconstructions.ad"
+                data for data in reversed(verification_data_argdown)
+                if data.metadata and data.metadata.get("filename")=="reconstructions.ad"
             ),
             None,
         )
@@ -144,11 +138,12 @@ class Evaluation:
         # formalizations are stored as details in result of WellFormedFormulasHandler
         all_expressions = None
         all_declarations = None
-        if last_argdown_reco is not None:
+        if last_argdown is not None:
+            argdown_vd_id = last_argdown_reco.id if last_argdown_reco is not None else last_argdown.id
             wff_result = next(
                 (
                     result for result in request.results
-                    if result.verifier_id == "WellFormedFormulasHandler" and result.verification_data_references==[last_argdown_reco.id]),
+                    if result.verifier_id == "WellFormedFormulasHandler" and result.verification_data_references==[argdown_vd_id]),
                 None,
             )
             if wff_result is not None:

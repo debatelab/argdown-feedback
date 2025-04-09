@@ -50,7 +50,14 @@ class BaseLogRecoHandler(InfRecoHandler):
         if vdata.dtype != VerificationDType.argdown:
             self.logger.debug(f"Verification data with ID {vdata_id} is not of type argdown.")
             return None, None
-        vr_details = next((r.details for r in request.results if vdata_id in r.verification_data_references), None)
+        vr_details = next(
+            (
+                r.details for r in request.results
+                if vdata_id in r.verification_data_references
+                and r.verifier_id == "WellFormedFormulasHandler"
+            ),
+            None
+        )
         if vr_details is None:
             self.logger.debug(f"No verification result found for verification data with ID {vdata_id}.")
             return None, None

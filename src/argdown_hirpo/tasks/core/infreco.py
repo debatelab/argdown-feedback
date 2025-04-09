@@ -1,4 +1,3 @@
-import copy
 from typing import Sequence
 
 import dataclasses
@@ -9,7 +8,6 @@ from pyargdown import (
     ArgdownMultiDiGraph,
     Conclusion,
     Proposition,
-    parse_argdown,
 )
 
 from argdown_hirpo.tasks.base import (
@@ -22,7 +20,11 @@ from argdown_hirpo.tasks.base import (
     Judge,
     FeedbackGenerator,
 )
-from argdown_hirpo.verifiers.infreco_verifier import InfRecoVerifier, DEFAULT_EVAL_DIMENSIONS_MAP
+from argdown_hirpo.verifiers.base import CompositeHandler
+from argdown_hirpo.verifiers.core.infreco_handler import InfRecoCompositeHandler, UsesAllPropsHandler
+from argdown_hirpo.verifiers.core.content_check_handler import HasArgdownHandler
+from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
+from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
 
 
 class InfRecoProblem(Problem):
@@ -136,11 +138,25 @@ class InformalReco(Solution):
     @classmethod
     def from_raw_answer(cls, answer) -> "InformalReco":
         """extract the argdown snippet from a raw answer"""
-        if answer.count("```argdown") == 1:
-            if answer.split("```argdown")[1].count("\n```") == 1:
-                answer = answer.split("```argdown")[1].split("\n```")[0]
-                answer = "```argdown" + answer + "\n```"
-        return cls(argdown_snippet=answer)
+        handler = FencedCodeBlockExtractor()
+        request = VerificationRequest(inputs=answer)
+        result = handler.handle(request)
+        code_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+            ),
+            None,
+        )
+        code_snippet = code_snippet if code_snippet is not None else answer 
+        return cls(argdown_snippet=code_snippet)
+    
+        # TODO remove       
+        # if answer.count("```argdown") == 1:
+        #     if answer.split("```argdown")[1].count("\n```") == 1:
+        #         answer = answer.split("```argdown")[1].split("\n```")[0]
+        #         answer = "```argdown" + answer + "\n```"
+        # return cls(argdown_snippet=answer)
 
 
 class InfRecoProblemGenerator(ProblemGenerator):
@@ -160,50 +176,73 @@ class InfRecoJudge(Judge):
     def _evaluate_infreco(
         self, problem: InfRecoProblem, reco: InformalReco
     ) -> Evaluation:
-        is_valid = True
-        eval_data = {
-            "fenced_code_block": "",
-            "invalid_argdown_syntax": "",
-            "no_unique_argument": "",
-        }
 
-        ads = reco.argdown_snippet.strip("\n ")
-        if ads.startswith("```argdown") and ads.endswith("```"):
-            ads = "\n".join(ads.splitlines()[1:-1])
-        else:  # no fenced code block
-            error_msg = "Failed to extract single fenced argdown block:"
-            if ads.count("```argdown") == 0:
-                error_msg += " No fenced code block starting with '```argdown'."
-            if ads.count("```argdown") > 1:
-                error_msg += (
-                    " More than one fenced code block starting with '```argdown'."
-                )
-            if "```\n" not in ads:
-                error_msg += " No closing '```'."
-            eval_data["fenced_code_block"] = error_msg
-
-        try:
-            argdown = parse_argdown(ads)
-        except Exception as e:
-            argdown = None
-            eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
-
-        if argdown:
-            verifier = InfRecoVerifier(argdown)
-            check, msg = verifier.has_unique_argument()
-            if check is False:
-                eval_data["no_unique_argument"] = msg if msg else "No unique argument."
-            del verifier
-
-            eval_dimensions_map = copy.deepcopy(DEFAULT_EVAL_DIMENSIONS_MAP)
-            eval_dimensions_map.pop("unused_propositions")
-            eval_data.update(InfRecoVerifier.run_battery(argdown, eval_dimensions_map=eval_dimensions_map))
-
-        is_valid = not any(v for v in eval_data.values())
-
-        return Evaluation(
-            is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
+        infreco_handler = InfRecoCompositeHandler()
+        # remove UsesAllPropsHandler
+        infreco_handler.handlers = [
+            h for h in infreco_handler.handlers if not isinstance(h, UsesAllPropsHandler)
+        ]
+        handler = CompositeHandler(
+            handlers=[
+                DefaultProcessingHandler(),
+                HasArgdownHandler(),
+                infreco_handler,
+            ]
         )
+        request = VerificationRequest(
+            inputs=reco.argdown_snippet, source=problem.sources
+        )
+        result = handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        if evaluation.artifacts.get("argdown_reco") is None:
+            evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")
+        return evaluation
+
+        # TODO remove
+        # is_valid = True
+        # eval_data = {
+        #     "fenced_code_block": "",
+        #     "invalid_argdown_syntax": "",
+        #     "no_unique_argument": "",
+        # }
+
+        # ads = reco.argdown_snippet.strip("\n ")
+        # if ads.startswith("```argdown") and ads.endswith("```"):
+        #     ads = "\n".join(ads.splitlines()[1:-1])
+        # else:  # no fenced code block
+        #     error_msg = "Failed to extract single fenced argdown block:"
+        #     if ads.count("```argdown") == 0:
+        #         error_msg += " No fenced code block starting with '```argdown'."
+        #     if ads.count("```argdown") > 1:
+        #         error_msg += (
+        #             " More than one fenced code block starting with '```argdown'."
+        #         )
+        #     if "```\n" not in ads:
+        #         error_msg += " No closing '```'."
+        #     eval_data["fenced_code_block"] = error_msg
+
+        # try:
+        #     argdown = parse_argdown(ads)
+        # except Exception as e:
+        #     argdown = None
+        #     eval_data["invalid_argdown_syntax"] = f"Failed to parse argdown: {str(e)}"
+
+        # if argdown:
+        #     verifier = InfRecoVerifier(argdown)
+        #     check, msg = verifier.has_unique_argument()
+        #     if check is False:
+        #         eval_data["no_unique_argument"] = msg if msg else "No unique argument."
+        #     del verifier
+
+        #     eval_dimensions_map = copy.deepcopy(DEFAULT_EVAL_DIMENSIONS_MAP)
+        #     eval_dimensions_map.pop("unused_propositions")
+        #     eval_data.update(InfRecoVerifier.run_battery(argdown, eval_dimensions_map=eval_dimensions_map))
+
+        # is_valid = not any(v for v in eval_data.values())
+
+        # return Evaluation(
+        #     is_valid=is_valid, artifacts={"argdown": argdown}, metrics=eval_data
+        # )
 
     async def arun(
         self,

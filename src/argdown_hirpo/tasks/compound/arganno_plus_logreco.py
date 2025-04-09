@@ -5,6 +5,7 @@ from textwrap import dedent
 from bs4 import BeautifulSoup
 
 from argdown_hirpo.tasks.base import (
+    Judge,
     Problem,
     Solution,
     Evaluation,
@@ -13,7 +14,6 @@ from argdown_hirpo.tasks.base import (
 )
 from argdown_hirpo.tasks.compound.arganno_plus_infreco import (
     ArgannoPlusInfreco,
-    ArgannoPlusInfrecoJudge,
 )
 from argdown_hirpo.tasks.core.arganno import (
     ANNOTATION_SCHEME,
@@ -22,7 +22,37 @@ from argdown_hirpo.tasks.core.arganno import (
 from argdown_hirpo.tasks.core.logreco import (
     LogRecoProblem,
 )
-from argdown_hirpo.verifiers.logreco_verifier import LogRecoVerifier
+
+from argdown_hirpo.verifiers.base import CompositeHandler
+from argdown_hirpo.verifiers.core.content_check_handler import (
+    HasArgdownHandler,
+    HasAnnotationsHandler,
+)
+from argdown_hirpo.verifiers.processing_handler import (
+    DefaultProcessingHandler,
+)
+from argdown_hirpo.verifiers.verification_request import (
+    VerificationRequest,
+)
+from argdown_hirpo.verifiers.core.infreco_handler import (
+    EndsWithConclusionHandler,
+    HasArgumentsHandler,
+    HasInferenceDataHandler,
+    HasLabelHandler,
+    HasPCSHandler,
+    InfRecoCompositeHandler,
+    NoDuplicatePCSLabelsHandler,
+    PropRefsExistHandler,
+    StartsWithPremiseHandler,
+    UsesAllPropsHandler,
+)
+from argdown_hirpo.verifiers.core.logreco_handler import (
+    LogRecoCompositeHandler,
+)
+from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_hirpo.verifiers.coherence.arganno_infreco_handler import (
+    ArgannoInfrecoCoherenceHandler,
+)
 
 
 
@@ -174,102 +204,147 @@ class ArgannoPlusLogRecoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgannoPlusLogRecoJudge(ArgannoPlusInfrecoJudge):
+class ArgannoPlusLogRecoJudge(Judge):
     """Judge for the anno plus argument mapping task."""
 
-    def _evaluate_solution(self, problem, reco) -> Evaluation:
-        evaluation = super()._evaluate_solution(problem, reco)
-        argdown = evaluation.artifacts["argdown"]
-        eval_data = evaluation.metrics
-        is_valid = evaluation.is_valid
-        if argdown is None:
-            return evaluation
-    
-        eval_data["argument_unused_propositions"] = ""
-        eval_data["argument_flawed_formalizations"] = ""
-        eval_data["argument_invalid_inference"] = ""
-        eval_data["argument_redundant_premises"] = ""
-        eval_data["argument_inconsistent_premises"] = ""
+    def _evaluate_solution(self, problem: ArgannoPlusLogRecoProblem, solution) -> Evaluation:
 
-        # unused propositions
-        msgs = []
-        for argument_idx, argument in enumerate(argdown.arguments):
-            verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
-            check, msg = verifier.uses_all_props()
-            if check is False:
-                msgs.append(
-                    f"Error in {argument.label}: {msg}" if msg else f"Unused propositions in argument {argument.label}"
-                )
-        if msgs:
-            is_valid = False
-            eval_data["argument_unused_propositions"] = "\n".join(msgs)
-        del msgs
 
-        # check for syntactically correct formalizations
-        msgs = []
-        for argument_idx, argument in enumerate(argdown.arguments):
-            verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
-            check, msg = verifier.has_flawless_formalizations()
-            if check is False:
-                msgs.append(
-                    f"Error in {argument.label}: {msg}" if msg else f"Flawed formalizations in argument {argument.label}"
-                )
-        if msgs:
-            is_valid = False
-            eval_data["argument_flawed_formalizations"] = "\n".join(msgs)
+        infreco_handler = InfRecoCompositeHandler(
+            handlers = [
+                # Argument existence handlers
+                HasArgumentsHandler(),
+                HasPCSHandler(),
 
-        # check for valid inference
-        msgs = []
-        for argument_idx, argument in enumerate(argdown.arguments):
-            verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
-            for veri_fn in [
-                verifier.is_globally_deductively_valid,
-                verifier.is_locally_deductively_valid
-            ]:
-                check, msg = veri_fn()
-                if check is False:
-                    msgs.append(
-                        f"Error in {argument.label}: {msg}"
-                        if msg else f"Invalid inference in argument {argument.label}"
-                    )
-        if msgs:
-            is_valid = False
-            eval_data["argument_invalid_inference"] = "\n".join(msgs)
-        del msgs
+                # Argument form handlers
+                StartsWithPremiseHandler(),
+                EndsWithConclusionHandler(),
+                NoDuplicatePCSLabelsHandler(),
+                
+                # Label and gist handlers
+                HasLabelHandler(),
+                
+                # Inference data handlers
+                HasInferenceDataHandler(),
+                PropRefsExistHandler(),
+                UsesAllPropsHandler(),
+            ]            
+        )
 
-        # check for redundant premises
-        msgs = []
-        for argument_idx, argument in enumerate(argdown.arguments):
-            verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
-            check, msg = verifier.all_premises_relevant()
-            if check is False:
-                msgs.append(
-                    f"Error in {argument.label}: {msg}"
-                    if msg else f"Redundant premises in argument {argument.label}"
-                )
-        if msgs:
-            is_valid = False
-            eval_data["argument_redundant_premises"] = "\n".join(msgs)
-        del msgs
-
-        # check for inconsistent premises
-        msgs = []
-        for argument_idx, argument in enumerate(argdown.arguments):
-            verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
-            check, msg = verifier.premises_consistent()
-            if check is False:
-                msgs.append(
-                    f"Error in {argument.label}: {msg}"
-                    if msg else f"Inconsistent premises in argument {argument.label}"
-                )
-        if msgs:
-            is_valid = False
-            eval_data["argument_inconsistent_premises"] = "\n".join(msgs)
-        del msgs
-
-        evaluation.is_valid = is_valid
-        evaluation.metrics = eval_data
+        handler = CompositeHandler(
+            handlers=[
+                DefaultProcessingHandler(),
+                HasAnnotationsHandler(),
+                HasArgdownHandler(),
+                ArgannoCompositeHandler(),
+                infreco_handler,
+                LogRecoCompositeHandler(),
+                ArgannoInfrecoCoherenceHandler(),                
+            ]
+        )
+        request = VerificationRequest(
+            inputs=str(solution), source=problem.sources
+        )
+        result = handler.handle(request)
+        evaluation = Evaluation.from_verification_request(result)
+        if evaluation.artifacts.get("argdown_map") is None:
+            evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
         return evaluation
+
+
+        # TODO remove
+        # evaluation = super()._evaluate_solution(problem, reco)
+        # argdown = evaluation.artifacts["argdown"]
+        # eval_data = evaluation.metrics
+        # is_valid = evaluation.is_valid
+        # if argdown is None:
+        #     return evaluation
+    
+        # eval_data["argument_unused_propositions"] = ""
+        # eval_data["argument_flawed_formalizations"] = ""
+        # eval_data["argument_invalid_inference"] = ""
+        # eval_data["argument_redundant_premises"] = ""
+        # eval_data["argument_inconsistent_premises"] = ""
+
+        # # unused propositions
+        # msgs = []
+        # for argument_idx, argument in enumerate(argdown.arguments):
+        #     verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
+        #     check, msg = verifier.uses_all_props()
+        #     if check is False:
+        #         msgs.append(
+        #             f"Error in {argument.label}: {msg}" if msg else f"Unused propositions in argument {argument.label}"
+        #         )
+        # if msgs:
+        #     is_valid = False
+        #     eval_data["argument_unused_propositions"] = "\n".join(msgs)
+        # del msgs
+
+        # # check for syntactically correct formalizations
+        # msgs = []
+        # for argument_idx, argument in enumerate(argdown.arguments):
+        #     verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
+        #     check, msg = verifier.has_flawless_formalizations()
+        #     if check is False:
+        #         msgs.append(
+        #             f"Error in {argument.label}: {msg}" if msg else f"Flawed formalizations in argument {argument.label}"
+        #         )
+        # if msgs:
+        #     is_valid = False
+        #     eval_data["argument_flawed_formalizations"] = "\n".join(msgs)
+
+        # # check for valid inference
+        # msgs = []
+        # for argument_idx, argument in enumerate(argdown.arguments):
+        #     verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
+        #     for veri_fn in [
+        #         verifier.is_globally_deductively_valid,
+        #         verifier.is_locally_deductively_valid
+        #     ]:
+        #         check, msg = veri_fn()
+        #         if check is False:
+        #             msgs.append(
+        #                 f"Error in {argument.label}: {msg}"
+        #                 if msg else f"Invalid inference in argument {argument.label}"
+        #             )
+        # if msgs:
+        #     is_valid = False
+        #     eval_data["argument_invalid_inference"] = "\n".join(msgs)
+        # del msgs
+
+        # # check for redundant premises
+        # msgs = []
+        # for argument_idx, argument in enumerate(argdown.arguments):
+        #     verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
+        #     check, msg = verifier.all_premises_relevant()
+        #     if check is False:
+        #         msgs.append(
+        #             f"Error in {argument.label}: {msg}"
+        #             if msg else f"Redundant premises in argument {argument.label}"
+        #         )
+        # if msgs:
+        #     is_valid = False
+        #     eval_data["argument_redundant_premises"] = "\n".join(msgs)
+        # del msgs
+
+        # # check for inconsistent premises
+        # msgs = []
+        # for argument_idx, argument in enumerate(argdown.arguments):
+        #     verifier = LogRecoVerifier(argdown, argument_idx=argument_idx)
+        #     check, msg = verifier.premises_consistent()
+        #     if check is False:
+        #         msgs.append(
+        #             f"Error in {argument.label}: {msg}"
+        #             if msg else f"Inconsistent premises in argument {argument.label}"
+        #         )
+        # if msgs:
+        #     is_valid = False
+        #     eval_data["argument_inconsistent_premises"] = "\n".join(msgs)
+        # del msgs
+
+        # evaluation.is_valid = is_valid
+        # evaluation.metrics = eval_data
+        # return evaluation
 
     async def arun(
         self,

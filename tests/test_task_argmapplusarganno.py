@@ -65,21 +65,21 @@ def source_texts() -> list[str]:
 @pytest.fixture
 def valid_recos(solution_class) -> list[Solution]:
     return [
-        solution_class.from_raw_answer(
-            textwrap.dedent("""
-            ```xml
-            <proposition id="1" argument_label="No meat">We should stop eating meat.</proposition>
-                            
-            <proposition id="2" supports="1" argument_label="Suffering">Animals suffer.</proposition> <proposition id="3" supports="1" argument_label="Climate change">Animal farming causes climate change.</proposition>
-            ```
-
-            ```argdown
-            [No meat]: We should stop eating meat. {annotation_ids: ['1']}
-                <+ <Suffering>: Animals suffer. {annotation_ids: ['2']}
-                <+ <Climate change>: Animal farming causes climate change. {annotation_ids: ['3']}
-            ```
-            """)
-        ),
+#        solution_class.from_raw_answer(
+#            textwrap.dedent("""
+#            ```xml
+#            <proposition id="1" argument_label="No meat">We should stop eating meat.</proposition>
+#                            
+#            <proposition id="2" supports="1" argument_label="Suffering">Animals suffer.</proposition> <proposition id="3" supports="1" argument_label="Climate change">Animal farming causes climate change.</proposition>
+#            ```
+#
+#            ```argdown
+#            [No meat]: We should stop eating meat. {annotation_ids: ['1']}
+#                <+ <Suffering>: Animals suffer. {annotation_ids: ['2']}
+#                <+ <Climate change>: Animal farming causes climate change. {annotation_ids: ['3']}
+#            ```
+#            """)
+#        ),
         solution_class.from_raw_answer(
             textwrap.dedent("""
             Bad stuff:

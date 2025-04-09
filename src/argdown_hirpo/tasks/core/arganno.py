@@ -19,7 +19,7 @@ from argdown_hirpo.tasks.base import (
 from argdown_hirpo.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_hirpo.verifiers.core.content_check_handler import HasAnnotationsHandler
 from argdown_hirpo.verifiers.verification_request import VerificationDType, VerificationRequest
-from argdown_hirpo.verifiers.processing_handler import CompositeProcessingHandler, FencedCodeBlockExtractor
+from argdown_hirpo.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
 from argdown_hirpo.verifiers.base import CompositeHandler
 
 ANNOTATION_SCHEME = dedent("""
@@ -139,7 +139,7 @@ class Annotation(Solution):
         #    if answer.split("```xml")[1].count("\n```") == 1:
         #        answer = answer.split("```xml")[1].split("\n```")[0]
         #        answer = "```xml" + answer + "\n```"
-        return cls(annotated_source_text=answer)
+        return cls(annotated_source_text=code_snippet)
 
 
 class AnnotationProblemGenerator(ProblemGenerator):
@@ -185,7 +185,7 @@ class AnnotationJudge(Judge):
     ) -> Evaluation:
         handler = CompositeHandler(
             handlers=[
-                CompositeProcessingHandler(),
+                DefaultProcessingHandler(),
                 HasAnnotationsHandler(),
                 ArgannoCompositeHandler(),
             ]
