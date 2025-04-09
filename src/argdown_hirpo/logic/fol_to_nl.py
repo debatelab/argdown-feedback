@@ -41,7 +41,14 @@ class FOL2NLTranslator:
     @classmethod
     def translate_to_nl_scheme(cls, expression: Expression) -> str:
         """translate a logic expression to natural language scheme"""
-
+        if isinstance(expression, ApplicationExpression):
+            print(f"Expression type: {type(expression)}")
+            print(f"Function type: {type(expression.function)}")
+            print(f"Expression string: {str(expression)}")
+            # See what attributes are available
+            print(f"Expression dir: {dir(expression)}")
+            print(f"Function dir: {dir(expression.function)}")
+        
         def is_negated_atomic_expression(expression: Expression) -> bool:
             """checks if expression is negated atomic expression (unary predicate)"""
             if isinstance(expression, NegatedExpression):
@@ -50,7 +57,7 @@ class FOL2NLTranslator:
             return False
 
         if isinstance(expression, ApplicationExpression):
-            if isinstance(expression.function, FunctionVariableExpression):
+            if isinstance(expression.function, FunctionVariableExpression) or isinstance(expression.function, ConstantExpression):
                 # unary predicate
                 return "{%s} is {%s}" % (
                     expression.argument.variable.name, expression.function.variable.name
@@ -62,7 +69,7 @@ class FOL2NLTranslator:
                 while isinstance(subexpression.function, ApplicationExpression):
                     objects = [subexpression.argument.variable.name] + objects
                     subexpression = subexpression.function
-                if isinstance(subexpression.function, FunctionVariableExpression):
+                if isinstance(subexpression.function, FunctionVariableExpression) or isinstance(subexpression.function, ConstantExpression):
                     return "{%s} stands in relation {%s} to %s" % (
                         subexpression.argument.variable.name,
                         subexpression.function.variable.name,
