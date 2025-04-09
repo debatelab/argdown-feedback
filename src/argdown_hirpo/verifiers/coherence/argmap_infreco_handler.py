@@ -1,4 +1,4 @@
-from typing import Callable, Optional, TypeAlias
+from typing import Optional
 import logging
 
 from pyargdown import (
@@ -29,6 +29,13 @@ class BaseArgmapInfrecoCoherenceHandler(CoherenceHandler):
 
     def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None,
                  filters: Optional[tuple[VDFilter,VDFilter]] = None, from_key: str = "from"):
+        """Base handler interface for evaluating coherence of Argmap and Infreco data.
+        
+        filters: Optional[tuple[VDFilter,VDFilter]] = None
+            Filters for the verification data. The first filter is applied to extract map,
+            and the second to extract the reconstruction.
+            If None, default filters are used.
+        """
         self._next_handler: Optional['CoherenceHandler'] = None
         self.name = name or self.__class__.__name__
         self.logger = logger or logging.getLogger(self.__class__.__module__)
@@ -249,7 +256,7 @@ class ArgmapInfrecoCoherenceHandler(CompositeHandler[BaseArgmapInfrecoCoherenceH
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        filters: Optional[tuple[Callable,Callable]] = None,
+        filters: Optional[tuple[VDFilter,VDFilter]] = None,
         from_key: str = "from",
         handlers: list[BaseArgmapInfrecoCoherenceHandler] | None = None,
     ):

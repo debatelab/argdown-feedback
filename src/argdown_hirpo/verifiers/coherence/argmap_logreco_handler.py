@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Optional
 import logging
 
 from pyargdown import (
@@ -13,6 +13,7 @@ from argdown_hirpo.verifiers.coherence.argmap_infreco_handler import (
     BaseArgmapInfrecoCoherenceHandler,
 )
 from argdown_hirpo.verifiers.verification_request import (
+    VDFilter,
     VerificationRequest,
     PrimaryVerificationData,
     VerificationResult,
@@ -25,7 +26,14 @@ class BaseArgmapLogrecoCoherenceHandler(BaseArgmapInfrecoCoherenceHandler):
     """Base handler interface for evaluating coherence of Argmap and Logreco data."""
 
     def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None,
-                 filters: Optional[tuple[Callable,Callable]] = None, from_key: str = "from"):
+                 filters: Optional[tuple[VDFilter,VDFilter]] = None, from_key: str = "from"):
+        """Base handler interface for evaluating coherence of Argmap and Logreco data.
+        
+        filters: Optional[tuple[VDFilter,VDFilter]] = None
+            Filters for the verification data. The first filter is applied to extract map,
+            and the second to extract the reconstruction.
+            If None, default filters are used.
+        """
         super().__init__(name, logger, filters, from_key)
 
     def is_applicable(self, vdata1: PrimaryVerificationData, vdata2: PrimaryVerificationData, ctx: VerificationRequest) -> bool:
@@ -144,7 +152,7 @@ class ArgmapLogrecoCoherenceHandler(CompositeHandler[BaseArgmapLogrecoCoherenceH
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        filters: Optional[tuple[Callable,Callable]] = None,
+        filters: Optional[tuple[VDFilter,VDFilter]] = None,
         from_key: str = "from",
         handlers: list[BaseArgmapLogrecoCoherenceHandler] | None = None,
     ):

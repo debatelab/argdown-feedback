@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Optional
 import logging
 
 from bs4 import BeautifulSoup
@@ -12,6 +12,7 @@ from argdown_hirpo.verifiers.verification_request import (
     PrimaryVerificationData,
     VerificationDType,
     VerificationResult,
+    VDFilter,
 )
 from argdown_hirpo.verifiers.base import CompositeHandler
 from argdown_hirpo.verifiers.coherence.coherence_handler import CoherenceHandler
@@ -21,7 +22,14 @@ class BaseArgannoArgmapCoherenceHandler(CoherenceHandler):
     """Base handler interface for evaluating coherence of Arganno and Argmap data."""
 
     def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None,
-                 filters: Optional[tuple[Callable,Callable]] = None):
+                 filters: Optional[tuple[VDFilter,VDFilter]] = None):
+        """Base handler interface for evaluating coherence of Argmap and Arganno data.
+        
+        filters: Optional[tuple[VDFilter,VDFilter]] = None
+            Filters for the verification data. The first filter is applied to extract argdown map,
+            and the second to extract the xml annotation.
+            If None, default filters are used.
+        """
         self._next_handler: Optional['CoherenceHandler'] = None
         self.name = name or self.__class__.__name__
         self.logger = logger or logging.getLogger(self.__class__.__module__)
@@ -198,7 +206,7 @@ class ArgannoArgmapCoherenceHandler(CompositeHandler[BaseArgannoArgmapCoherenceH
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        filters: Optional[tuple[Callable,Callable]] = None,
+        filters: Optional[tuple[VDFilter,VDFilter]] = None,
         handlers: list[BaseArgannoArgmapCoherenceHandler] | None = None,
     ):
         super().__init__(name, logger, handlers)

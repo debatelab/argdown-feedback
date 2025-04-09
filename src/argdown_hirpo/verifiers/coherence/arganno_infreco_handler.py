@@ -1,4 +1,4 @@
-from typing import Callable, Optional, Dict
+from typing import Optional, Dict
 import logging
 
 from bs4 import BeautifulSoup
@@ -11,6 +11,7 @@ from pyargdown import (
 )
 
 from argdown_hirpo.verifiers.verification_request import (
+    VDFilter,
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
@@ -52,7 +53,14 @@ class BaseArgannoInfrecoCoherenceHandler(CoherenceHandler):
     """Base handler interface for evaluating coherence of Arganno and InfReco data."""
 
     def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None,
-                 filters: Optional[tuple[Callable,Callable]] = None, from_key: str = "from"):
+                 filters: Optional[tuple[VDFilter,VDFilter]] = None, from_key: str = "from"):
+        """Base handler interface for evaluating coherence of Arganno and Infreco data.
+        
+        filters: Optional[tuple[VDFilter,VDFilter]] = None
+            Filters for the verification data. The first filter is applied to extract argdown reco,
+            and the second to extract the xml annotation.
+            If None, default filters are used.
+        """
         self._next_handler: Optional['CoherenceHandler'] = None
         self.name = name or self.__class__.__name__
         self.logger = logger or logging.getLogger(self.__class__.__module__)
@@ -378,7 +386,7 @@ class ArgannoInfrecoCoherenceHandler(CompositeHandler[BaseArgannoInfrecoCoherenc
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
-        filters: Optional[tuple[Callable,Callable]] = None,
+        filters: Optional[tuple[VDFilter,VDFilter]] = None,
         from_key: str = "from",
         handlers: list[BaseArgannoInfrecoCoherenceHandler] | None = None,
     ):
