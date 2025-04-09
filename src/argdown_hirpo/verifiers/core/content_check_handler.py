@@ -7,6 +7,7 @@ from argdown_hirpo.verifiers.verification_request import (
     VerificationRequest,
     VerificationDType,
     VerificationResult,
+    VDFilter,
 )
 from argdown_hirpo.verifiers.base import BaseHandler
 
@@ -53,13 +54,19 @@ class HasArgdownHandler(BaseHandler):
         self,
         name: Optional[str] = None,
         logger: Optional[logging.Logger] = None,
+        filter: Optional[VDFilter] = None
     ):
         super().__init__(name, logger)
-
+        if filter is None:
+            filter = lambda x: True  # noqa: E731
+        self.filter = filter
+        
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         message = None
         if not any(
-            vdata.dtype == VerificationDType.argdown and vdata.code_snippet
+            self.filter(vdata)
+            and vdata.dtype == VerificationDType.argdown
+            and vdata.code_snippet
             for vdata in request.verification_data
         ):
             error_msg = "Input data has no properly formatted fenced codeblocks with Argdown code."

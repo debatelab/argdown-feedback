@@ -1,4 +1,4 @@
-from typing import Callable, Optional
+from typing import Callable, Optional, TypeAlias
 import logging
 
 from pyargdown import (
@@ -17,6 +17,7 @@ from argdown_hirpo.verifiers.verification_request import (
     PrimaryVerificationData,
     VerificationDType,
     VerificationResult,
+    VDFilter,
 )
 from argdown_hirpo.verifiers.base import CompositeHandler
 from argdown_hirpo.verifiers.coherence.coherence_handler import CoherenceHandler
@@ -27,7 +28,7 @@ class BaseArgmapInfrecoCoherenceHandler(CoherenceHandler):
     """Base handler interface for evaluating coherence of Argmap and Infreco data."""
 
     def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None,
-                 filters: Optional[tuple[Callable,Callable]] = None, from_key: str = "from"):
+                 filters: Optional[tuple[VDFilter,VDFilter]] = None, from_key: str = "from"):
         self._next_handler: Optional['CoherenceHandler'] = None
         self.name = name or self.__class__.__name__
         self.logger = logger or logging.getLogger(self.__class__.__module__)
@@ -42,8 +43,13 @@ class BaseArgmapInfrecoCoherenceHandler(CoherenceHandler):
         if self.filters:
             filter_fn1, filter_fn2 = self.filters
         else:
-            filter_fn1 = lambda vd: vd.dtype == VerificationDType.argdown and vd.metadata.get("filename").startswith("map") # noqa: E731
-            filter_fn2 = lambda vd: vd.dtype == VerificationDType.argdown and vd.metadata.get("filename").startswith("reconstructions") # noqa: E731
+            # Default filters for argmap and infreco data
+            def filter_fn1(vd: PrimaryVerificationData) -> bool:
+                metadata: dict = vd.metadata if vd.metadata is not None else {}
+                return vd.dtype == VerificationDType.argdown and metadata.get("filename", "").startswith("map")
+            def filter_fn2(vd: PrimaryVerificationData) -> bool:
+                metadata: dict = vd.metadata if vd.metadata is not None else {}
+                return vd.dtype == VerificationDType.argdown and metadata.get("filename", "").startswith("reconstructions")
         vds_map = [vd for vd in ctx.verification_data if filter_fn1(vd)]
         if not vds_map:
             return False

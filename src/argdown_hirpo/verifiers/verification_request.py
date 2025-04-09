@@ -1,9 +1,10 @@
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, Optional, Tuple, List, overload
+from typing import Any, Callable, Dict, Optional, List, TypeAlias
 import logging
 from bs4 import BeautifulSoup
 from pyargdown import Argdown
+
 
 class VerificationDType(Enum):
     """Types of primary verification data."""
@@ -22,6 +23,10 @@ class PrimaryVerificationData:
     data: Argdown | BeautifulSoup | None = None
     code_snippet: Optional[str] = None
     metadata: Optional[Dict[str, Any]] = field(default_factory=dict)
+
+# Define a custom type for data filters
+VDFilter: TypeAlias = Callable[[PrimaryVerificationData], bool]
+
 
 @dataclass
 class VerificationResult:
