@@ -49,7 +49,7 @@ requires-dist = [
     { name = "beautifulsoup4", specifier = ">=4.13.3" },
     { name = "nltk", specifier = ">=3.9.1" },
     { name = "openai", specifier = ">=1.66.3" },
-    { name = "pyargdown", git = "https://github.com/ggbetz/pyargdown.git" },
+    { name = "pyargdown", git = "https://github.com/debatelab/pyargdown.git" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "textdistance", specifier = ">=4.6.3" },
     { name = "z3-solver", specifier = ">=4.14.1.0" },
@@ -297,7 +297,7 @@ wheels = [
 [[package]]
 name = "pyargdown"
 version = "0.1.0"
-source = { git = "https://github.com/ggbetz/pyargdown.git#79f50cadcc1d3987ff11379163636d7e4328acf9" }
+source = { git = "https://github.com/debatelab/pyargdown.git#5d97c667e33639b1b38bb7a3c4704eed0c4656a6" }
 dependencies = [
     { name = "lark" },
     { name = "networkx" },
