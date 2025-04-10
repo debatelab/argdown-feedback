@@ -24,6 +24,19 @@ from argdown_feedback.tasks.base import Evaluation
 from argdown_feedback.verifiers.verification_request import VerificationRequest
 
 
+snippet = """
+Hello. Here's some argdown code.
+
+```argdown
+<Argument>
+
+(1) Premise
+(2) Premise
+-- {from:["2"]} --
+(3) Conclusion
+\n```
+"""
+
 handler = CompositeHandler(
     handlers=[
         DefaultProcessingHandler(),
