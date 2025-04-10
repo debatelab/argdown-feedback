@@ -25,7 +25,7 @@ wheels = [
 ]
 
 [[package]]
-name = "argdown-hirpo"
+name = "argdown-feedback"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [

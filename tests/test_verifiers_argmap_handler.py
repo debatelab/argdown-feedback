@@ -5,14 +5,14 @@ from textwrap import dedent
 
 from pyargdown import parse_argdown
 
-from argdown_hirpo.verifiers.core.argmap_handler import (
+from argdown_feedback.verifiers.core.argmap_handler import (
     ArgMapHandler,
     CompleteClaimsHandler,
     NoDuplicateLabelsHandler,
     NoPCSHandler,
     ArgMapCompositeHandler
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,

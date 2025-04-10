@@ -2,19 +2,19 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
-from argdown_hirpo.tasks.compound.argmap_plus_arganno import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
+from argdown_feedback.tasks.compound.argmap_plus_arganno import (
     ArgmapPlusArgannoProblem,
     ArgmapPlusArgannoProblemGenerator,
     ArgmapPlusArganno,
     ArgmapPlusArgannoJudge,
     AnnotationProximityPreferencePairGenerator,
 )
-from argdown_hirpo.tasks.core.argmap import (
+from argdown_feedback.tasks.core.argmap import (
     ConnectednessPreferencePairGenerator,
     MaxArgsPreferencePairGenerator,
 )
-from argdown_hirpo.tasks.core.arganno import (
+from argdown_feedback.tasks.core.arganno import (
     AnnotationScopePreferencePairGenerator,
 )
 

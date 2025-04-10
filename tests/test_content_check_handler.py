@@ -4,8 +4,8 @@ import pytest
 from textwrap import dedent
 import uuid
 
-from argdown_hirpo.verifiers.core.content_check_handler import HasAnnotationsHandler, HasArgdownHandler
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.core.content_check_handler import HasAnnotationsHandler, HasArgdownHandler
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest, 
     VerificationResult,
     PrimaryVerificationData,

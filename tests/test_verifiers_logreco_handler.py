@@ -5,7 +5,7 @@ from textwrap import dedent
 from nltk.sem.logic import Expression  # type: ignore
 from pyargdown import parse_argdown
 
-from argdown_hirpo.verifiers.core.logreco_handler import (
+from argdown_feedback.verifiers.core.logreco_handler import (
     WellFormedFormulasHandler,
     GlobalDeductiveValidityHandler,
     LocalDeductiveValidityHandler,
@@ -14,7 +14,7 @@ from argdown_hirpo.verifiers.core.logreco_handler import (
     FormallyGroundedRelationsHandler,
     LogRecoCompositeHandler,
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,

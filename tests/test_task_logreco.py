@@ -1,8 +1,8 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericSolutionGenerator
-from argdown_hirpo.tasks.core.logreco import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericSolutionGenerator
+from argdown_feedback.tasks.core.logreco import (
     LogicalReco,
     LogRecoProblem,
     LogRecoProblemGenerator,

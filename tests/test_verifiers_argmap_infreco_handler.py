@@ -3,13 +3,13 @@ import pytest
 from textwrap import dedent
 from pyargdown import parse_argdown, ArgdownMultiDiGraph
 
-from argdown_hirpo.verifiers.coherence.argmap_infreco_handler import (
+from argdown_feedback.verifiers.coherence.argmap_infreco_handler import (
     BaseArgmapInfrecoCoherenceHandler,
     ArgmapInfrecoElemCohereHandler,
     ArgmapInfrecoRelationCohereHandler,
     ArgmapInfrecoCoherenceHandler
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,

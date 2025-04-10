@@ -6,14 +6,14 @@ from bs4 import BeautifulSoup
 
 from pyargdown import ArgdownMultiDiGraph
 
-from argdown_hirpo.verifiers.processing_handler import (
+from argdown_feedback.verifiers.processing_handler import (
     ProcessingHandler,
     FencedCodeBlockExtractor,
     ArgdownParser,
     XMLParser,
     DefaultProcessingHandler,
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     VerificationDType,
 )

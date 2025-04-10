@@ -1,8 +1,8 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, GenericSolutionGenerator
-from argdown_hirpo.tasks.core.argmap import (
+from argdown_feedback.tasks.base import Feedback, GenericSolutionGenerator
+from argdown_feedback.tasks.core.argmap import (
     ArgumentMap,
     ArgMapProblem,
     ArgMapProblemGenerator,

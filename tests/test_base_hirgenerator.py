@@ -3,7 +3,7 @@ from typing import Sequence
 import pytest
 import dataclasses
 
-from argdown_hirpo.tasks.base import (
+from argdown_feedback.tasks.base import (
     Problem,
     Solution,
     Evaluation,

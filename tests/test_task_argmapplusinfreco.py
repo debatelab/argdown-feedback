@@ -2,8 +2,8 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
-from argdown_hirpo.tasks.compound.argmap_plus_infreco import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
+from argdown_feedback.tasks.compound.argmap_plus_infreco import (
     ArgmapPlusInfrecoProblem,
     ArgmapPlusInfrecoProblemGenerator,
     ArgmapPlusInfreco,

@@ -5,7 +5,7 @@ from bs4 import BeautifulSoup
 import textwrap
 
 
-from argdown_hirpo.verifiers.core.arganno_handler import (
+from argdown_feedback.verifiers.core.arganno_handler import (
     ArgannoHandler, 
     SourceTextIntegrityHandler,
     NestedPropositionHandler,
@@ -19,7 +19,7 @@ from argdown_hirpo.verifiers.core.arganno_handler import (
     RefRecoLabelValidityHandler,
     ArgannoCompositeHandler
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,

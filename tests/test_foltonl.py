@@ -1,5 +1,5 @@
 from nltk.sem.logic import Expression  # type: ignore
-from argdown_hirpo.logic.fol_to_nl import FOL2NLTranslator
+from argdown_feedback.logic.fol_to_nl import FOL2NLTranslator
 
 class TestFOL2NLTranslator:
     

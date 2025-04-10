@@ -2,19 +2,19 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
-from argdown_hirpo.tasks.compound.arganno_plus_infreco import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericFeedbackGenerator, GenericSolutionGenerator
+from argdown_feedback.tasks.compound.arganno_plus_infreco import (
     ArgannoPlusInfrecoProblem,
     ArgannoPlusInfrecoProblemGenerator,
     ArgannoPlusInfreco,
     ArgannoPlusInfrecoJudge,
     AnnotationProximityPreferencePairGenerator,
 )
-from argdown_hirpo.tasks.core.infreco import (
+from argdown_feedback.tasks.core.infreco import (
     NoUnusedPropsPreferencePairGenerator,
     SimplicityPreferencePairGenerator,
 )
-from argdown_hirpo.tasks.core.arganno import (
+from argdown_feedback.tasks.core.arganno import (
     AnnotationScopePreferencePairGenerator,
     AnnotationSupportsPreferencePairGenerator,
     AnnotationCoveragePreferencePairGenerator,

@@ -5,7 +5,7 @@ from textwrap import dedent
 
 from pyargdown import parse_argdown
 
-from argdown_hirpo.verifiers.core.infreco_handler import (
+from argdown_feedback.verifiers.core.infreco_handler import (
     InfRecoHandler,
     HasArgumentsHandler,
     HasUniqueArgumentHandler,
@@ -25,7 +25,7 @@ from argdown_hirpo.verifiers.core.infreco_handler import (
     NoArgInlineDataHandler,
     InfRecoCompositeHandler
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,

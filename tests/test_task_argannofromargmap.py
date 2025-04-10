@@ -1,19 +1,19 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericSolutionGenerator
-from argdown_hirpo.tasks.core.argmap import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericSolutionGenerator
+from argdown_feedback.tasks.core.argmap import (
     ArgMapJudge,
     ArgMapProblem,
     ArgumentMap,
 )
-from argdown_hirpo.tasks.core.arganno import (
+from argdown_feedback.tasks.core.arganno import (
     Annotation,
     AnnotationJudge,
     AnnotationFeedbackGenerator,
     AnnotationCoveragePreferencePairGenerator
 )
-from argdown_hirpo.tasks.sequential.arganno_from_argmap import (
+from argdown_feedback.tasks.sequential.arganno_from_argmap import (
     ArgannoFromArgmapProblem,
     ArgannoFromArgmapProblemGenerator,
     ArgmapTextProximityPreferencePairGenerator,

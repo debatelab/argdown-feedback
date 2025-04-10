@@ -2,15 +2,15 @@ from pprint import pprint
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericSolutionGenerator
-from argdown_hirpo.tasks.core.arganno import AnnotationJudge
-from argdown_hirpo.tasks.core.argmap import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericSolutionGenerator
+from argdown_feedback.tasks.core.arganno import AnnotationJudge
+from argdown_feedback.tasks.core.argmap import (
     ArgumentMap,
     ArgMapJudge,
     ArgMapFeedbackGenerator,
     MaxArgsPreferencePairGenerator
 )
-from argdown_hirpo.tasks.sequential.argmap_from_arganno import (
+from argdown_feedback.tasks.sequential.argmap_from_arganno import (
     ArgmapFromArgannoProblem,
     ArgmapFromArgannoProblemGenerator,
     AnnotationTextProximityPreferencePairGenerator,

@@ -1,19 +1,19 @@
 import pytest
 import textwrap
 
-from argdown_hirpo.tasks.base import Feedback, Solution, GenericSolutionGenerator
-from argdown_hirpo.tasks.core.infreco import (
+from argdown_feedback.tasks.base import Feedback, Solution, GenericSolutionGenerator
+from argdown_feedback.tasks.core.infreco import (
     InfRecoJudge,
     InfRecoProblem,
     InformalReco,
 )
-from argdown_hirpo.tasks.core.logreco import (
+from argdown_feedback.tasks.core.logreco import (
     LogicalReco,
     LogRecoJudge,
     LogRecoFeedbackGenerator,
     FormalizationsFaithfulnessPreferencePairGenerator,
 )
-from argdown_hirpo.tasks.sequential.logreco_from_infreco import (
+from argdown_feedback.tasks.sequential.logreco_from_infreco import (
     LogrecoFromInfrecoProblem,
     LogrecoFromInfrecoProblemGenerator,
     InfrecoProximityPreferencePairGenerator,

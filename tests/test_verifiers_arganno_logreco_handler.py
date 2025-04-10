@@ -4,21 +4,21 @@ from textwrap import dedent
 from bs4 import BeautifulSoup
 from pyargdown import parse_argdown, ArgdownMultiDiGraph
 
-from argdown_hirpo.verifiers.coherence.arganno_logreco_handler import (
+from argdown_feedback.verifiers.coherence.arganno_logreco_handler import (
     ArgannoLogrecoCoherenceHandler
 )
-from argdown_hirpo.verifiers.coherence.arganno_infreco_handler import (
+from argdown_feedback.verifiers.coherence.arganno_infreco_handler import (
     ArgannoInfrecoElemCohereHandler,
     ArgannoInfrecoRelationCohereHandler,
     BaseArgannoInfrecoCoherenceHandler
 )
-from argdown_hirpo.verifiers.verification_request import (
+from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
     VerificationDType,
     VerificationResult
 )
-from argdown_hirpo.verifiers.processing_handler import _MULTI_VALUED_ATTRIBUTES
+from argdown_feedback.verifiers.processing_handler import _MULTI_VALUED_ATTRIBUTES
 
 
 def parse_fenced_argdown(argdown_text: str):
