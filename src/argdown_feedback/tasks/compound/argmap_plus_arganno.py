@@ -177,7 +177,7 @@ class ArgmapPlusArganno(Annotation, ArgumentMap):
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusArganno":
         handler = FencedCodeBlockExtractor()
         request = VerificationRequest(inputs=raw_answer)
-        result = handler.handle(request)
+        result = handler.process(request)
 
         annotated_source_text = next(
             (
@@ -235,7 +235,7 @@ class ArgmapPlusArgannoJudge(Judge):
             ]
         )
         request = VerificationRequest(inputs=str(solution), source=problem.sources)
-        result = handler.handle(request)
+        result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         if evaluation.artifacts.get("argdown_map") is None:
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")

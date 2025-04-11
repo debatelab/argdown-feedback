@@ -1,5 +1,6 @@
 
 from abc import ABC, abstractmethod
+from copy import deepcopy
 import logging
 from typing import Generic, Optional, TypeVar
 
@@ -38,6 +39,9 @@ class BaseHandler(ABC):
         Process request and pass to next handler if it should continue.
         Returns the request with processing results added.
         """
+
+        # request = deepcopy(request)  # Create a deep copy of the request to avoid side effects
+
         if not request.continue_processing:
             return request
             

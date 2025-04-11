@@ -194,7 +194,7 @@ def test_composite_handler(verification_request):
     request.verification_data.append(vdata_incomplete)
     
     composite = ArgMapCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     
     # Should find issues in the incomplete claims data
     assert len(request.results) > 0
@@ -252,7 +252,7 @@ def test_argmap_handler_handle_method():
             )
     
     handler = TestHandler()
-    handler.handle(request)
+    handler.process(request)
     
     assert len(request.results) == 1
     assert request.results[0].is_valid is True
@@ -274,7 +274,7 @@ def test_real_world_example_argmap():
     request.verification_data.append(vdata)
     
     composite = ArgMapCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     
     # All validations should pass
     invalid_results = [r for r in request.results if not r.is_valid]

@@ -136,7 +136,7 @@ class ArgumentMap(Solution):
         # extract fenced code block
         handler = FencedCodeBlockExtractor()
         request = VerificationRequest(inputs=answer)
-        result = handler.handle(request)
+        result = handler.process(request)
         code_snippet = next(
             (
                 vr.code_snippet
@@ -176,7 +176,7 @@ class ArgMapJudge(Judge):
         request = VerificationRequest(
             inputs=argmap.argdown_snippet, source=problem.sources
         )
-        result = handler.handle(request)
+        result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         if evaluation.artifacts.get("argdown_map") is None:
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")

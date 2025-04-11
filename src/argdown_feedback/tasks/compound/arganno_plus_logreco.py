@@ -245,7 +245,7 @@ class ArgannoPlusLogRecoJudge(Judge):
         request = VerificationRequest(
             inputs=str(solution), source=problem.sources
         )
-        result = handler.handle(request)
+        result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         if evaluation.artifacts.get("argdown_map") is None:
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")

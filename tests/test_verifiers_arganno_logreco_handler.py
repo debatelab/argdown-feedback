@@ -371,7 +371,7 @@ def test_custom_init_parameters():
 def test_elem_cohere_handler_valid(verification_request_with_valid_data):
     """Test elem coherence with valid logreco data."""
     handler = ArgannoLogrecoCoherenceHandler()
-    result_request = handler.handle(verification_request_with_valid_data)
+    result_request = handler.process(verification_request_with_valid_data)
     
     assert len(result_request.results) == 2
     
@@ -389,7 +389,7 @@ def test_elem_cohere_handler_illegal_argument_label(valid_logreco_vdata, invalid
         valid_logreco_vdata, invalid_argument_label_xml_vdata
     ])
     
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Get the result from the element coherence handler
     elem_result = next((r for r in result_request.results if "Elem" in r.verifier_id), None)
@@ -405,7 +405,7 @@ def test_elem_cohere_handler_illegal_ref_reco_label(valid_logreco_vdata, invalid
         valid_logreco_vdata, invalid_ref_reco_label_xml_vdata
     ])
     
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Get the result from the element coherence handler
     elem_result = next((r for r in result_request.results if "Elem" in r.verifier_id), None)
@@ -421,7 +421,7 @@ def test_elem_cohere_handler_missing_annotation_ids(missing_annotation_ids_vdata
         missing_annotation_ids_vdata, valid_xml_vdata
     ])
     
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Get the result from the element coherence handler
     elem_result = next((r for r in result_request.results if "Elem" in r.verifier_id), None)
@@ -437,7 +437,7 @@ def test_elem_cohere_handler_invalid_annotation_id(invalid_annotation_id_vdata, 
         invalid_annotation_id_vdata, valid_xml_vdata
     ])
     
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Get the result from the element coherence handler
     elem_result = next((r for r in result_request.results if "Elem" in r.verifier_id), None)
@@ -449,7 +449,7 @@ def test_elem_cohere_handler_invalid_annotation_id(invalid_annotation_id_vdata, 
 def test_relation_cohere_handler_valid(verification_request_with_valid_relations):
     """Test relation coherence with valid relations."""
     handler = ArgannoLogrecoCoherenceHandler()
-    result_request = handler.handle(verification_request_with_valid_relations)
+    result_request = handler.process(verification_request_with_valid_relations)
     
     # Get the result from the relation coherence handler
     relation_result = next((r for r in result_request.results if "Relation" in r.verifier_id), None)
@@ -465,7 +465,7 @@ def test_relation_cohere_handler_inconsistent(inconsistent_relation_logreco_vdat
         inconsistent_relation_logreco_vdata, inconsistent_relation_xml_vdata
     ])
     
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Get the result from the relation coherence handler
     relation_result = next((r for r in result_request.results if "Relation" in r.verifier_id), None)
@@ -481,7 +481,7 @@ def test_relation_cohere_handler_attack_same_argument(attack_between_same_argume
         attack_between_same_argument_logreco_vdata, attack_between_same_argument_xml_vdata
     ])
     
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Get the result from the relation coherence handler
     relation_result = next((r for r in result_request.results if "Relation" in r.verifier_id), None)
@@ -500,7 +500,7 @@ def test_handle_wrong_data_types():
         PrimaryVerificationData(id="wrong_xml", dtype=VerificationDType.xml, data="not a soup")
     ])
     
-    result = handler.handle(request)
+    result = handler.process(request)
     pprint(result)
     assert all("Internal error:" in vr.message for vr in result.results)
 
@@ -554,7 +554,7 @@ def test_real_world_example():
     
     # Test with the handler
     handler = ArgannoLogrecoCoherenceHandler()
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
     
     # Should have results for both handlers
     assert len(result_request.results) == 2
@@ -599,7 +599,7 @@ def test_custom_handlers():
     )
     
     # Process the request
-    result_request = logreco_handler.handle(request)
+    result_request = logreco_handler.process(request)
     
     # Check that both handlers were called and their results added
     assert len(result_request.results) == 2

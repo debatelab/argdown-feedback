@@ -377,7 +377,7 @@ class ArgmapPlusLogrecoJudge(Judge):
             ]
         )
         request = VerificationRequest(inputs=str(solution), source=problem.sources)
-        result = main_handler.handle(request)
+        result = main_handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
 

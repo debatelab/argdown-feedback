@@ -369,7 +369,7 @@ def test_composite_handler(verification_request):
     request.verification_data.append(vdata_nested)
     
     composite = ArgannoCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     
     # Should find issues in the nested proposition data
     assert len(request.results) > 0
@@ -458,7 +458,7 @@ def test_arganno_handler_handle_method():
             )
     
     handler = TestHandler()
-    handler.handle(request)
+    handler.process(request)
     
     assert len(request.results) == 1
     assert request.results[0].is_valid is True
@@ -479,7 +479,7 @@ def test_real_world_example_from_test_task_arganno():
     )
     request = VerificationRequest(inputs="", source=source, verification_data=[vdata])    
     composite = ArgannoCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     pprint(request.results)    
     # All validations should pass
     invalid_results = [r for r in request.results if not r.is_valid]

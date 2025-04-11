@@ -151,7 +151,7 @@ class LogicalReco(Solution):
         """Extract a LogicalReco from a raw answer string."""
         handler = FencedCodeBlockExtractor()
         request = VerificationRequest(inputs=answer)
-        result = handler.handle(request)
+        result = handler.process(request)
         code_snippet = next(
             (
                 vr.code_snippet for vr in reversed(result.verification_data)
@@ -197,7 +197,7 @@ class LogRecoJudge(Judge):
         request = VerificationRequest(
             inputs=reco.argdown_snippet, source=problem.sources
         )
-        result = handler.handle(request)
+        result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         if evaluation.artifacts.get("argdown_reco") is None:
             evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")

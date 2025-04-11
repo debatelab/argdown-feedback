@@ -507,7 +507,7 @@ def test_logreco_composite_handler():
 
 def test_composite_handler_process_all(verification_request_with_valid_logreco):
     composite = LogRecoCompositeHandler()
-    result_request = composite.handle(verification_request_with_valid_logreco)
+    result_request = composite.process(verification_request_with_valid_logreco)
 
     # Should have at least one result for valid data
     assert len(result_request.results) > 0
@@ -557,7 +557,7 @@ def test_real_world_example():
 
     # Test with the composite handler
     composite = LogRecoCompositeHandler()
-    result_request = composite.handle(request)
+    result_request = composite.process(request)
 
     # Should have results for each handler
     assert len(result_request.results) == 6

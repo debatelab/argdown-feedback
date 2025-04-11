@@ -94,7 +94,7 @@ def verification_request(argdown_input_text):
 
 def test_fenced_code_block_extractor_argdown(verification_request):
     handler = FencedCodeBlockExtractor()
-    result_request = handler.handle(verification_request)
+    result_request = handler.process(verification_request)
 
     assert len(result_request.verification_data) == 1
     assert result_request.verification_data[0].dtype == VerificationDType.argdown
@@ -114,7 +114,7 @@ def test_fenced_code_block_extractor_xml():
     )
 
     handler = FencedCodeBlockExtractor()
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
 
     assert len(result_request.verification_data) == 1
     assert result_request.verification_data[0].dtype == VerificationDType.xml
@@ -127,7 +127,7 @@ def test_fenced_code_block_extractor_mixed(mixed_input_text):
     request = VerificationRequest(inputs=mixed_input_text, source=None)
 
     handler = FencedCodeBlockExtractor()
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
 
     assert len(result_request.verification_data) == 2
 
@@ -159,7 +159,7 @@ def test_fenced_code_block_extractor_with_metadata(input_with_metadata):
     request = VerificationRequest(inputs=input_with_metadata, source=None)
 
     handler = FencedCodeBlockExtractor()
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
 
     assert len(result_request.verification_data) == 1
     assert result_request.verification_data[0].metadata is not None
@@ -173,7 +173,7 @@ def test_fenced_code_block_extractor_no_codeblocks():
     )
 
     handler = FencedCodeBlockExtractor()
-    result_request = handler.handle(request)
+    result_request = handler.process(request)
 
     assert len(result_request.verification_data) == 0
 
@@ -184,8 +184,8 @@ def test_argdown_parser_valid(argdown_input_text):
     extractor = FencedCodeBlockExtractor()
     parser = ArgdownParser()
 
-    request = extractor.handle(request)
-    request = parser.handle(request)
+    request = extractor.process(request)
+    request = parser.process(request)
 
     assert len(request.verification_data) == 1
     assert request.verification_data[0].data is not None
@@ -199,8 +199,8 @@ def test_argdown_parser_invalid(invalid_argdown_input):
     extractor = FencedCodeBlockExtractor()
     parser = ArgdownParser()
 
-    request = extractor.handle(request)
-    request = parser.handle(request)
+    request = extractor.process(request)
+    request = parser.process(request)
 
     assert len(request.verification_data) == 1
     assert request.verification_data[0].data is None
@@ -215,8 +215,8 @@ def test_xml_parser_valid(xml_input_text):
     extractor = FencedCodeBlockExtractor()
     parser = XMLParser()
 
-    request = extractor.handle(request)
-    request = parser.handle(request)
+    request = extractor.process(request)
+    request = parser.process(request)
     assert len(request.verification_data) == 1
     assert request.verification_data[0].data is not None
     assert isinstance(request.verification_data[0].data, BeautifulSoup)
@@ -230,8 +230,8 @@ def test_xml_parser_invalid(invalid_xml_input):
     extractor = FencedCodeBlockExtractor()
     parser = XMLParser()
 
-    request = extractor.handle(request)
-    request = parser.handle(request)
+    request = extractor.process(request)
+    request = parser.process(request)
 
     assert len(request.verification_data) == 1
     assert request.verification_data[0].data is not None
@@ -250,12 +250,12 @@ def test_parsers_skip_already_parsed():
     extractor = FencedCodeBlockExtractor()
     xml_parser = XMLParser()
 
-    request = extractor.handle(request)
-    request = xml_parser.handle(request)
+    request = extractor.process(request)
+    request = xml_parser.process(request)
 
     # Now create a deep copy and try to parse again
     request_copy = copy.deepcopy(request)
-    request_copy = xml_parser.handle(request_copy)
+    request_copy = xml_parser.process(request_copy)
 
     # The data should be identical in both requests
     assert request.verification_data[0].data == request_copy.verification_data[0].data
@@ -265,7 +265,7 @@ def test_composite_processing_handler(mixed_input_text):
     request = VerificationRequest(inputs=mixed_input_text, source=None)
 
     composite = DefaultProcessingHandler()
-    result_request = composite.handle(request)
+    result_request = composite.process(request)
 
     # Should have extracted and parsed both code blocks
     assert len(result_request.verification_data) == 2
@@ -297,7 +297,7 @@ def test_composite_processing_handler_with_errors(invalid_argdown_input):
     request = VerificationRequest(inputs=invalid_argdown_input, source=None)
 
     composite = DefaultProcessingHandler()
-    result_request = composite.handle(request)
+    result_request = composite.process(request)
 
     # Should have extracted but failed to parse
     assert len(result_request.verification_data) == 1
@@ -318,7 +318,7 @@ def test_composite_handler_with_custom_handlers():
     composite = DefaultProcessingHandler(handlers=[custom_handler])
 
     request = VerificationRequest(inputs="test", source=None)
-    result_request = composite.handle(request)
+    result_request = composite.process(request)
 
     assert "CustomHandler" in result_request.executed_handlers
 
@@ -328,7 +328,7 @@ def test_list_inputs_handling():
     request = VerificationRequest(inputs=inputs, source=None)
 
     extractor = FencedCodeBlockExtractor()
-    result_request = extractor.handle(request)
+    result_request = extractor.process(request)
 
     assert len(result_request.verification_data) == 1
     assert result_request.verification_data[0].dtype == VerificationDType.argdown

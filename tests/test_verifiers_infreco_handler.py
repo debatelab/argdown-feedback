@@ -651,7 +651,7 @@ def test_composite_handler(verification_request):
     request.verification_data.append(vdata_invalid)
     
     composite = InfRecoCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     
     # Should find issues in the invalid data
     assert len(request.results) > 0
@@ -739,7 +739,7 @@ def test_infreco_handler_handle_method():
             )
     
     handler = TestHandler()
-    handler.handle(request)
+    handler.process(request)
     
     assert len(request.results) == 1
     assert request.results[0].is_valid is True
@@ -764,7 +764,7 @@ def test_real_world_example_basic():
     request.verification_data.append(vdata)
     
     composite = InfRecoCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     
     # All validations should pass
     invalid_results = [r for r in request.results if not r.is_valid]
@@ -793,7 +793,7 @@ def test_real_world_example_complex():
     request = VerificationRequest(inputs=argdown_text, source=source, verification_data=[vdata])
     
     composite = InfRecoCompositeHandler()
-    composite.handle(request)
+    composite.process(request)
     pprint(request.results)
     # All validations should pass
     invalid_results = [r for r in request.results if not r.is_valid]

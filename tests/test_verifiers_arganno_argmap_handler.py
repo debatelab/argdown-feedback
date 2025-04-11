@@ -409,7 +409,7 @@ def test_composite_handler_process_request(verification_request_with_valid_data,
         MockHandler("TestHandler2", False)
     ]
     
-    result_request = composite.handle(verification_request_with_valid_data)
+    result_request = composite.process(verification_request_with_valid_data)
     
     # Should have results for both handlers
     assert len(result_request.results) == 2
@@ -480,7 +480,7 @@ def test_real_world_example():
     
     # Test with composite handler
     composite = ArgannoArgmapCoherenceHandler()
-    result_request = composite.handle(request)
+    result_request = composite.process(request)
     
     # Should have results for both handlers
     assert len(result_request.results) == 2

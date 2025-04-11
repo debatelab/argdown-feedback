@@ -149,7 +149,7 @@ class InformalReco(Solution):
         """extract the argdown snippet from a raw answer"""
         handler = FencedCodeBlockExtractor()
         request = VerificationRequest(inputs=answer)
-        result = handler.handle(request)
+        result = handler.process(request)
         code_snippet = next(
             (
                 vr.code_snippet
@@ -196,7 +196,7 @@ class InfRecoJudge(Judge):
         request = VerificationRequest(
             inputs=reco.argdown_snippet, source=problem.sources
         )
-        result = handler.handle(request)
+        result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         if evaluation.artifacts.get("argdown_reco") is None:
             evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")

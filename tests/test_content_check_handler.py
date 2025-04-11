@@ -117,7 +117,7 @@ def test_has_annotations_handler_with_xml():
     )
     
     handler = HasAnnotationsHandler(name="xml_checker")
-    result = handler.handle(request)
+    result = handler.process(request)
     
     assert len(result.results) == 1
     assert result.results[0].is_valid
@@ -131,7 +131,7 @@ def test_has_annotations_handler_without_xml():
     # No verification data added
     
     handler = HasAnnotationsHandler(name="xml_checker")
-    result = handler.handle(request)
+    result = handler.process(request)
     
     assert len(result.results) == 1
     assert not result.results[0].is_valid
@@ -145,7 +145,7 @@ def test_has_annotations_handler_with_incomplete_xml():
     # No verification data (extractor would fail due to incomplete block)
     
     handler = HasAnnotationsHandler(name="xml_checker")
-    result = handler.handle(request)
+    result = handler.process(request)
     
     assert len(result.results) == 1
     assert not result.results[0].is_valid
@@ -174,7 +174,7 @@ def test_has_argdown_handler_with_argdown():
     )
     
     handler = HasArgdownHandler(name="argdown_checker")
-    result = handler.handle(request)
+    result = handler.process(request)
     
     assert len(result.results) == 1
     assert result.results[0].is_valid
@@ -188,7 +188,7 @@ def test_has_argdown_handler_without_argdown():
     # No verification data added
     
     handler = HasArgdownHandler(name="argdown_checker")
-    result = handler.handle(request)
+    result = handler.process(request)
     
     assert len(result.results) == 1
     assert not result.results[0].is_valid
@@ -202,7 +202,7 @@ def test_has_argdown_handler_with_incomplete_argdown():
     # No verification data (extractor would fail due to incomplete block)
     
     handler = HasArgdownHandler(name="argdown_checker")
-    result = handler.handle(request)
+    result = handler.process(request)
     
     assert len(result.results) == 1
     assert not result.results[0].is_valid
@@ -255,7 +255,7 @@ def test_has_argdown_handler_with_filter():
     # Test with a filter that only accepts argdown with map.ad filename
     filter_func = lambda vdata: vdata.metadata and vdata.metadata.get("filename") == "map.ad"  # noqa: E731
     handler = HasArgdownHandler(name="map_checker", filter=filter_func)
-    result = handler.handle(copy.deepcopy(request))
+    result = handler.process(copy.deepcopy(request))
     
     assert len(result.results) == 1
     assert result.results[0].is_valid
@@ -263,7 +263,7 @@ def test_has_argdown_handler_with_filter():
     # Test with a filter that only accepts argdown with different filename
     filter_func = lambda vdata: vdata.metadata and vdata.metadata.get("filename") == "non_existent.ad"  # noqa: E731
     handler = HasArgdownHandler(name="non_existent_checker", filter=filter_func)
-    result = handler.handle(request)
+    result = handler.process(request)
     
     pprint(result.results)
     assert len(result.results) == 1
@@ -310,14 +310,14 @@ def test_with_mixed_input():
     
     # Test HasAnnotationsHandler
     annotations_handler = HasAnnotationsHandler(name="xml_checker")
-    result = annotations_handler.handle(request)
+    result = annotations_handler.process(request)
     
     assert len(result.results) == 1
     assert result.results[0].is_valid
     
     # Test HasArgdownHandler
     argdown_handler = HasArgdownHandler(name="argdown_checker")
-    result = argdown_handler.handle(result)  # Chain the handlers
+    result = argdown_handler.process(result)  # Chain the handlers
     
     assert len(result.results) == 2
     assert result.results[1].is_valid
@@ -327,14 +327,14 @@ def test_with_empty_input():
     request = VerificationRequest(inputs="", source=None)
     
     annotations_handler = HasAnnotationsHandler(name="xml_checker")
-    result = annotations_handler.handle(request)
+    result = annotations_handler.process(request)
     
     assert len(result.results) == 1
     assert not result.results[0].is_valid
     assert "No fenced code block starting with '```xml'" in result.results[0].message
     
     argdown_handler = HasArgdownHandler(name="argdown_checker")
-    result = argdown_handler.handle(result)
+    result = argdown_handler.process(result)
     
     assert len(result.results) == 2
     assert not result.results[1].is_valid

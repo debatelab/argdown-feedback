@@ -194,7 +194,7 @@ class ArgmapPlusInfreco(Solution):
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusInfreco":
         handler = FencedCodeBlockExtractor()
         request = VerificationRequest(inputs=raw_answer)
-        result = handler.handle(request)
+        result = handler.process(request)
 
         map_snippet = next(
             (
@@ -290,7 +290,7 @@ class ArgmapPlusInfrecoJudge(Judge):
             ]
         )
         request = VerificationRequest(inputs=str(solution), source=problem.sources)
-        result = main_handler.handle(request)
+        result = main_handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
 

@@ -141,7 +141,7 @@ class Annotation(Solution):
         """Extract the annotated source text from the answer."""
         handler = FencedCodeBlockExtractor()
         request = VerificationRequest(inputs=answer)
-        result = handler.handle(request)
+        result = handler.process(request)
         code_snippet = next(
             (
                 vr.code_snippet
@@ -206,7 +206,7 @@ class AnnotationJudge(Judge):
         request = VerificationRequest(
             inputs=annotation.annotated_source_text, source=problem.sources
         )
-        result = handler.handle(request)
+        result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
 
