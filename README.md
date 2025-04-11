@@ -44,7 +44,7 @@ handler = CompositeHandler(
     ]
 )
 request = VerificationRequest(inputs=snippet)
-result = handler.handle(request)
+result = handler.process(request)
 evaluation = Evaluation.from_verification_request(result)
 
 pprint.pprint(evaluation)
