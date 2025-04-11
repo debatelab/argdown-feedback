@@ -1,0 +1,10 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+authors:
+- family-names: "Betz"
+  given-names: "Gregor"
+  orcid: "https://orcid.org/0000-0001-5802-5030"
+title: "argdown-feedback: verifiers and dpo data generaors with hindsight instruction relabeleing"
+version: 0.1.0
+date-released: 2025-04-11
+url: "https://github.com/debatelab/argdown-feedback"
