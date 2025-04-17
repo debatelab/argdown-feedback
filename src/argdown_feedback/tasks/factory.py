@@ -4,8 +4,15 @@ import logging
 from typing import Any
 
 from argdown_feedback.tasks import registry
-from argdown_feedback.tasks.base import GenericFailureDiffPreferencePairGenerator, GenericSolutionGenerator, HIRAbstractGenerator, HIRAbstractGeneratorLLM, HIREvaluator, HIRPreferencePairGenerator
-
+from argdown_feedback.tasks.base import (
+    GenericFailureDiffPreferencePairGenerator,
+    GenericFeedbackGenerator,
+    GenericSolutionGenerator,
+    HIRAbstractGenerator,
+    HIRAbstractGeneratorLLM,
+    HIREvaluator,
+    HIRPreferencePairGenerator,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -21,6 +28,8 @@ class HIRPOFactory:
         feedback_generator: str | None = None,
         virtue_preference_pair_generator: str | list[str] | None = None,
         failure_type_preference_pair_generator: str | None = None,
+        solution_generator_kwargs: dict[str, Any] | None = None,
+        feedback_generator_kwargs: dict[str, Any] | None = None,
         **kwargs,
     ) -> HIRPreferencePairGenerator | None:
         """Create a HIRPreferencePairGenerator from config."""
@@ -37,6 +46,7 @@ class HIRPOFactory:
             sg_instance = GenericSolutionGenerator(
                 solution_class=registry.get_class(solution),
                 **model_kwargs,
+                **(solution_generator_kwargs or {}),
             )
 
             jg_class = registry.get_class(judge)
@@ -47,14 +57,15 @@ class HIRPOFactory:
             else:
                 raise TypeError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 
+            fg_kwargs = feedback_generator_kwargs or {}
             if feedback_generator is None:
-                fg_instance = None
+                fg_instance = GenericFeedbackGenerator(**fg_kwargs)
             else:
                 fg_class = registry.get_class(feedback_generator)
                 if issubclass(fg_class, HIRAbstractGeneratorLLM):
-                    fg_instance = fg_class(**model_kwargs)
+                    fg_instance = fg_class(**model_kwargs, **fg_kwargs)
                 elif issubclass(fg_class, HIRAbstractGenerator):
-                    fg_instance = fg_class()
+                    fg_instance = fg_class(**fg_kwargs)
                 else:
                     raise TypeError(f"Invalid feedback generator class: {fg_class} of type {type(fg_class)}")
 
@@ -94,6 +105,7 @@ class HIRPOFactory:
         problem_generator: str,
         judge: str,
         model_kwargs: dict[str, Any],
+        solution_generator_kwargs: dict[str, Any] | None = None,
         **kwargs
     ) -> HIREvaluator | None:
         """Create an evaluator from config."""
@@ -109,6 +121,7 @@ class HIRPOFactory:
             sg_instance = GenericSolutionGenerator(
                 solution_class=registry.get_class(solution),
                 **model_kwargs,
+                **(solution_generator_kwargs or {}),
             )
 
             jg_class = registry.get_class(judge)
