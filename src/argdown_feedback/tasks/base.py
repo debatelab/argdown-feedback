@@ -653,7 +653,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         problem_generator: ProblemGenerator,
         solution_generator: SolutionGenerator,
         judge: Judge,
-        virtue_preference_pair_generator: VirtuePreferencePairGenerator,
+        virtue_preference_pair_generator: VirtuePreferencePairGenerator | list[VirtuePreferencePairGenerator] | None = None,
         feedback_generator: FeedbackGenerator | None = None,
         failure_type_preference_pair_generator: FailureTypePreferencePairGenerator
         | None = None,
@@ -663,7 +663,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         self.solution_generator = solution_generator
         self.judge = judge
         self.feedback_generator = feedback_generator
-        self.virtue_preference_pair_generator = virtue_preference_pair_generator
+        if virtue_preference_pair_generator is None:
+            virtue_preference_pair_generator = []
+        if isinstance(virtue_preference_pair_generator, VirtuePreferencePairGenerator):
+            virtue_preference_pair_generator = [virtue_preference_pair_generator]
+        self.virtue_preference_pair_generators = virtue_preference_pair_generator
         self.failure_type_preference_pair_generator = (
             failure_type_preference_pair_generator
         )
@@ -673,7 +677,10 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
     def validity_vs_virtue_router(
         self, mean_syntactic_validity: float
     ) -> tuple[bool, bool]:
-        do_virtue_hirp = random.random() < mean_syntactic_validity
+        do_virtue_hirp = (
+            bool(self.virtue_preference_pair_generators)
+            and random.random() < mean_syntactic_validity
+        )
         do_validity_hirp = not do_virtue_hirp
         return do_validity_hirp, do_virtue_hirp
 
@@ -753,8 +760,10 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         )
         if do_virtue_hirp:
             logger.debug("Constructing virtue preference pair")
+            assert self.virtue_preference_pair_generators, "Internal error: Attempting do_virtue_hirp while no virtue preference pair generators available."
+            virtue_preference_pair_generator = random.choice(self.virtue_preference_pair_generators)
             pairs.extend(
-                await self.virtue_preference_pair_generator.arun(
+                await virtue_preference_pair_generator.arun(
                     problem,
                     candidate_solutions,
                     evaluations,
