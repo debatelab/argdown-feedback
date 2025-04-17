@@ -20,6 +20,9 @@ from argdown_feedback.tasks.compound.arganno_plus_infreco import (
 from argdown_feedback.tasks.core.infreco import (
     SimplicityPreferencePairGenerator,
 )
+from argdown_feedback.tasks.core.logreco import (
+    FormalizationsFaithfulnessPreferencePairGenerator,
+)
 from argdown_feedback.tasks.core.arganno import (
     AnnotationScopePreferencePairGenerator,
     AnnotationSupportsPreferencePairGenerator,
@@ -657,6 +660,39 @@ class TestArgannoPlusLogRecoPreferencePairGenerators:
                 ```
                 """,
             ),
+            (
+                FormalizationsFaithfulnessPreferencePairGenerator,
+                """
+                ```xml
+                <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
+                                
+                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                ```
+
+                ```argdown
+                <Suffering>
+                                
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"q": "Animals suffer", "p": "We should stop eating meat"}}
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
+                ```
+                """,
+                """
+                ```xml
+                <proposition id="1" argument_label="Suffering" ref_reco_label="2">We should stop eating meat.</proposition>
+                                
+                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> Animal farming causes climate change.
+                ```
+
+                ```argdown
+                <Suffering>
+                                
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p & q", declarations: {"p": "Tiere leiden sehr", q: "Wir sollten sie nicht mehr essen"}}
+                -- {from: ["1"]} --
+                (2) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "p"}
+                ```
+                """,
+            )
         ],
     )
     async def test_preference_pair_generator(
