@@ -30,6 +30,7 @@ from argdown_feedback.tasks.core.arganno import (
     AnnotationSupportsPreferencePairGenerator,
     AnnotationCoveragePreferencePairGenerator,
 )
+from argdown_feedback.tasks.compound import argmap_plus_arganno, arganno_plus_infreco
 
 from .hirpo_tester import HirpoTester
 from .util import llm_available, MODEL_KWARGS
@@ -1476,6 +1477,155 @@ class TestArgmapPlusLogrecoPreferencePairGenerators:
                 ```
                 """,
             ),
+            (
+                argmap_plus_arganno.AnnotationProximityPreferencePairGenerator,
+                """
+                ```xml {filename="annotation.txt"}
+                <proposition id="1" argument_label="No more meat" ref_reco_label="1">We should stop eating meat.</proposition>
+                                
+                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> <proposition id="3" supports="1" argument_label="Climate Change" ref_reco_label="1">Animal farming causes climate change.</proposition>
+                ```
+
+                ```argdown {filename="map.ad"}
+                <No more meat>: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <No more meat>: We should stop eating meat.
+
+                (1) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "q", declarations: {q: "We should not eat animals."}}
+                (2) If no meat then vegan. {annotation_ids: [], formalization: "q -> s", declarations: {s: "We should be vegan."}}
+                -- {from: ["1","2"]} --
+                (3) We should be vegan. {annotation_ids: [], formalization: "s"}
+
+                <Suffering>
+                                
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p", declarations: {p: "Animals suffer."}}
+                (2) If they suffer, we should not eat them. {annotation_ids: [], formalization: "p -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change. {annotation_ids: ['3'], formalization: "r", declarations: {r: "Animal farming causes climate change."}}
+                (2) If animal farming causes climate change, we should not eat them. {annotation_ids: [], formalization: "r -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                ```
+                """,
+                """
+                ```xml {filename="annotation.txt"}
+                <proposition id="1" argument_label="No more meat" ref_reco_label="1">We should stop eating meat.</proposition>
+                                
+                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> <proposition id="3" supports="1" argument_label="Climate Change" ref_reco_label="1">Animal farming causes climate change.</proposition>
+                ```
+
+                ```argdown {filename="map.ad"}
+                <No more meat>: Wir sollten kein Fleisch mehr essen.
+                    <+ <Suffering>: Tiere leiden.
+                    <+ <Climate Change>: Tierhaltung verursacht CO2-Emissionen.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <No more meat>: We should stop eating meat.
+
+                (1) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "q", declarations: {q: "We should not eat animals."}}
+                (2) If no meat then vegan. {annotation_ids: [], formalization: "q -> s", declarations: {s: "We should be vegan."}}
+                -- {from: ["1","2"]} --
+                (3) We should be vegan. {annotation_ids: [], formalization: "s"}
+
+                <Suffering>
+                                
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p", declarations: {p: "Animals suffer."}}
+                (2) If they suffer, we should not eat them. {annotation_ids: [], formalization: "p -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change. {annotation_ids: ['3'], formalization: "r", declarations: {r: "Animal farming causes climate change."}}
+                (2) If animal farming causes climate change, we should not eat them. {annotation_ids: [], formalization: "r -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                ```
+                """,
+            ),
+            (
+                arganno_plus_infreco.AnnotationProximityPreferencePairGenerator,
+                """
+                ```xml {filename="annotation.txt"}
+                <proposition id="1" argument_label="No more meat" ref_reco_label="1">We should stop eating meat.</proposition>
+                                
+                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> <proposition id="3" supports="1" argument_label="Climate Change" ref_reco_label="1">Animal farming causes climate change.</proposition>
+                ```
+
+                ```argdown {filename="map.ad"}
+                <No more meat>: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <No more meat>: We should stop eating meat.
+
+                (1) [No meat]: We should stop eating meat. {annotation_ids: ['1'], formalization: "q", declarations: {q: "We should not eat animals."}}
+                (2) If no meat then vegan. {annotation_ids: [], formalization: "q -> s", declarations: {s: "We should be vegan."}}
+                -- {from: ["1","2"]} --
+                (3) We should be vegan. {annotation_ids: [], formalization: "s"}
+
+                <Suffering>
+                                
+                (1) Animals suffer. {annotation_ids: ['2'], formalization: "p", declarations: {p: "Animals suffer."}}
+                (2) If they suffer, we should not eat them. {annotation_ids: [], formalization: "p -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                                
+                <Climate Change>
+                                
+                (1) Animal farming causes climate change. {annotation_ids: ['3'], formalization: "r", declarations: {r: "Animal farming causes climate change."}}
+                (2) If animal farming causes climate change, we should not eat them. {annotation_ids: [], formalization: "r -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                ```
+                """,
+                """
+                ```xml {filename="annotation.txt"}
+                <proposition id="1" argument_label="No more meat" ref_reco_label="1">We should stop eating meat.</proposition>
+                                
+                <proposition id="2" supports="1" argument_label="Suffering" ref_reco_label="1">Animals suffer.</proposition> <proposition id="3" supports="1" argument_label="Climate Change" ref_reco_label="1">Animal farming causes climate change.</proposition>
+                ```
+
+                ```argdown {filename="map.ad"}
+                <No more meat>: We should stop eating meat.
+                    <+ <Suffering>: Animals suffer.
+                    <+ <Climate Change>: Animal farming causes climate change.
+                ```
+
+                ```argdown {filename="reconstructions.ad"}
+                <No more meat>: We should stop eating meat.
+
+                (1) [No meat]: Wir sollten kein Fleisch mehr essen. {annotation_ids: ['1'], formalization: "q", declarations: {q: "We should not eat animals."}}
+                (2) If no meat then vegan. {annotation_ids: [], formalization: "q -> s", declarations: {s: "We should be vegan."}}
+                -- {from: ["1","2"]} --
+                (3) We should be vegan. {annotation_ids: [], formalization: "s"}
+
+                <Suffering>
+                                
+                (1) Tiere leiden. {annotation_ids: ['2'], formalization: "p", declarations: {p: "Animals suffer."}}
+                (2) If they suffer, we should not eat them. {annotation_ids: [], formalization: "p -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                                
+                <Climate Change>
+                                
+                (1) Tierhaltung verursacht THG-Emissionen. {annotation_ids: ['3'], formalization: "r", declarations: {r: "Animal farming causes climate change."}}
+                (2) If animal farming causes climate change, we should not eat them. {annotation_ids: [], formalization: "r -> q", declarations: {q: "We should not eat animals."}}
+                -- {from: ["1","2"]} --
+                (3) [No meat]
+                ```
+                """,            ),
         ],
     )
     async def test_preference_pair_generator(
