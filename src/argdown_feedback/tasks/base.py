@@ -920,7 +920,6 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         return pairs
 
 
-
 class HIREvaluator(HIRAbstractGenerator):
     def __init__(
         self,
@@ -942,3 +941,4 @@ class HIREvaluator(HIRAbstractGenerator):
         evaluations = await self.judge.arun(problem, candidate_solutions)
         accuracy = sum(int(e.is_valid) for e in evaluations) / len(evaluations)
         return accuracy
+    
