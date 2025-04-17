@@ -334,8 +334,8 @@ class ArgannoPlusInfrecoJudge(Judge):
 
 class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the argument reco task, prefering valid solutions
-    where the source text's annotated propositions are textually similiar to the node texts in the argument map."""
-
+    where the source text's annotated propositions are textually similiar to the propositions in the reconstructed argument."""
+    
     hints = [
         (
             "Make sure that your argument reconstruction stays faithful to and mimics closely "
@@ -353,7 +353,9 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
         soup = evaluation.artifacts["soup"]
         anno_props = soup.find_all("proposition")
 
-        argdown = evaluation.artifacts["argdown"]
+        argdown = evaluation.artifacts["argdown_reco"]
+        if argdown is None:
+            argdown = evaluation.artifacts["argdown"]
 
         matches: list[tuple[str, str]] = []
         for proposition in argdown.propositions:
