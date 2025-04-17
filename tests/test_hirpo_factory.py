@@ -8,20 +8,6 @@ from argdown_feedback.tasks.factory import HIRPOFactory
 from .util import llm_available, MODEL_KWARGS
 
 
-"""
-solution: "arganno.Annotation"
-    problem: "arganno.AnnotationProblem"
-    problem_generator: "arganno.AnnotationProblemGenerator"
-    judge: "arganno.AnnotationJudge"
-    feedback_generator: "arganno.AnnotationFeedbackGenerator"
-    virtue_preference_pair_generator: 
-      - "arganno.AnnotationAttacksPreferencePairGenerator"
-      - "arganno.AnnotationCoveragePreferencePairGenerator"
-      - "arganno.AnnotationNoAttacksPreferencePairGenerator"
-      - "arganno.AnnotationScopePreferencePairGenerator"
-      - "arganno.AnnotationSupportsPreferencePairGenerator"
-"""
-
 @pytest.fixture
 def config_data():
     return [
