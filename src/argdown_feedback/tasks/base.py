@@ -1,6 +1,7 @@
 "Base HIR preference pair generators."
 
 from abc import ABC, abstractmethod
+import copy
 import dataclasses
 import logging
 import random
@@ -761,16 +762,21 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         if do_virtue_hirp:
             logger.debug("Constructing virtue preference pair")
             assert self.virtue_preference_pair_generators, "Internal error: Attempting do_virtue_hirp while no virtue preference pair generators available."
-            virtue_preference_pair_generator = random.choice(self.virtue_preference_pair_generators)
-            pairs.extend(
-                await virtue_preference_pair_generator.arun(
+            shuffled_generators = copy.deepcopy(self.virtue_preference_pair_generators)
+            random.shuffle(shuffled_generators)
+            virtue_pairs: list[ChatPreferencePair] = []
+            for virtue_preference_pair_generator in shuffled_generators:
+                virtue_pairs = await virtue_preference_pair_generator.arun(
                     problem,
                     candidate_solutions,
                     evaluations,
                     original_solution=original_solution,
                     feedback=feedback,
                 )
-            )
+                if virtue_pairs:
+                    break
+            pairs.extend(virtue_pairs)
+
         if do_validity_hirp:
             logger.debug("Constructing syntactic validity preference pair")
             pairs.extend(
