@@ -273,6 +273,7 @@ class SolutionGenerator(HIRAbstractGeneratorLLM):
 
 
 class GenericSolutionGenerator(SolutionGenerator):
+    """Generic solution generator with postprocessing."""
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # solution class
@@ -285,6 +286,36 @@ class GenericSolutionGenerator(SolutionGenerator):
         self.n_solutions = kwargs.get("n_solutions", 10)
         self.temperature = kwargs.get("temperature", 0.5)
         self.max_tokens = kwargs.get("max_tokens", 2048)
+
+
+    def remove_repetitions(self, answer: str, keep: int = 3, min_lines: int = 16) -> str:
+        """
+        Remove repetitive blocs of text at the end of the answer.
+        """
+        lines = answer.split("\n")
+
+        # remove one-line-blocs
+        print(set(lines[(-2-keep):-1]))
+        while (
+            len(set(lines[(-2-keep):-1])) == 1
+            and lines[-2].startswith(lines[-1])
+            and len(lines) > min_lines
+            and lines[(-2)].strip()
+        ):
+            del lines[(-2)]  # delete line at idx -2
+
+        # remove multi-line-blocs
+        for bloclength in [2,3]:
+            while (
+                len(set(["".join(lines[-ri-bloclength:-ri]) for ri in range(1,bloclength*(keep+1),bloclength)])) == 1
+                and lines[-1-bloclength].startswith(lines[-1])
+                and len(lines) > min_lines
+                and any(lines[-ri].strip() for ri in range(2,bloclength+1))
+            ):
+                del lines[-1-bloclength:-1] # delete last bloc
+
+        return "\n".join(lines)  # return the modified answer
+
 
     async def arun(
         self,
@@ -333,6 +364,9 @@ class GenericSolutionGenerator(SolutionGenerator):
         # remove empty and duplicate answers
         answers = [a for a in answers if a]
         answers = list(set(answers))
+
+        # remove repetitive blocs of text at the end of the answer
+        answers = [self.remove_repetitions(answer) for answer in answers]
 
         recos: list[Solution] = []
 
