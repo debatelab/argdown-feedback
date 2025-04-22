@@ -174,7 +174,7 @@ class AnnotationJudge(Judge):
     ) -> tuple[BeautifulSoup, str | None]:
         error_msg: str | None = None
         ast = annotated_source_text.strip("\n ")
-        if ast.startswith("```xml") and ast.endswith("```"):
+        if ast.startswith("```xml") and ast.endswith("```") and len(ast.splitlines()) > 1:
             ast = "\n".join(ast.splitlines()[1:-1])
         else:  # no fenced code block
             error_msg = "Failed to extract single fenced annotation block:"
@@ -182,7 +182,7 @@ class AnnotationJudge(Judge):
                 error_msg += " No fenced code block starting with '```xml'."
             if ast.count("```xml") > 1:
                 error_msg += " More than one fenced code block starting with '```xml'."
-            if "```\n" not in ast:
+            if not ast.endswith("```"):
                 error_msg += " No closing '```'."
 
         multi_valued_attributes = {"*": {"supports", "attacks"}}
