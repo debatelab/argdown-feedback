@@ -295,7 +295,7 @@ class GenericSolutionGenerator(SolutionGenerator):
         lines = answer.split("\n")
 
         # remove one-line-blocs
-        print(set(lines[(-2-keep):-1]))
+        #print(set(lines[(-2-keep):-1]))
         while (
             len(set(lines[(-2-keep):-1])) == 1
             and lines[-2].startswith(lines[-1])

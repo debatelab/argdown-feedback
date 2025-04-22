@@ -368,8 +368,8 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
                 for text in proposition.texts:
                     matches.append((anno_prop.get_text(), text))
 
-        print("matches")
-        print(matches)
+        #print("matches")
+        #print(matches)
         dlss = [
             textdistance.damerau_levenshtein.normalized_similarity(s, t)
             for s, t in matches

@@ -435,7 +435,7 @@ class GlobalFormalizationsFaithfulnessPreferencePairGenerator(
 
         dlds: list[float] = []
         for argument in argdown_reco.arguments:
-            print(f"Argument: {argument.label}")
+            #print(f"Argument: {argument.label}")
             for pr in argument.pcs:
                 expression = all_expressions.get(pr.proposition_label)
                 if expression is None:
@@ -448,10 +448,10 @@ class GlobalFormalizationsFaithfulnessPreferencePairGenerator(
                 text_1 = FOL2NLTranslator.translate_to_nl_sentence(
                     expression, all_declarations
                 )
-                print(f"Text 1: {text_1}")
+                #print(f"Text 1: {text_1}")
 
                 for text_2 in proposition.texts:
-                    print(f"Text 2: {text_2}")
+                    #print(f"Text 2: {text_2}")
                     dlds.append(
                         textdistance.damerau_levenshtein.normalized_similarity(
                             text_1, text_2

@@ -365,7 +365,7 @@ class LogRecoVerifier(InfRecoVerifier):
         """
         Check if the final conclusion follows from a real subset of the premises.
         """
-        print("Checking relevance of premises...")
+        #print("Checking relevance of premises...")
         if self.argument is None or not self.argument.pcs:
             return None, None
 

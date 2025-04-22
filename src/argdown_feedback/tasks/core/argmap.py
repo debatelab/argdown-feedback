@@ -394,10 +394,10 @@ class MaxDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         H = nx.DiGraph(argdown)
         if nx.is_directed_acyclic_graph(H):
             le = nx.dag_longest_path_length(H)
-            print(le)
+            #print(le)
         else:
             le = nx.diameter(H.to_undirected())
-            print("diameter:", le)
+            #print("diameter:", le)
         return le
 
 
@@ -424,10 +424,10 @@ class MinDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
         H = nx.DiGraph(argdown)
         if nx.is_directed_acyclic_graph(H):
             le = nx.dag_longest_path_length(H)
-            print(le)
+            #print(le)
         else:
             le = nx.diameter(H.to_undirected())
-            print("diameter:", le)
+            #print("diameter:", le)
         return 1 / (1 + le)
 
 

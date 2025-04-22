@@ -34,20 +34,20 @@ class FOL2NLTranslator:
         for placeholder in cls._get_placeholders(scheme):
             if placeholder not in substitutions:
                 substitutions[placeholder] = placeholder
-        print(scheme, substitutions)
+        #print(scheme, substitutions)
         return scheme.format(**substitutions)
 
 
     @classmethod
     def translate_to_nl_scheme(cls, expression: Expression) -> str:
         """translate a logic expression to natural language scheme"""
-        if isinstance(expression, ApplicationExpression):
-            print(f"Expression type: {type(expression)}")
-            print(f"Function type: {type(expression.function)}")
-            print(f"Expression string: {str(expression)}")
-            # See what attributes are available
-            print(f"Expression dir: {dir(expression)}")
-            print(f"Function dir: {dir(expression.function)}")
+        #if isinstance(expression, ApplicationExpression):
+            #print(f"Expression type: {type(expression)}")
+            #print(f"Function type: {type(expression.function)}")
+            #print(f"Expression string: {str(expression)}")
+            ## See what attributes are available
+            #print(f"Expression dir: {dir(expression)}")
+            #print(f"Function dir: {dir(expression.function)}")
         
         def is_negated_atomic_expression(expression: Expression) -> bool:
             """checks if expression is negated atomic expression (unary predicate)"""

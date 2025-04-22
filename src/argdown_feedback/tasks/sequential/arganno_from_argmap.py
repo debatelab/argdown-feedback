@@ -120,8 +120,8 @@ class ArgannoFromArgmapProblemGenerator(ProblemGeneratorLLM):
         ):
             argmap_problem = await self._argmap_pg.arun(inputs)
             argmap_solution = await self._argmap_sg.arun(argmap_problem)
-            print("argmap_problem", argmap_problem)
-            print("argmap_solution", argmap_solution)
+            #print("argmap_problem", argmap_problem)
+            #print("argmap_solution", argmap_solution)
             argmap_evaluation = ArgMapJudge()._evaluate_argmap(argmap_problem, argmap_solution[0])
             argdown_map = argmap_evaluation.artifacts.get("argdown_map")
             return ArgannoFromArgmapProblem(
@@ -241,7 +241,7 @@ class ArgmapGraphProximityPreferencePairGenerator(ScoringVirtuePreferencePairGen
             ):
                 matched_n += 1
 
-        print("MATCHED_N", matched_n)
+        #print("MATCHED_N", matched_n)
 
         return round(
             matched_n / len(argdown_map.dialectical_relations),

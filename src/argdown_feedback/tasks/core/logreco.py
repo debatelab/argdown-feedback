@@ -489,7 +489,7 @@ class FormalizationsFaithfulnessPreferencePairGenerator(ScoringVirtuePreferenceP
             )
 
             for text_2 in proposition.texts:
-                print(f"Comparing '{text_1}' and '{text_2}'")
+                #print(f"Comparing '{text_1}' and '{text_2}'")
                 dlds.append(
                     textdistance.damerau_levenshtein.normalized_similarity(
                         text_1, text_2

@@ -212,7 +212,7 @@ class AnnotationGraphProximityPreferencePairGenerator(ScoringVirtuePreferencePai
             ):
                 matched_n += 1
 
-        print("MATCHED_N", matched_n)
+        #print("MATCHED_N", matched_n)
 
         return round(
             matched_n / (len(supports_anno) + len(attacks_anno)),
