@@ -427,7 +427,7 @@ class GenericFeedbackGenerator(FeedbackGenerator):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
         self.temperature = kwargs.get("temperature", 0.7)
-        self.max_tokens = kwargs.get("max_tokens", 4096)
+        self.max_tokens = kwargs.get("max_tokens", 1024)
 
     async def arun(
         self,
