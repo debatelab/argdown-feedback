@@ -235,15 +235,23 @@ class HIRAbstractGeneratorLLM(ABC):
     )
     async def _generate(self, messages, **gen_kwargs):
         stream = False
-        completion = await self.client.chat.completions.create(
-            model=self.model_id,
-            messages=messages,
-            stream=stream,
-            **gen_kwargs,
-        )
-        answers = [choice.message.content for choice in completion.choices]
-        answers = [a for a in answers if a is not None]
-        return answers
+        try:
+            completion = await self.client.chat.completions.create(
+                model=self.model_id,
+                messages=messages,
+                stream=stream,
+                **gen_kwargs,
+            )
+            answers = [choice.message.content for choice in completion.choices]
+            answers = [a for a in answers if a is not None]
+            return answers
+        except Exception as e:
+            logger.error(f"Error calling the OpenAI API: {str(e)}")
+            logger.info("Error-inducing messages:")
+            for message in messages:
+                logger.info(f"  {message['role']}: {message['content']}")
+            logger.info(f"Error-inducing kwargs: {gen_kwargs}")
+            raise e
 
 
 class ProblemGenerator(HIRAbstractGenerator):
