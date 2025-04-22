@@ -951,9 +951,14 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         do_self_critique, skip_self_critique = self.self_critique_router(evaluations)
 
         if do_self_critique:
-            pairs = await self.run_self_critique(
-                problem, candidate_solutions, evaluations
-            )
+            try:
+                pairs = await self.run_self_critique(
+                    problem, candidate_solutions, evaluations
+                )
+            except Exception as e:
+                logger.error(f"Error in self-critique workflow: {e}")
+                logger.info("Attempting to build pref pairs without self-critique.")
+                skip_self_critique = True
 
         if skip_self_critique:
             pairs = await self.build_solution_pref_pair(
