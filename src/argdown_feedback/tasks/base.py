@@ -247,10 +247,10 @@ class HIRAbstractGeneratorLLM(ABC):
             return answers
         except Exception as e:
             logger.error(f"Error calling the OpenAI API: {str(e)}")
-            logger.info("Error-inducing messages:")
+            logger.debug("Error-inducing messages:")
             for message in messages:
-                logger.info(f"  {message['role']}: {message['content']}")
-            logger.info(f"Error-inducing kwargs: {gen_kwargs}")
+                logger.debug(f"  {message['role']}: {message['content']}")
+            logger.debug(f"Error-inducing kwargs: {gen_kwargs}")
             raise e
 
 
