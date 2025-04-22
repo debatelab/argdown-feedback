@@ -96,6 +96,8 @@ class ArgdownParser(ProcessingHandler):
         from pyargdown import parse_argdown
 
         for vdata in request.verification_data:
+            if vdata.dtype != VerificationDType.argdown:
+                continue
             if vdata.data is not None:
                 # Skip if data is already parsed
                 self.logger.warning(f"Data for {vdata.id} is already parsed. Skipping.")
@@ -103,29 +105,29 @@ class ArgdownParser(ProcessingHandler):
             if vdata.code_snippet is None:
                 self.logger.debug(f"Code snippet for {vdata.id} is None. Skipping.")
                 continue
-            if vdata.dtype == VerificationDType.argdown:
-                code_snippet = vdata.code_snippet.strip("\n ")
-                code_marker = _CODE_MARKERS[vdata.dtype]
-                close_marker = "\n```"
-                # remove code markers from code snippet before parsing
-                if "\n" in code_snippet and code_snippet.startswith(code_marker):
-                    # remove the first line from the code snippet
-                    code_snippet = code_snippet.split("\n", 1)[1]
-                if "\n" in code_snippet and code_snippet.endswith(close_marker):
-                    # remove the last line from the code snippet
-                    code_snippet = code_snippet.rsplit("\n", 1)[0]
 
-                try:
-                    argdown = parse_argdown(code_snippet)
-                    vdata.data = argdown
-                except Exception as e:
-                    metadata_text = f" {vdata.metadata}" if vdata.metadata else ""
-                    request.add_result(
-                        self.name,
-                        [vdata.id],
-                        False,
-                        f"Failed to parse argdown code snippet{metadata_text}: {str(e)}",
-                    )
+            code_snippet = vdata.code_snippet.strip("\n ")
+            code_marker = _CODE_MARKERS[vdata.dtype]
+            close_marker = "\n```"
+            # remove code markers from code snippet before parsing
+            if "\n" in code_snippet and code_snippet.startswith(code_marker):
+                # remove the first line from the code snippet
+                code_snippet = code_snippet.split("\n", 1)[1]
+            if "\n" in code_snippet and code_snippet.endswith(close_marker):
+                # remove the last line from the code snippet
+                code_snippet = code_snippet.rsplit("\n", 1)[0]
+
+            try:
+                argdown = parse_argdown(code_snippet)
+                vdata.data = argdown
+            except Exception as e:
+                metadata_text = f" {vdata.metadata}" if vdata.metadata else ""
+                request.add_result(
+                    self.name,
+                    [vdata.id],
+                    False,
+                    f"Failed to parse argdown code snippet{metadata_text}: {str(e)}",
+                )
 
         return request
 
@@ -143,6 +145,8 @@ class XMLParser(ProcessingHandler):
         from bs4 import BeautifulSoup
 
         for vdata in request.verification_data:
+            if vdata.dtype != VerificationDType.xml:
+                continue
             if vdata.data is not None:
                 # Skip if data is already parsed
                 self.logger.warning(f"Data for {vdata.id} is already parsed. Skipping.")
@@ -150,29 +154,29 @@ class XMLParser(ProcessingHandler):
             if vdata.code_snippet is None:
                 self.logger.debug(f"Code snippet for {vdata.id} is None. Skipping.")
                 continue
-            if vdata.dtype == VerificationDType.xml:
-                code_snippet = vdata.code_snippet
-                code_marker = _CODE_MARKERS[vdata.dtype]
-                # remove metadata from code snippet
-                if "\n" in code_snippet and code_snippet.startswith(code_marker) and code_snippet.endswith("```"):
-                    # remove the first and last line 
-                    code_snippet = "\n".join(code_snippet.split("\n")[1:-1])
-                try:
-                    
-                    soup = BeautifulSoup(
-                        code_snippet,
-                        "html.parser",
-                        multi_valued_attributes=_MULTI_VALUED_ATTRIBUTES,
-                    )
-                    vdata.data = soup
-                except Exception as e:
-                    metadata_text = f" {vdata.metadata}" if vdata.metadata else ""
-                    request.add_result(
-                        self.name,
-                        [vdata.id],
-                        False,
-                        f"Failed to parse XML code snippet{metadata_text}: {str(e)}",
-                    )
+
+            code_snippet = vdata.code_snippet
+            code_marker = _CODE_MARKERS[vdata.dtype]
+            # remove metadata from code snippet
+            if "\n" in code_snippet and code_snippet.startswith(code_marker) and code_snippet.endswith("```"):
+                # remove the first and last line 
+                code_snippet = "\n".join(code_snippet.split("\n")[1:-1])
+            try:
+                
+                soup = BeautifulSoup(
+                    code_snippet,
+                    "html.parser",
+                    multi_valued_attributes=_MULTI_VALUED_ATTRIBUTES,
+                )
+                vdata.data = soup
+            except Exception as e:
+                metadata_text = f" {vdata.metadata}" if vdata.metadata else ""
+                request.add_result(
+                    self.name,
+                    [vdata.id],
+                    False,
+                    f"Failed to parse XML code snippet{metadata_text}: {str(e)}",
+                )
 
         return request
 
