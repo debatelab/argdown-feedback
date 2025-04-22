@@ -293,7 +293,7 @@ class GenericSolutionGenerator(SolutionGenerator):
         # generation kwargs
         self.n_solutions = kwargs.get("n_solutions", 10)
         self.temperature = kwargs.get("temperature", 0.5)
-        self.max_tokens = kwargs.get("max_tokens", 2048)
+        self.max_tokens = kwargs.get("max_tokens", 4096)
 
 
     def remove_repetitions(self, answer: str, keep: int = 3, min_lines: int = 16) -> str:
@@ -427,7 +427,7 @@ class GenericFeedbackGenerator(FeedbackGenerator):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
         self.temperature = kwargs.get("temperature", 0.7)
-        self.max_tokens = kwargs.get("max_tokens", 1024)
+        self.max_tokens = kwargs.get("max_tokens", 4096)
 
     async def arun(
         self,
