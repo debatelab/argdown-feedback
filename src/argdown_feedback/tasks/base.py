@@ -301,6 +301,8 @@ class GenericSolutionGenerator(SolutionGenerator):
         Remove repetitive blocs of text at the end of the answer.
         """
         lines = answer.split("\n")
+        if len(lines) <= min_lines:
+            return answer
 
         # remove one-line-blocs
         #print(set(lines[(-2-keep):-1]))
