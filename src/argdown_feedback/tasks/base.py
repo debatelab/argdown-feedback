@@ -745,11 +745,16 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         pairs: list[ChatPreferencePair] = []
 
         top_valid_solution = next(
-            cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid
+            (cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid),
+            None
         )
         top_invalid_solution = next(
-            cs for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid
+            (cs for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid),
+            None
         )
+
+        if top_valid_solution is None or top_invalid_solution is None:
+            return pairs
 
         pairs.append(
             ChatPreferencePair(
