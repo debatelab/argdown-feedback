@@ -58,9 +58,8 @@ class HIRPOFactory:
                 raise TypeError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 
             fg_kwargs = feedback_generator_kwargs or {}
-            fg_kwargs.update(model_kwargs)
             if feedback_generator is None:
-                fg_instance = GenericFeedbackGenerator(**fg_kwargs)
+                fg_instance = GenericFeedbackGenerator(**model_kwargs, **fg_kwargs)
             else:
                 fg_class = registry.get_class(feedback_generator)
                 if issubclass(fg_class, HIRAbstractGeneratorLLM):
