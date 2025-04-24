@@ -540,19 +540,17 @@ class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
 
         pairs: list[ChatPreferencePair] = []
 
-        # rank valid recos according to the _score function
-        valid_recos: list[tuple[Solution, Evaluation]] = list(
-            zip(candidate_solutions, evaluations)  # type: ignore
-        )
-        valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
-        valid_recos = [
+        valid_recos: list[tuple[Solution, Evaluation]] = [
             (solution, evaluation)
-            for solution, evaluation in valid_recos
+            for solution, evaluation in zip(candidate_solutions, evaluations)
             if evaluation.is_valid
-        ]
-
+        ]        
         if len(valid_recos) < 2:
             return pairs
+
+        # rank valid recos according to the _score function
+        valid_recos.sort(key=lambda x: self._score(problem, x[0], x[1]), reverse=True)
+
         top_score = self._score(problem, *valid_recos[0])
         if top_score == self._score(problem, *valid_recos[-1]):
             return pairs
