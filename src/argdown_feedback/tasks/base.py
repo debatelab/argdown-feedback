@@ -994,11 +994,18 @@ class HIREvaluator(HIRAbstractGenerator):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def arun(self, inputs) -> float:
+    async def arun(self, inputs) -> dict[str, Any]:
         """evaluate inputs and returns average accuracy of the candidate solutions"""
         problem = await self.problem_generator.arun(inputs)
         candidate_solutions = await self.solution_generator.arun(problem)
         evaluations = await self.judge.arun(problem, candidate_solutions)
-        accuracy = sum(int(e.is_valid) for e in evaluations) / len(evaluations)
-        return accuracy
+        metric_keys = set(
+            key for evaluation in evaluations for key in evaluation.metrics.keys()
+        )
+        issue_counts: dict[str, Any] = {
+            f"{key}_counts": sum(bool(e.metrics.get(key)) for e in evaluations)
+            for key in metric_keys
+        }
+        issue_counts["accuracy"] =  sum(int(e.is_valid) for e in evaluations) / len(evaluations)
+        return issue_counts
     
