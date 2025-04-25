@@ -14,7 +14,10 @@ from openai import AsyncOpenAI, OpenAI
 from pyargdown import Argdown
 import tenacity
 
-from argdown_feedback.verifiers.verification_request import VerificationDType, VerificationRequest
+from argdown_feedback.verifiers.verification_request import (
+    VerificationDType,
+    VerificationRequest,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -38,13 +41,13 @@ class Problem(ABC):
 
     @abstractmethod
     def instruct_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation=None
     ) -> str:
         """Cast the problem as a problem statement, including an instruction to solve it."""
 
     @abstractmethod
     def revise_prompt(
-        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation = None
+        self, ask_for_invalid=False, hints: list[str] | None = None, evaluation=None
     ) -> str:
         """Instruction to revise earlier mentioned solution of the problem."""
 
@@ -60,7 +63,6 @@ class Solution(ABC):
     @abstractmethod
     def from_raw_answer(cls, answer: str) -> "Solution":
         """Cast a raw answer as a solution."""
-
 
 
 @dataclasses.dataclass
@@ -93,14 +95,19 @@ class Evaluation:
         Create an Evaluation from a VerificationRequest.
         """
 
-        metrics = dict((f"{e+1:02d}_{result.verifier_id}", result.message) for e, result in enumerate(request.results))
-        
+        metrics = dict(
+            (f"{e + 1:02d}_{result.verifier_id}", result.message)
+            for e, result in enumerate(request.results)
+        )
+
         artifacts = {}
 
         last_soup = next(
             (
-                data for data in reversed(request.verification_data)
-                if data.dtype == VerificationDType.xml and data.data is not None
+                data
+                for data in reversed(request.verification_data)
+                if data.dtype == VerificationDType.xml
+                and data.data is not None
                 and isinstance(data.data, BeautifulSoup)
             ),
             None,
@@ -108,8 +115,10 @@ class Evaluation:
         artifacts["soup"] = last_soup.data if last_soup is not None else None
 
         verification_data_argdown = [
-            data for data in request.verification_data
-            if data.dtype == VerificationDType.argdown and data.data is not None
+            data
+            for data in request.verification_data
+            if data.dtype == VerificationDType.argdown
+            and data.data is not None
             and isinstance(data.data, Argdown)
         ]
 
@@ -119,32 +128,46 @@ class Evaluation:
         # argdown_map
         last_argdown_map = next(
             (
-                data for data in reversed(verification_data_argdown)
-                if data.metadata and data.metadata.get("filename")=="map.ad"
+                data
+                for data in reversed(verification_data_argdown)
+                if data.metadata and data.metadata.get("filename") == "map.ad"
             ),
             None,
         )
-        artifacts["argdown_map"] = last_argdown_map.data if last_argdown_map is not None else None
+        artifacts["argdown_map"] = (
+            last_argdown_map.data if last_argdown_map is not None else None
+        )
 
-        # argdown_reco        
+        # argdown_reco
         last_argdown_reco = next(
             (
-                data for data in reversed(verification_data_argdown)
-                if data.metadata and data.metadata.get("filename")=="reconstructions.ad"
+                data
+                for data in reversed(verification_data_argdown)
+                if data.metadata
+                and data.metadata.get("filename") == "reconstructions.ad"
             ),
             None,
         )
-        artifacts["argdown_reco"] = last_argdown_reco.data if last_argdown_reco is not None else None
+        artifacts["argdown_reco"] = (
+            last_argdown_reco.data if last_argdown_reco is not None else None
+        )
 
         # formalizations are stored as details in result of WellFormedFormulasHandler
         all_expressions = None
         all_declarations = None
         if last_argdown is not None:
-            argdown_vd_id = last_argdown_reco.id if last_argdown_reco is not None else last_argdown.id
+            argdown_vd_id = (
+                last_argdown_reco.id
+                if last_argdown_reco is not None
+                else last_argdown.id
+            )
             wff_result = next(
                 (
-                    result for result in request.results
-                    if result.verifier_id == "WellFormedFormulasHandler" and result.verification_data_references==[argdown_vd_id]),
+                    result
+                    for result in request.results
+                    if result.verifier_id == "WellFormedFormulasHandler"
+                    and result.verification_data_references == [argdown_vd_id]
+                ),
                 None,
             )
             if wff_result is not None:
@@ -212,7 +235,6 @@ class HIRAbstractGenerator(ABC):
 
 
 class HIRAbstractGeneratorLLM(ABC):
-
     def __init__(self, *args, **kwargs):
         inference_base_url = kwargs.get("inference_base_url", None)
         model_id = kwargs.get("model_id", None)
@@ -266,7 +288,6 @@ class ProblemGeneratorLLM(HIRAbstractGeneratorLLM, ProblemGenerator):
     """Generates a problem."""
 
 
-
 class SolutionGenerator(HIRAbstractGeneratorLLM):
     """Generates solutions."""
 
@@ -282,21 +303,23 @@ class SolutionGenerator(HIRAbstractGeneratorLLM):
 
 class GenericSolutionGenerator(SolutionGenerator):
     """Generic solution generator with postprocessing."""
+
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         # solution class
         self.solution_class = kwargs.get("solution_class", Solution)
         assert self.solution_class, "Solution class is required"
-        assert issubclass(
-            self.solution_class, Solution
-        ), "Solution class must be a subclass of Solution"
+        assert issubclass(self.solution_class, Solution), (
+            "Solution class must be a subclass of Solution"
+        )
         # generation kwargs
         self.n_solutions = kwargs.get("n_solutions", 10)
         self.temperature = kwargs.get("temperature", 0.5)
         self.max_tokens = kwargs.get("max_tokens", 4096)
 
-
-    def remove_repetitions(self, answer: str, keep: int = 3, min_lines: int = 16) -> str:
+    def remove_repetitions(
+        self, answer: str, keep: int = 3, min_lines: int = 16
+    ) -> str:
         """
         Remove repetitive blocs of text at the end of the answer.
         """
@@ -305,9 +328,9 @@ class GenericSolutionGenerator(SolutionGenerator):
             return answer
 
         # remove one-line-blocs
-        #print(set(lines[(-2-keep):-1]))
+        # print(set(lines[(-2-keep):-1]))
         while (
-            len(set(lines[(-2-keep):-1])) == 1
+            len(set(lines[(-2 - keep) : -1])) == 1
             and lines[-2].startswith(lines[-1])
             and len(lines) > min_lines
             and lines[(-2)].strip()
@@ -315,17 +338,24 @@ class GenericSolutionGenerator(SolutionGenerator):
             del lines[(-2)]  # delete line at idx -2
 
         # remove multi-line-blocs
-        for bloclength in [2,3]:
+        for bloclength in [2, 3]:
             while (
-                len(set(["".join(lines[-ri-bloclength:-ri]) for ri in range(1,bloclength*(keep+1),bloclength)])) == 1
-                and lines[-1-bloclength].startswith(lines[-1])
+                len(
+                    set(
+                        [
+                            "".join(lines[-ri - bloclength : -ri])
+                            for ri in range(1, bloclength * (keep + 1), bloclength)
+                        ]
+                    )
+                )
+                == 1
+                and lines[-1 - bloclength].startswith(lines[-1])
                 and len(lines) > min_lines
-                and any(lines[-ri].strip() for ri in range(2,bloclength+1))
+                and any(lines[-ri].strip() for ri in range(2, bloclength + 1))
             ):
-                del lines[-1-bloclength:-1] # delete last bloc
+                del lines[-1 - bloclength : -1]  # delete last bloc
 
         return "\n".join(lines)  # return the modified answer
-
 
     async def arun(
         self,
@@ -386,6 +416,7 @@ class GenericSolutionGenerator(SolutionGenerator):
 
         return recos
 
+
 class Judge(HIRAbstractGenerator):
     """Judges solutions."""
 
@@ -401,7 +432,7 @@ class Judge(HIRAbstractGenerator):
 
 
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
-#     BIG REFACTORING TODO     # 
+#     BIG REFACTORING TODO     #
 # !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
 
 
@@ -412,7 +443,6 @@ class BaseJudge(HIRAbstractGenerator):
     """
 
 
-
 class FeedbackGenerator(HIRAbstractGeneratorLLM):
     """Generates feedback."""
 
@@ -421,7 +451,6 @@ class FeedbackGenerator(HIRAbstractGeneratorLLM):
         self, problem: Problem, solution: Solution, evaluation: Evaluation
     ) -> Sequence[Feedback]:
         pass
-
 
 
 class GenericFeedbackGenerator(FeedbackGenerator):
@@ -489,9 +518,6 @@ class GenericFeedbackGenerator(FeedbackGenerator):
         return [Feedback(feedback=answer, prompt=prompt) for answer in answers]
 
 
-
-
-
 class VirtuePreferencePairGenerator(HIRAbstractGenerator):
     """
     Generates preference pairs from differences in terms of additional
@@ -510,7 +536,6 @@ class VirtuePreferencePairGenerator(HIRAbstractGenerator):
         pass
 
 
-                        
 class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
     """Generate virtue-preference pairs for the informal argument reconstruction task
     based on score."""
@@ -544,7 +569,7 @@ class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
             (solution, evaluation)
             for solution, evaluation in zip(candidate_solutions, evaluations)
             if evaluation.is_valid
-        ]        
+        ]
         if len(valid_recos) < 2:
             return pairs
 
@@ -580,8 +605,6 @@ class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         return pairs
 
 
-
-
 class FailureTypePreferencePairGenerator(HIRAbstractGenerator):
     """
     Generates preference pairs from failure type differences
@@ -598,7 +621,6 @@ class FailureTypePreferencePairGenerator(HIRAbstractGenerator):
         feedback: Feedback | None = None,
     ) -> list[ChatPreferencePair]:
         pass
-
 
 
 class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerator):
@@ -627,7 +649,9 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
         for key in evaluations[0].metrics.keys():
             error_counts[key] = len([1 for e in evaluations if e.metrics[key]])
         # dismiss errors that are never avoided, i.e. always present
-        error_counts = {k: v for k, v in error_counts.items() if 0 < v < len(evaluations)}
+        error_counts = {
+            k: v for k, v in error_counts.items() if 0 < v < len(evaluations)
+        }
 
         if not error_counts:
             return pairs
@@ -657,13 +681,13 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
 
         # list all errors avoided by the chosen solution
         errors_avoided = {
-            k: v for k, v in evaluations[rejected_idx].metrics.items()
+            k: v
+            for k, v in evaluations[rejected_idx].metrics.items()
             if v and not evaluations[chosen_idx].metrics[k]
         }
 
-        hint = (
-            self.avoid_errors_hint
-            + "\n".join(f"- {k}: {v}" for k, v in errors_avoided.items())
+        hint = self.avoid_errors_hint + "\n".join(
+            f"- {k}: {v}" for k, v in errors_avoided.items()
         )
 
         pairs.append(
@@ -696,7 +720,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         problem_generator: ProblemGenerator,
         solution_generator: SolutionGenerator,
         judge: Judge,
-        virtue_preference_pair_generator: VirtuePreferencePairGenerator | list[VirtuePreferencePairGenerator] | None = None,
+        virtue_preference_pair_generator: VirtuePreferencePairGenerator
+        | list[VirtuePreferencePairGenerator]
+        | None = None,
         feedback_generator: FeedbackGenerator | None = None,
         failure_type_preference_pair_generator: FailureTypePreferencePairGenerator
         | None = None,
@@ -743,12 +769,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         pairs: list[ChatPreferencePair] = []
 
         top_valid_solution = next(
-            (cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid),
-            None
+            (cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid), None
         )
         top_invalid_solution = next(
             (cs for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid),
-            None
+            None,
         )
 
         if top_valid_solution is None or top_invalid_solution is None:
@@ -808,7 +833,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         )
         if do_virtue_hirp:
             logger.debug("Constructing virtue preference pair")
-            assert self.virtue_preference_pair_generators, "Internal error: Attempting do_virtue_hirp while no virtue preference pair generators available."
+            assert self.virtue_preference_pair_generators, (
+                "Internal error: Attempting do_virtue_hirp while no virtue preference pair generators available."
+            )
             shuffled_generators = copy.deepcopy(self.virtue_preference_pair_generators)
             random.shuffle(shuffled_generators)
             virtue_pairs: list[ChatPreferencePair] = []
@@ -940,7 +967,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
 
         return pairs
 
-    def self_critique_router(self, evaluations: Sequence[Evaluation]) -> tuple[bool, bool]:
+    def self_critique_router(
+        self, evaluations: Sequence[Evaluation]
+    ) -> tuple[bool, bool]:
         """router for main workflow"""
         do_self_critique = not any(e.is_valid for e in evaluations)
         return do_self_critique, not do_self_critique
@@ -1004,6 +1033,9 @@ class HIREvaluator(HIRAbstractGenerator):
             f"{key}_counts": sum(bool(e.metrics.get(key)) for e in evaluations)
             for key in metric_keys
         }
-        eval_result["accuracy"] =  sum(int(e.is_valid) for e in evaluations) / len(evaluations) if evaluations else 0.0
+        eval_result["accuracy"] = (
+            sum(int(e.is_valid) for e in evaluations) / len(evaluations)
+            if evaluations
+            else 0.0
+        )
         return eval_result
-    
