@@ -56,7 +56,7 @@ class BaseLogRecoHandler(InfRecoHandler):
             (
                 r.details for r in request.results
                 if vdata_id in r.verification_data_references
-                and r.verifier_id == "WellFormedFormulasHandler"
+                and "WellFormedFormulasHandler" in r.verifier_id  # NOTE: this is a hacky way to get the right VerificationResult
             ),
             None
         )
@@ -69,6 +69,25 @@ class BaseLogRecoHandler(InfRecoHandler):
 class WellFormedFormulasHandler(BaseLogRecoHandler):
     """Parses and checks first-order logic formulas in argdown code snippets.
     Stores the artifacts in the verification result object (details)."""
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+        from_key: str = "from",
+        formalization_key: str = "formalization",
+        declarations_key: str = "declarations",
+        filter: Optional[VDFilter] = None,
+    ):
+        super().__init__(name, logger, from_key, formalization_key, declarations_key, filter)
+        # NOTE: hacky fix
+        # TODO: add 'source_handler' attribute to VerificationResult
+        if "WellFormedFormulasHandler" not in self.name:
+            raise ValueError(
+                "The name of instances of class WellFormedFormulasHandler "
+                "must contain 'WellFormedFormulasHandler'. This instance has "
+                f"'{self.name}' as name."
+            )
 
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         """Parse first-order logic formulas in argdown code snippets."""

@@ -567,7 +567,7 @@ def test_real_world_example():
         (
             r
             for r in result_request.results
-            if r.verifier_id == "WellFormedFormulasHandler"
+            if "WellFormedFormulasHandler" in r.verifier_id
         ),
         None,
     )
