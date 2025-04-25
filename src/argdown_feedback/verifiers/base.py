@@ -24,9 +24,10 @@ class BaseHandler(ABC):
             return vdata.metadata.get(key) in values
         return filter
 
-    def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None):
+    def __init__(self, name: Optional[str] = None, logger: Optional[logging.Logger] = None, parent_handler_id: Optional[str] = None):
         self._next_handler: Optional['BaseHandler'] = None
-        self.name = name or self.__class__.__name__
+        name = name or self.__class__.__name__
+        self.name = name if parent_handler_id is None else f"{parent_handler_id}.{name}"
         self.logger = logger or logging.getLogger(self.__class__.__module__)
         
     def set_next(self, handler: 'BaseHandler') -> 'BaseHandler':
@@ -92,8 +93,9 @@ class CompositeHandler(BaseHandler, Generic[H]):
     def __init__(self, 
                  name: Optional[str] = None,
                  logger: Optional[logging.Logger] = None,
-                 handlers: list[H] | None = None):
-        super().__init__(name, logger)
+                 handlers: list[H] | None = None,
+                 parent_handler_id: Optional[str] = None):
+        super().__init__(name, logger, parent_handler_id=parent_handler_id)
         self.handlers = handlers or []
         
     def add_handler(self, handler: H) -> None:
