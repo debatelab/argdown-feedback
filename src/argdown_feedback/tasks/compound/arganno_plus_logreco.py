@@ -213,21 +213,21 @@ class ArgannoPlusLogRecoJudge(Judge):
         infreco_handler = InfRecoCompositeHandler(
             handlers = [
                 # Argument existence handlers
-                HasArgumentsHandler(),
-                HasPCSHandler(),
+                HasArgumentsHandler(name="InfReco.HasArgumentsHandler"),
+                HasPCSHandler(name="InfReco.HasPCSHandler"),
 
                 # Argument form handlers
-                StartsWithPremiseHandler(),
-                EndsWithConclusionHandler(),
-                NoDuplicatePCSLabelsHandler(),
+                StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler"),
+                EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler"),
+                NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler"),
                 
                 # Label and gist handlers
-                HasLabelHandler(),
+                HasLabelHandler(name="InfReco.HasLabelHandler"),
                 
                 # Inference data handlers
-                HasInferenceDataHandler(),
-                PropRefsExistHandler(),
-                UsesAllPropsHandler(),
+                HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler"),
+                PropRefsExistHandler(name="InfReco.PropRefsExistHandler"),
+                UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler"),
             ]            
         )
 

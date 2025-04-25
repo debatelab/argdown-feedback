@@ -598,6 +598,7 @@ class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
             self.handlers = [
                 # Formalization handlers
                 WellFormedFormulasHandler(
+                    name="LogReco.WellFormedFormulasHandler",
                     from_key=from_key,
                     formalization_key=formalization_key,
                     declarations_key=declarations_key,
@@ -606,12 +607,14 @@ class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
                 
                 # Deductive validity handlers
                 GlobalDeductiveValidityHandler(
+                    name="LogReco.GlobalDeductiveValidityHandler",
                     from_key=from_key,
                     formalization_key=formalization_key,
                     declarations_key=declarations_key,
                     filter=filter,
                 ),
                 LocalDeductiveValidityHandler(
+                    name="LogReco.LocalDeductiveValidityHandler",
                     from_key=from_key,
                     formalization_key=formalization_key,
                     declarations_key=declarations_key,
@@ -620,12 +623,14 @@ class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
                 
                 # Logical analysis handlers
                 AllPremisesRelevantHandler(
+                    name="LogReco.AllPremisesRelevantHandler",
                     from_key=from_key,
                     formalization_key=formalization_key,
                     declarations_key=declarations_key,
                     filter=filter,
                 ),
                 PremisesConsistentHandler(
+                    name="LogReco.PremisesConsistentHandler",
                     from_key=from_key,
                     formalization_key=formalization_key,
                     declarations_key=declarations_key,
@@ -634,6 +639,7 @@ class LogRecoCompositeHandler(CompositeHandler[BaseLogRecoHandler]):
                 
                 # Dialectical relation handlers
                 FormallyGroundedRelationsHandler(
+                    name="LogReco.FormallyGroundedRelationsHandler",
                     from_key=from_key,
                     formalization_key=formalization_key,
                     declarations_key=declarations_key,

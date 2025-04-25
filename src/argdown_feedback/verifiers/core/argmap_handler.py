@@ -162,7 +162,7 @@ class ArgMapCompositeHandler(CompositeHandler[ArgMapHandler]):
         # Initialize with default handlers if none provided
         if not handlers:
             self.handlers = [
-                CompleteClaimsHandler(filter=filter),
-                NoDuplicateLabelsHandler(filter=filter),
-                NoPCSHandler(filter=filter),
+                CompleteClaimsHandler(name="ArgMap.CompleteClaimsHandler", filter=filter),
+                NoDuplicateLabelsHandler(name="ArgMap.NoDuplicateLabelsHandler", filter=filter),
+                NoPCSHandler(name="ArgMap.NoPCSHandler", filter=filter),
             ]

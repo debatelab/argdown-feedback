@@ -409,13 +409,13 @@ class ArgannoCompositeHandler(CompositeHandler[ArgannoHandler]):
         # Initialize with default handlers if none provided
         if not handlers:
             self.handlers = [
-                SourceTextIntegrityHandler(filter=filter),
-                NestedPropositionHandler(filter=filter),
-                PropositionIdPresenceHandler(filter=filter),
-                PropositionIdUniquenessHandler(filter=filter),
-                SupportReferenceValidityHandler(filter=filter),
-                AttackReferenceValidityHandler(filter=filter),
-                AttributeValidityHandler(filter=filter),
-                ElementValidityHandler(filter=filter),
+                SourceTextIntegrityHandler(name="Arganno.SourceTextIntegrityHandler", filter=filter),
+                NestedPropositionHandler(name="Arganno.NestedPropositionHandler", filter=filter),
+                PropositionIdPresenceHandler(name="Arganno.PropositionIdPresenceHandler", filter=filter),
+                PropositionIdUniquenessHandler(name="Arganno.PropositionIdUniquenessHandler", filter=filter),
+                SupportReferenceValidityHandler(name="Arganno.SupportReferenceValidityHandler", filter=filter),
+                AttackReferenceValidityHandler(name="Arganno.AttackReferenceValidityHandler", filter=filter),
+                AttributeValidityHandler(name="Arganno.AttributeValidityHandler", filter=filter),
+                ElementValidityHandler(name="Arganno.ElementValidityHandler", filter=filter),
             ]
             

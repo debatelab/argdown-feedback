@@ -629,28 +629,28 @@ class InfRecoCompositeHandler(CompositeHandler[InfRecoHandler]):
         if not handlers:
             self.handlers = [
                 # Argument existence handlers
-                HasArgumentsHandler(filter=filter),
-                HasUniqueArgumentHandler(filter=filter),
-                HasPCSHandler(filter=filter),
+                HasArgumentsHandler(name="InfReco.HasArgumentsHandler", filter=filter),
+                HasUniqueArgumentHandler(name="InfReco.HasUniqueArgumentHandler", filter=filter),
+                HasPCSHandler(name="InfReco.HasPCSHandler", filter=filter),
 
                 # Argument form handlers
-                StartsWithPremiseHandler(filter=filter),
-                EndsWithConclusionHandler(filter=filter),
-                NotMultipleGistsHandler(filter=filter),
-                NoDuplicatePCSLabelsHandler(filter=filter),
+                StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler", filter=filter),
+                EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler", filter=filter),
+                NotMultipleGistsHandler(name="InfReco.NotMultipleGistsHandler", filter=filter),
+                NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler", filter=filter),
                 
                 # Label and gist handlers
-                HasLabelHandler(filter=filter),
-                HasGistHandler(filter=filter),
+                HasLabelHandler(name="InfReco.HasLabelHandler", filter=filter),
+                HasGistHandler(name="InfReco.HasGistHandler", filter=filter),
                 
                 # Inference data handlers
-                HasInferenceDataHandler(from_key=from_key, filter=filter),
-                PropRefsExistHandler(from_key=from_key, filter=filter),
-                UsesAllPropsHandler(from_key=from_key, filter=filter),
+                HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler", from_key=from_key, filter=filter),
+                PropRefsExistHandler(name="InfReco.PropRefsExistHandler", from_key=from_key, filter=filter),
+                UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler", from_key=from_key, filter=filter),
                 
                 # Content restriction handlers
-                NoExtraPropositionsHandler(filter=filter),
-                OnlyGroundedDialecticalRelationsHandler(filter=filter),
-                NoPropInlineDataHandler(filter=filter),
-                NoArgInlineDataHandler(filter=filter),
+                NoExtraPropositionsHandler(name="InfReco.NoExtraPropositionsHandler", filter=filter),
+                OnlyGroundedDialecticalRelationsHandler(name="InfReco.OnlyGroundedDialecticalRelationsHandler", filter=filter),
+                NoPropInlineDataHandler(name="InfReco.NoPropInlineDataHandler", filter=filter),
+                NoArgInlineDataHandler(name="InfReco.NoArgInlineDataHandler", filter=filter),
             ]

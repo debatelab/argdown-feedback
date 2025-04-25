@@ -265,25 +265,25 @@ class ArgmapPlusInfrecoJudge(Judge):
         infreco_handler = InfRecoCompositeHandler(
             handlers=[
                 # Argument existence handlers
-                HasArgumentsHandler(filter=reco_filter),
-                HasPCSHandler(filter=reco_filter),
+                HasArgumentsHandler(name="InfReco.HasArgumentsHandler", filter=reco_filter),
+                HasPCSHandler(name="InfReco.HasPCSHandler", filter=reco_filter),
                 # Argument form handlers
-                StartsWithPremiseHandler(filter=reco_filter),
-                EndsWithConclusionHandler(filter=reco_filter),
-                NoDuplicatePCSLabelsHandler(filter=reco_filter),
+                StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler", filter=reco_filter),
+                EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler", filter=reco_filter),
+                NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler", filter=reco_filter),
                 # Label and gist handlers
-                HasLabelHandler(filter=reco_filter),
+                HasLabelHandler(name="InfReco.HasLabelHandler", filter=reco_filter),
                 # Inference data handlers
-                HasInferenceDataHandler(filter=reco_filter),
-                PropRefsExistHandler(filter=reco_filter),
-                UsesAllPropsHandler(filter=reco_filter),
+                HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler", filter=reco_filter),
+                PropRefsExistHandler(name="InfReco.PropRefsExistHandler", filter=reco_filter),
+                UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler", filter=reco_filter),
             ]
         )
         main_handler = CompositeHandler(
             handlers=[
                 DefaultProcessingHandler(),
-                HasArgdownHandler(filter=map_filter),
-                HasArgdownHandler(filter=reco_filter),
+                HasArgdownHandler(name="HasArgdownHandler.map", filter=map_filter),
+                HasArgdownHandler(name="HasArgdownHandler.reco", filter=reco_filter),
                 ArgMapCompositeHandler(filter=map_filter),
                 infreco_handler,
                 ArgmapInfrecoCoherenceHandler(),
