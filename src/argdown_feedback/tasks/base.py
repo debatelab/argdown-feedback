@@ -254,7 +254,7 @@ class HIRAbstractGeneratorLLM(ABC):
                 self.model_id = next(models.data[0].id)
 
     @tenacity.retry(
-        wait=tenacity.wait_random_exponential(min=1, max=60),
+        wait=tenacity.wait_random_exponential(min=1, max=30),
         stop=tenacity.stop_after_attempt(6),
     )
     async def _generate(self, messages, **gen_kwargs):
