@@ -11,7 +11,7 @@ from textwrap import dedent
 from typing import Any, Sequence, TypedDict
 
 from bs4 import BeautifulSoup
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI, BadRequestError, OpenAI
 from pyargdown import Argdown
 import tenacity
 
@@ -270,6 +270,11 @@ class HIRAbstractGeneratorLLM(ABC):
             answers = [a for a in answers if a is not None]
             return answers
         except Exception as e:
+            if isinstance(e, BadRequestError):
+                if "maximum context length" in e.message:
+                    logger.error("Request is exceeding maximum context length. Will not retry.")
+                    logger.debug(f"Error message: {str(e)}")
+                    return []
             logger.error(f"Error calling the OpenAI API: {str(e)}")
             logger.debug("Error-inducing messages:")
             for message in messages:
