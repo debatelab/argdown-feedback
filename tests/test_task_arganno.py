@@ -250,7 +250,7 @@ def feedback1() -> Feedback:
 def hirp_factory(model_kwargs, vpp_gen=AnnotationSupportsPreferencePairGenerator):
     return HIRPreferencePairGenerator(
         problem_generator=AnnotationProblemGenerator(),
-        solution_generator=GenericSolutionGenerator(n_solutions=8, **model_kwargs),
+        solution_generator=GenericSolutionGenerator(n_solutions=1, solution_class=Annotation, **model_kwargs),
         judge=AnnotationJudge(),
         feedback_generator=AnnotationFeedbackGenerator(**model_kwargs),
         virtue_preference_pair_generator=vpp_gen(),
@@ -384,6 +384,26 @@ async def test_revised_solution_generator(invalid_annotations1, source_texts, mo
     assert isinstance(revised_annotation, Annotation)
     print(revised_annotation)
 
+
+@pytest.mark.skipif(not llm_available(), reason="LLM model not available")
+@pytest.mark.asyncio
+async def test_self_critique(model_kwargs, invalid_annotations1, source_texts):
+    source_text = source_texts[0]
+    invalid_annotations = invalid_annotations1[:2]
+    pg = AnnotationProblemGenerator()
+    problem = await pg.arun(source_text)
+    judge = AnnotationJudge()
+    evaluations = await judge.arun(problem, invalid_annotations)
+
+
+    hirp_generator = hirp_factory(model_kwargs)
+    pairs = await hirp_generator.run_self_critique(
+        problem=problem,
+        candidate_solutions=invalid_annotations,
+        evaluations=evaluations
+    )
+    pprint(pairs)
+    assert isinstance(pairs, list)
 
 @pytest.mark.asyncio
 class TestAnnotationPreferencePairGenerators:
