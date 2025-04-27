@@ -274,7 +274,7 @@ class HIRAbstractGeneratorLLM(ABC):
         except Exception as e:
             if isinstance(e, BadRequestError):
                 if "maximum context length" in e.message:
-                    logger.error("Request is exceeding maximum context length. Will not retry.")
+                    logger.error(f"Request {e.request_id} is exceeding maximum context length. Will not retry.")
                     logger.debug(f"Error message: {str(e)}")
                     return []
             logger.error(f"Error calling the inference server: {str(e)}")
