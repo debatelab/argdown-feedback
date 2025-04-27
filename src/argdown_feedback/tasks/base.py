@@ -6,6 +6,7 @@ from concurrent.futures import ProcessPoolExecutor
 import copy
 import dataclasses
 import functools
+import hashlib
 import logging
 import random
 from statistics import mean
@@ -274,7 +275,8 @@ class HIRAbstractGeneratorLLM(ABC):
         except Exception as e:
             if isinstance(e, BadRequestError):
                 if "maximum context length" in e.message:
-                    logger.error(f"Request {e.request_id} is exceeding maximum context length. Will not retry.")
+                    hash = hashlib.sha256(str(messages).encode()).hexdigest()
+                    logger.warning(f"Request with hash {hash} is exceeding maximum context length. Will not retry.")
                     logger.debug(f"Error message: {str(e)}")
                     return []
             logger.error(f"Error calling the inference server: {str(e)}")
@@ -323,6 +325,8 @@ class GenericSolutionGenerator(SolutionGenerator):
         )
         # generation kwargs
         self.n_solutions = kwargs.get("n_solutions", 10)
+        n_revisions = max(round(self.n_solutions / 2), 1)
+        self.n_revisions = kwargs.get("n_revisions", n_revisions)
         self.temperature = kwargs.get("temperature", 0.5)
         self.max_tokens = kwargs.get("max_tokens", 4096)
 
@@ -403,10 +407,12 @@ class GenericSolutionGenerator(SolutionGenerator):
                 },
             ]
 
+        n = self.n_solutions if original_solution is None else self.n_revisions
+
         answers = await self._generate(
             messages,
             max_tokens=self.max_tokens,
-            n=self.n_solutions,
+            n=n,
             temperature=self.temperature,
         )
 
