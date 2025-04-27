@@ -78,7 +78,7 @@ def example_problem() -> ArgannoFromArgmapProblem:
                 <+ <Climate change>: Animal farming causes climate change.
             ```
             """)
-        argmap_evaluation = ArgMapJudge()._evaluate_argmap(ArgMapProblem(argdown_snippet), ArgumentMap(argdown_snippet))
+        argmap_evaluation = ArgMapJudge()._evaluate_solution(ArgumentMap(argdown_snippet), ArgMapProblem(argdown_snippet))
         return ArgannoFromArgmapProblem(
             sources=sources,
             argdown_snippet=argdown_snippet,

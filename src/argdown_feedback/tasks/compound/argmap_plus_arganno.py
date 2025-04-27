@@ -9,6 +9,7 @@ from pyargdown import (
 import textdistance
 
 from argdown_feedback.tasks.base import (
+    MPJudge,
     Problem,
     Solution,
     Evaluation,
@@ -218,12 +219,40 @@ class ArgmapPlusArgannoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgmapPlusArgannoJudge(Judge):
+class ArgmapPlusArgannoJudge(MPJudge):
     """Judge for the anno plus argument mapping task."""
 
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, ArgmapPlusArgannoProblem), (
+            "Problem must be an ArgmapPlusArgannoProblem"
+        )
+        assert (
+            isinstance(original_solution, ArgmapPlusArganno)
+            or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        assert all(
+            isinstance(solution, ArgmapPlusArganno) for solution in solutions
+        ), "All solutions must be ArgmapPlusArganno objects"
+
+    @staticmethod
     def _evaluate_solution(
-        self, problem: ArgmapPlusArgannoProblem, solution: ArgmapPlusArganno
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, ArgmapPlusArgannoProblem), "Problem must be an ArgmapPlusArgannoProblem"
+        assert isinstance(solution, ArgmapPlusArganno), "Solution must be an ArgmapPlusArganno"
+
         handler = CompositeHandler(
             handlers=[
                 DefaultProcessingHandler(),
@@ -241,32 +270,56 @@ class ArgmapPlusArgannoJudge(Judge):
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
         return evaluation
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgmapPlusArgannoProblem), (
-            "Problem must be an ArgmapPlusArgannoProblem"
-        )
-        assert (
-            isinstance(original_solution, ArgmapPlusArganno)
-            or original_solution is None
-        )
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, ArgmapPlusArganno), (
-                "All solutions must be ArgmapPlusArganno"
-            )
-            evaluations.append(self._evaluate_solution(problem, solution))
+# class ArgmapPlusArgannoJudge2(Judge):
+#     """Judge for the anno plus argument mapping task."""
 
-        return evaluations
+#     def _evaluate_solution(
+#         self, problem: ArgmapPlusArgannoProblem, solution: ArgmapPlusArganno
+#     ) -> Evaluation:
+#         handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasAnnotationsHandler(),
+#                 HasArgdownHandler(),
+#                 ArgannoCompositeHandler(),
+#                 ArgMapCompositeHandler(),
+#                 ArgannoArgmapCoherenceHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(inputs=str(solution), source=problem.sources)
+#         result = handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         if evaluation.artifacts.get("argdown_map") is None:
+#             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, ArgmapPlusArgannoProblem), (
+#             "Problem must be an ArgmapPlusArgannoProblem"
+#         )
+#         assert (
+#             isinstance(original_solution, ArgmapPlusArganno)
+#             or original_solution is None
+#         )
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, ArgmapPlusArganno), (
+#                 "All solutions must be ArgmapPlusArganno"
+#             )
+#             evaluations.append(self._evaluate_solution(problem, solution))
+
+#         return evaluations
 
 
 class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):

@@ -11,6 +11,7 @@ from pyargdown import (
 )
 
 from argdown_feedback.tasks.base import (
+    MPJudge,
     Problem,
     ScoringVirtuePreferencePairGenerator,
     Solution,
@@ -174,12 +175,37 @@ class LogRecoProblemGenerator(ProblemGenerator):
         )
 
 
-class LogRecoJudge(Judge):
+class LogRecoJudge(MPJudge):
     """Judge for the informal argument reconstruction task."""
 
-    def _evaluate_logreco(
-        self, problem: LogRecoProblem, reco: LogicalReco
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+        assert isinstance(original_solution, LogicalReco) or original_solution is None
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        for solution in solutions:
+            assert isinstance(solution, LogicalReco), (
+                "All solutions must be LogicalReco objects"
+            )
+
+
+    @staticmethod
+    def _evaluate_solution(
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+
+        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+        assert isinstance(solution, LogicalReco), "Solution must be an LogicalReco"
 
         infreco_handler = InfRecoCompositeHandler()
         infreco_handler.handlers = [
@@ -195,7 +221,7 @@ class LogRecoJudge(Judge):
             ]
         )
         request = VerificationRequest(
-            inputs=reco.argdown_snippet, source=problem.sources
+            inputs=solution.argdown_snippet, source=problem.sources
         )
         result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
@@ -204,28 +230,58 @@ class LogRecoJudge(Judge):
         return evaluation
 
 
+# class LogRecoJudge2(Judge):
+#     """Judge for the informal argument reconstruction task."""
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
-        assert isinstance(original_solution, LogicalReco) or original_solution is None
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
+#     def _evaluate_logreco(
+#         self, problem: LogRecoProblem, reco: LogicalReco
+#     ) -> Evaluation:
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, LogicalReco), (
-                "All solutions must be LogicalReco objects"
-            )
-            evaluations.append(self._evaluate_logreco(problem, solution))
+#         infreco_handler = InfRecoCompositeHandler()
+#         infreco_handler.handlers = [
+#             h for h in infreco_handler.handlers if not isinstance(h, NoPropInlineDataHandler)
+#         ]
 
-        return evaluations
+#         handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasArgdownHandler(),
+#                 infreco_handler,
+#                 LogRecoCompositeHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(
+#             inputs=reco.argdown_snippet, source=problem.sources
+#         )
+#         result = handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         if evaluation.artifacts.get("argdown_reco") is None:
+#             evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")
+#         return evaluation
+
+
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
+#         assert isinstance(original_solution, LogicalReco) or original_solution is None
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, LogicalReco), (
+#                 "All solutions must be LogicalReco objects"
+#             )
+#             evaluations.append(self._evaluate_logreco(problem, solution))
+
+#         return evaluations
 
 
 class LogRecoFeedbackGenerator(FeedbackGenerator):

@@ -122,7 +122,7 @@ class ArgannoFromArgmapProblemGenerator(ProblemGeneratorLLM):
             argmap_solution = await self._argmap_sg.arun(argmap_problem)
             #print("argmap_problem", argmap_problem)
             #print("argmap_solution", argmap_solution)
-            argmap_evaluation = ArgMapJudge()._evaluate_argmap(argmap_problem, argmap_solution[0])
+            argmap_evaluation = ArgMapJudge()._evaluate_solution(argmap_solution[0], argmap_problem)
             argdown_map = argmap_evaluation.artifacts.get("argdown_map")
             return ArgannoFromArgmapProblem(
                 sources=inputs,

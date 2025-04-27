@@ -8,6 +8,7 @@ from argdown_feedback.tasks.base import (
     Evaluation,
     Feedback,
     Judge,
+    MPJudge,
     Problem,
     ProblemGenerator,
     ScoringVirtuePreferencePairGenerator,
@@ -251,12 +252,40 @@ class ArgmapPlusInfrecoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgmapPlusInfrecoJudge(Judge):
+class ArgmapPlusInfrecoJudge(MPJudge):
     """Judge for the argmap plus infreco task."""
 
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, ArgmapPlusInfrecoProblem), (
+            "Problem must be an ArgmapPlusInfrecoProblem"
+        )
+        assert (
+            isinstance(original_solution, ArgmapPlusInfreco)
+            or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        assert all(
+            isinstance(solution, ArgmapPlusInfreco) for solution in solutions
+        ), "All solutions must be ArgmapPlusInfreco objects"
+
+    @staticmethod
     def _evaluate_solution(
-        self, problem: ArgmapPlusInfrecoProblem, solution: ArgmapPlusInfreco
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, ArgmapPlusInfrecoProblem), "Problem must be an ArgmapPlusInfrecoProblem"
+        assert isinstance(solution, ArgmapPlusInfreco), "Solution must be an ArgmapPlusInfreco"
+
         map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
         reco_filter = BaseHandler.create_metadata_filter(
             "filename", ["reconstructions.ad"]
@@ -294,32 +323,76 @@ class ArgmapPlusInfrecoJudge(Judge):
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgmapPlusInfrecoProblem), (
-            "Problem must be an ArgannoPlusInfrecoProblem"
-        )
-        assert (
-            isinstance(original_solution, ArgmapPlusInfreco)
-            or original_solution is None
-        )
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, ArgmapPlusInfreco), (
-                "All solutions must be ArgmapPlusInfreco"
-            )
-            evaluations.append(self._evaluate_solution(problem, solution))
+# class ArgmapPlusInfrecoJudge2(Judge):
+#     """Judge for the argmap plus infreco task."""
 
-        return evaluations
+#     def _evaluate_solution(
+#         self, problem: ArgmapPlusInfrecoProblem, solution: ArgmapPlusInfreco
+#     ) -> Evaluation:
+#         map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
+#         reco_filter = BaseHandler.create_metadata_filter(
+#             "filename", ["reconstructions.ad"]
+#         )
+
+#         infreco_handler = InfRecoCompositeHandler(
+#             handlers=[
+#                 # Argument existence handlers
+#                 HasArgumentsHandler(name="InfReco.HasArgumentsHandler", filter=reco_filter),
+#                 HasPCSHandler(name="InfReco.HasPCSHandler", filter=reco_filter),
+#                 # Argument form handlers
+#                 StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler", filter=reco_filter),
+#                 EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler", filter=reco_filter),
+#                 NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler", filter=reco_filter),
+#                 # Label and gist handlers
+#                 HasLabelHandler(name="InfReco.HasLabelHandler", filter=reco_filter),
+#                 # Inference data handlers
+#                 HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler", filter=reco_filter),
+#                 PropRefsExistHandler(name="InfReco.PropRefsExistHandler", filter=reco_filter),
+#                 UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler", filter=reco_filter),
+#             ]
+#         )
+#         main_handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasArgdownHandler(name="HasArgdownHandler.map", filter=map_filter),
+#                 HasArgdownHandler(name="HasArgdownHandler.reco", filter=reco_filter),
+#                 ArgMapCompositeHandler(filter=map_filter),
+#                 infreco_handler,
+#                 ArgmapInfrecoCoherenceHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(inputs=str(solution), source=problem.sources)
+#         result = main_handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, ArgmapPlusInfrecoProblem), (
+#             "Problem must be an ArgannoPlusInfrecoProblem"
+#         )
+#         assert (
+#             isinstance(original_solution, ArgmapPlusInfreco)
+#             or original_solution is None
+#         )
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, ArgmapPlusInfreco), (
+#                 "All solutions must be ArgmapPlusInfreco"
+#             )
+#             evaluations.append(self._evaluate_solution(problem, solution))
+
+#         return evaluations
 
 
 class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):

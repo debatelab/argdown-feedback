@@ -5,6 +5,7 @@ from typing import Sequence
 from bs4 import BeautifulSoup
 
 from argdown_feedback.tasks.base import (
+    MPJudge,
     Problem,
     ScoringVirtuePreferencePairGenerator,
     Solution,
@@ -166,7 +167,7 @@ class AnnotationProblemGenerator(ProblemGenerator):
         )
 
 
-class AnnotationJudge(Judge):
+class AnnotationJudge(MPJudge):
     """Judge for the annotation task."""
 
     def parse_xml_snippet(
@@ -193,9 +194,29 @@ class AnnotationJudge(Judge):
         )
         return soup, error_msg
 
-    def _evaluate_annotation(
-        self, problem: AnnotationProblem, annotation: Annotation
+    def _check_inputs(self, problem, solutions, original_solution = None, feedback = None):
+        assert isinstance(problem, AnnotationProblem), (
+            "Problem must be an AnnotationProblem"
+        )
+        assert isinstance(original_solution, Annotation) or original_solution is None
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        for solution in solutions:
+            assert isinstance(solution, Annotation), "All solutions must be Annotations"
+
+    @staticmethod
+    def _evaluate_solution(
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, AnnotationProblem), (
+            "Problem must be an AnnotationProblem"
+        )
+        assert isinstance(solution, Annotation), "Solution must be an Annotation"
+
         handler = CompositeHandler(
             handlers=[
                 DefaultProcessingHandler(),
@@ -204,33 +225,79 @@ class AnnotationJudge(Judge):
             ]
         )
         request = VerificationRequest(
-            inputs=annotation.annotated_source_text, source=problem.sources
+            inputs=solution.annotated_source_text, source=problem.sources
         )
         result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
+    
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, AnnotationProblem), (
-            "Problem must be an AnnotationProblem"
-        )
-        assert isinstance(original_solution, Annotation) or original_solution is None
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, Annotation), "All solutions must be Annotations"
-            evaluations.append(self._evaluate_annotation(problem, solution))
+# class AnnotationJudge2(Judge):
+#     """Judge for the annotation task."""
 
-        return evaluations
+#     def parse_xml_snippet(
+#         self, annotated_source_text: str
+#     ) -> tuple[BeautifulSoup, str | None]:
+#         error_msg: str | None = None
+#         ast = annotated_source_text.strip("\n ")
+#         if ast.startswith("```xml") and ast.endswith("```") and len(ast.splitlines()) > 1:
+#             ast = "\n".join(ast.splitlines()[1:-1])
+#         else:  # no fenced code block
+#             error_msg = "Failed to extract single fenced annotation block:"
+#             if ast.count("```xml") == 0:
+#                 error_msg += " No fenced code block starting with '```xml'."
+#             if ast.count("```xml") > 1:
+#                 error_msg += " More than one fenced code block starting with '```xml'."
+#             if not ast.endswith("```"):
+#                 error_msg += " No closing '```'."
+
+#         multi_valued_attributes = {"*": {"supports", "attacks"}}
+#         soup = BeautifulSoup(
+#             ast,
+#             "html.parser",
+#             multi_valued_attributes=multi_valued_attributes,
+#         )
+#         return soup, error_msg
+
+#     def _evaluate_annotation(
+#         self, problem: AnnotationProblem, annotation: Annotation
+#     ) -> Evaluation:
+#         handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasAnnotationsHandler(),
+#                 ArgannoCompositeHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(
+#             inputs=annotation.annotated_source_text, source=problem.sources
+#         )
+#         result = handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, AnnotationProblem), (
+#             "Problem must be an AnnotationProblem"
+#         )
+#         assert isinstance(original_solution, Annotation) or original_solution is None
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, Annotation), "All solutions must be Annotations"
+#             evaluations.append(self._evaluate_annotation(problem, solution))
+
+#         return evaluations
 
 
 class AnnotationFeedbackGenerator(FeedbackGenerator):

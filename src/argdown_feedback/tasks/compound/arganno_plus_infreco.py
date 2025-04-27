@@ -10,6 +10,7 @@ from pyargdown import (
 import textdistance
 
 from argdown_feedback.tasks.base import (
+    MPJudge,
     Problem,
     Solution,
     Evaluation,
@@ -263,12 +264,41 @@ class ArgannoPlusInfrecoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgannoPlusInfrecoJudge(Judge):
+class ArgannoPlusInfrecoJudge(MPJudge):
     """Judge for the anno plus argument mapping task."""
 
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, ArgannoPlusInfrecoProblem), (
+            "Problem must be an ArgannoPlusInfrecoProblem"
+        )
+        assert (
+            isinstance(original_solution, ArgannoPlusInfreco)
+            or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        assert all(
+            isinstance(solution, ArgannoPlusInfreco) for solution in solutions
+        ), "All solutions must be ArgannoPlusInfreco objects"
+
+
+    @staticmethod
     def _evaluate_solution(
-        self, problem: ArgannoPlusInfrecoProblem, solution: Solution
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, ArgannoPlusInfrecoProblem), "Problem must be an ArgannoPlusInfrecoProblem"
+        assert isinstance(solution, ArgannoPlusInfreco), "Solution must be an ArgannoPlusInfreco"
+
         infreco_handler = InfRecoCompositeHandler(
             handlers=[
                 # Argument existence handlers
@@ -304,32 +334,75 @@ class ArgannoPlusInfrecoJudge(Judge):
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
         return evaluation
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgannoPlusInfrecoProblem), (
-            "Problem must be an ArgannoPlusInfrecoProblem"
-        )
-        assert (
-            isinstance(original_solution, ArgannoPlusInfreco)
-            or original_solution is None
-        )
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, ArgannoPlusInfreco), (
-                "All solutions must be ArgannoPlusInfreco"
-            )
-            evaluations.append(self._evaluate_solution(problem, solution))
+# class ArgannoPlusInfrecoJudge2(Judge):
+#     """Judge for the anno plus argument mapping task."""
 
-        return evaluations
+#     def _evaluate_solution(
+#         self, problem: ArgannoPlusInfrecoProblem, solution: Solution
+#     ) -> Evaluation:
+#         infreco_handler = InfRecoCompositeHandler(
+#             handlers=[
+#                 # Argument existence handlers
+#                 HasArgumentsHandler(name="InfReco.HasArgumentsHandler"),
+#                 HasPCSHandler(name="InfReco.HasPCSHandler"),
+#                 # Argument form handlers
+#                 StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler"),
+#                 EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler"),
+#                 NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler"),
+#                 # Label and gist handlers
+#                 HasLabelHandler(name="InfReco.HasLabelHandler"),
+#                 # Inference data handlers
+#                 HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler"),
+#                 PropRefsExistHandler(name="InfReco.PropRefsExistHandler"),
+#                 UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler"),
+#             ]
+#         )
+
+#         handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasAnnotationsHandler(),
+#                 HasArgdownHandler(),
+#                 ArgannoCompositeHandler(),
+#                 infreco_handler,
+#                 ArgannoInfrecoCoherenceHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(inputs=str(solution), source=problem.sources)
+#         result = handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         if evaluation.artifacts.get("argdown_map") is None:
+#             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, ArgannoPlusInfrecoProblem), (
+#             "Problem must be an ArgannoPlusInfrecoProblem"
+#         )
+#         assert (
+#             isinstance(original_solution, ArgannoPlusInfreco)
+#             or original_solution is None
+#         )
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, ArgannoPlusInfreco), (
+#                 "All solutions must be ArgannoPlusInfreco"
+#             )
+#             evaluations.append(self._evaluate_solution(problem, solution))
+
+#         return evaluations
+
 
 
 class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):

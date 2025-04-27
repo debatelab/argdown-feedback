@@ -2,8 +2,10 @@
 
 from abc import ABC, abstractmethod
 import asyncio
+from concurrent.futures import ProcessPoolExecutor
 import copy
 import dataclasses
+import functools
 import logging
 import random
 from statistics import mean
@@ -275,7 +277,7 @@ class HIRAbstractGeneratorLLM(ABC):
                     logger.error("Request is exceeding maximum context length. Will not retry.")
                     logger.debug(f"Error message: {str(e)}")
                     return []
-            logger.error(f"Error calling the OpenAI API: {str(e)}")
+            logger.error(f"Error calling the inference server: {str(e)}")
             logger.debug("Error-inducing messages:")
             for message in messages:
                 logger.debug(f"  {message['role']}: {message['content']}")
@@ -438,16 +440,77 @@ class Judge(HIRAbstractGenerator):
         pass
 
 
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
-#     BIG REFACTORING TODO     #
-# !!!!!!!!!!!!!!!!!!!!!!!!!!!! #
-
-
-class BaseJudge(HIRAbstractGenerator):
+class MPJudge(Judge):
     """
-    BaseJudge implenents skeleton handler / chain-of-repsonsibility pattern
-    Specific judges individually construct handler chains fromVerifiers
+    MPJudge implements parallel multiprocessing of solutions to improve efficiency.
     """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.max_workers = kwargs.get("max_workers", 8)
+
+    @abstractmethod
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        """
+        Check that the inputs of verification request are correct and consistent.
+        """
+
+    @staticmethod
+    @abstractmethod
+    def _evaluate_solution(
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> Evaluation:
+        """Evaluate a given solution."""
+        pass
+
+    async def arun(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> Sequence[Evaluation]:
+
+        self._check_inputs(
+            problem,
+            solutions,
+            original_solution=original_solution,
+            feedback=feedback,
+        )
+
+        # multiprocessing with concurrent.futures.PoolExecutor
+
+        # prepare partial function
+        evaluate_solution = functools.partial(
+            self._evaluate_solution,
+            problem=problem,
+            original_solution=original_solution,
+            feedback=feedback,
+        )
+
+        # evaluate solutions in parallel
+        loop = asyncio.get_event_loop()
+
+        tasks = []
+
+        with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
+            for solution in solutions:
+                tasks.append(loop.run_in_executor(executor, evaluate_solution, solution))
+
+        # wait for all tasks to finish
+        evaluations = await asyncio.gather(*tasks)
+
+        return evaluations
+
 
 
 class FeedbackGenerator(HIRAbstractGeneratorLLM):

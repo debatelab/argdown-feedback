@@ -6,6 +6,7 @@ from bs4 import BeautifulSoup
 
 from argdown_feedback.tasks.base import (
     Judge,
+    MPJudge,
     Problem,
     Solution,
     Evaluation,
@@ -316,14 +317,40 @@ class ArgmapPlusArgannoPlusLogrecoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgmapPlusArgannoPlusLogrecoJudge(Judge):
+class ArgmapPlusArgannoPlusLogrecoJudge(MPJudge):
     """Judge for the argmap plus infreco task."""
 
-    def _evaluate_solution(
+    def _check_inputs(
         self,
-        problem: ArgmapPlusArgannoPlusLogrecoProblem,
-        solution: ArgmapPlusArgannoPlusLogreco,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, ArgmapPlusArgannoPlusLogrecoProblem), (
+            "Problem must be an ArgmapPlusArgannoPlusLogrecoProblem"
+        )
+        assert (
+            isinstance(original_solution, ArgmapPlusArgannoPlusLogreco)
+            or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        assert all(
+            isinstance(solution, ArgmapPlusArgannoPlusLogreco) for solution in solutions
+        ), "All solutions must be ArgmapPlusArgannoPlusLogreco objects"
+
+    @staticmethod
+    def _evaluate_solution(
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, ArgmapPlusArgannoPlusLogrecoProblem), "Problem must be an ArgmapPlusArgannoPlusLogrecoProblem"
+        assert isinstance(solution, ArgmapPlusArgannoPlusLogreco), "Solution must be an ArgmapPlusArgannoPlusLogreco"
+
         anno_filter = BaseHandler.create_metadata_filter("filename", ["annotation.txt"])
         map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
         reco_filter = BaseHandler.create_metadata_filter(
@@ -372,29 +399,87 @@ class ArgmapPlusArgannoPlusLogrecoJudge(Judge):
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgmapPlusArgannoPlusLogrecoProblem), (
-            "Problem must be an ArgannoPlusLogRecoProblem"
-        )
-        assert (
-            isinstance(original_solution, ArgmapPlusArgannoPlusLogreco)
-            or original_solution is None
-        )
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, ArgmapPlusArgannoPlusLogreco), (
-                "All solutions must be ArgmapPlusLogreco"
-            )
-            evaluations.append(self._evaluate_solution(problem, solution))
+# class ArgmapPlusArgannoPlusLogrecoJudge2(Judge):
+#     """Judge for the argmap plus infreco task."""
 
-        return evaluations
+#     def _evaluate_solution(
+#         self,
+#         problem: ArgmapPlusArgannoPlusLogrecoProblem,
+#         solution: ArgmapPlusArgannoPlusLogreco,
+#     ) -> Evaluation:
+#         anno_filter = BaseHandler.create_metadata_filter("filename", ["annotation.txt"])
+#         map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
+#         reco_filter = BaseHandler.create_metadata_filter(
+#             "filename", ["reconstructions.ad"]
+#         )
+
+#         infreco_handler = InfRecoCompositeHandler(
+#             handlers=[
+#                 # Argument existence handlers
+#                 HasAtLeastNArgumentsHandler(name="InfReco.HasAtLeastNArgumentsHandler",filter=reco_filter, N=2),
+#                 HasPCSHandler(name="InfReco.HasPCSHandler", filter=reco_filter),
+#                 # Argument form handlers
+#                 StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler", filter=reco_filter),
+#                 EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler", filter=reco_filter),
+#                 NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler", filter=reco_filter),
+#                 # Label and gist handlers
+#                 HasLabelHandler(name="InfReco.HasLabelHandler", filter=reco_filter),
+#                 # Inference data handlers
+#                 HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler", filter=reco_filter),
+#                 PropRefsExistHandler(name="InfReco.PropRefsExistHandler", filter=reco_filter),
+#                 UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler", filter=reco_filter),
+#                 # Extra material handlers
+#                 NoExtraPropositionsHandler(name="InfReco.NoExtraPropositionsHandler", filter=reco_filter),
+#             ]
+#         )
+#         main_handler = CompositeHandler(
+#             handlers=[
+#                 # Processing
+#                 DefaultProcessingHandler(),
+#                 HasAnnotationsHandler(filter=anno_filter),
+#                 HasArgdownHandler(name="HasArgdownHandler.map", filter=map_filter),
+#                 HasArgdownHandler(name="HasArgdownHandler.reco", filter=reco_filter),
+#                 # Core
+#                 ArgannoCompositeHandler(filter=anno_filter),
+#                 ArgMapCompositeHandler(filter=map_filter),
+#                 infreco_handler,
+#                 LogRecoCompositeHandler(filter=reco_filter),
+#                 # Coherence
+#                 ArgannoInfrecoCoherenceHandler(),
+#                 ArgmapInfrecoCoherenceHandler(),
+#                 ArgmapLogrecoCoherenceHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(inputs=str(solution), source=problem.sources)
+#         result = main_handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, ArgmapPlusArgannoPlusLogrecoProblem), (
+#             "Problem must be an ArgannoPlusLogRecoProblem"
+#         )
+#         assert (
+#             isinstance(original_solution, ArgmapPlusArgannoPlusLogreco)
+#             or original_solution is None
+#         )
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, ArgmapPlusArgannoPlusLogreco), (
+#                 "All solutions must be ArgmapPlusLogreco"
+#             )
+#             evaluations.append(self._evaluate_solution(problem, solution))
+
+#         return evaluations
+

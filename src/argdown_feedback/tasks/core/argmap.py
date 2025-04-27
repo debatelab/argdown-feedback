@@ -14,6 +14,7 @@ from pyargdown import (
 )
 
 from argdown_feedback.tasks.base import (
+    MPJudge,
     Problem,
     ScoringVirtuePreferencePairGenerator,
     Solution,
@@ -160,12 +161,34 @@ class ArgMapProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgMapJudge(Judge):
+class ArgMapJudge(MPJudge):
     """Judge for the argument mapping task."""
 
-    def _evaluate_argmap(
-        self, problem: ArgMapProblem, argmap: ArgumentMap
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(original_solution, ArgumentMap) or original_solution is None
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        assert all(
+            isinstance(solution, ArgumentMap) for solution in solutions
+        ), "All solutions must be ArgumentMaps"
+
+    @staticmethod
+    def _evaluate_solution(
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
         handler = CompositeHandler(
             handlers=[
                 DefaultProcessingHandler(),
@@ -174,7 +197,7 @@ class ArgMapJudge(Judge):
             ]
         )
         request = VerificationRequest(
-            inputs=argmap.argdown_snippet, source=problem.sources
+            inputs=solution.argdown_snippet, source=problem.sources
         )
         result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
@@ -182,28 +205,52 @@ class ArgMapJudge(Judge):
             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
         return evaluation
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(original_solution, ArgumentMap) or original_solution is None
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, ArgumentMap), (
-                "All solutions must be ArgumentMaps"
-            )
-            evaluations.append(self._evaluate_argmap(problem, solution))
 
-        return evaluations
 
+# class ArgMapJudge2(Judge):
+#     """Judge for the argument mapping task."""
+
+#     def _evaluate_argmap(
+#         self, problem: ArgMapProblem, argmap: ArgumentMap
+#     ) -> Evaluation:
+#         handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasArgdownHandler(),
+#                 ArgMapCompositeHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(
+#             inputs=argmap.argdown_snippet, source=problem.sources
+#         )
+#         result = handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         if evaluation.artifacts.get("argdown_map") is None:
+#             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
+#         assert isinstance(original_solution, ArgumentMap) or original_solution is None
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, ArgumentMap), (
+#                 "All solutions must be ArgumentMaps"
+#             )
+#             evaluations.append(self._evaluate_argmap(problem, solution))
+
+#         return evaluations
 
 class ArgMapFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):

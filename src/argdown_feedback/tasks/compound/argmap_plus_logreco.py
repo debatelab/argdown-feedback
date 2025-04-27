@@ -9,6 +9,7 @@ import textdistance
 
 from argdown_feedback.tasks.base import (
     Judge,
+    MPJudge,
     Problem,
     Solution,
     Evaluation,
@@ -209,137 +210,40 @@ class ArgmapPlusLogrecoProblemGenerator(ProblemGenerator):
         )
 
 
-class ArgmapPlusLogrecoJudge(Judge):
+class ArgmapPlusLogrecoJudge(MPJudge):
     """Judge for the argmap plus infreco task."""
 
-    # @staticmethod
-    # def are_identical(prop1: Proposition | None, prop2: Proposition | None, argdown: Argdown | None = None) -> bool:
-    #     """Check if two propositions are identical."""
-    #     if (
-    #         prop1 is None or prop1.label is None
-    #         or prop2 is None or prop2.label is None
-    #     ):
-    #         return False
+    def _check_inputs(
+        self,
+        problem: Problem,
+        solutions: Sequence[Solution],
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
+    ) -> None:
+        assert isinstance(problem, ArgmapPlusLogrecoProblem), (
+            "Problem must be an ArgmapPlusLogrecoProblem"
+        )
+        assert (
+            isinstance(original_solution, ArgmapPlusLogreco)
+            or original_solution is None
+        )
+        assert feedback or original_solution is None, (
+            "Feedback is required for evaluating revised solutions"
+        )
+        assert all(
+            isinstance(solution, ArgmapPlusLogreco) for solution in solutions
+        ), "All solutions must be ArgmapPlusLogreco objects"
 
-    #     # equivalence via dialectical relations
-    #     if argdown is not None:
-    #         rels1 = argdown.get_dialectical_relation(prop1.label, prop2.label)
-    #         rels2 = argdown.get_dialectical_relation(prop2.label, prop1.label)
-    #         if rels1 and rels2 :
-    #             for rel1 in rels1:
-    #                 for rel2 in rels2:
-    #                     if (
-    #                         rel1 is not None and rel2 is not None
-    #                         and rel1.valence == Valence.SUPPORT
-    #                         and DialecticalType.AXIOMATIC in rel1.dialectics
-    #                         and rel2.valence == Valence.SUPPORT
-    #                         and DialecticalType.AXIOMATIC in rel2.dialectics
-    #                     ):
-    #                         return True
-
-    #     return prop1.label == prop2.label
-
-    # @staticmethod
-    # def are_contradictory(prop1: Proposition | None, prop2: Proposition | None, argdown: Argdown | None = None) -> bool:
-    #     """Check if two propositions are identical."""
-    #     if prop1 is None or prop2 is None:
-    #         return False
-    #     if prop1.label == prop2.label:
-    #         return False
-    #     if argdown is not None:
-    #         if any(
-    #             drel.source in [prop1, prop2]
-    #             and drel.target in [prop1, prop2]
-    #             and drel.source != drel.target
-    #             and drel.valence in [Valence.ATTACK, Valence.CONTRADICT]
-    #             and DialecticalType.AXIOMATIC in drel.dialectics
-    #             for drel in argdown.dialectical_relations
-    #         ):
-    #             return True
-    #     return False
-
-    # def _evaluate_coherence(self, argdown_map: Argdown, argdown_reco: Argdown) -> dict[str, str]:
-    #     """Evaluate the coherence between the argument map and the informal reconstruction."""
-
-    #     eval_data: dict[str, str] = {}
-
-    #     # check elements correspondence
-    #     #print("ARGMAP<>LOGRECO check")
-    #     msgs = []
-    #     map_alabels = list(set(a.label for a in argdown_map.arguments))
-    #     reco_alabels = list(set(a.label for a in argdown_reco.arguments))
-    #     #print(f"Map alabels: {map_alabels}")
-    #     #print(f"Reco plabels: {reco_alabels}")
-    #     for label in map_alabels:
-    #         if label not in reco_alabels:
-    #             msgs.append(f"Argument <{label}> in map is not reconstructed (argument label mismatch).")
-    #     for label in reco_alabels:
-    #         if label not in map_alabels:
-    #             msgs.append(f"Reconstructed argument <{label}> is not in the map (argument label mismatch).")
-    #     map_prop_labels = list(set(p.label for p in argdown_map.propositions))
-    #     reco_prop_labels = list(set(p.label for p in argdown_reco.propositions))
-    #     for label in map_prop_labels:
-    #         if label not in reco_prop_labels:
-    #             msgs.append(f"Claim [{label}] in argument map has no corresponding proposition in reconstructions (proposition label mismatch).")
-    #     if msgs:
-    #         eval_data["elements_correspondence"] = " - ".join(msgs)
-
-    #     # check relations correspondence
-    #     msgs = []
-
-    #     for drel in argdown_map.dialectical_relations:
-    #         #print(f"Checking if {drel} in argmap is grounded in reco...")
-    #         if drel.source not in reco_alabels+reco_prop_labels or drel.target not in reco_alabels+reco_prop_labels:
-    #             #print(f"Skipping {drel} in argmap, labels not in reco.")
-    #             continue
-    #         if DialecticalType.SKETCHED in drel.dialectics:
-    #             rel_matches = argdown_reco.get_dialectical_relation(drel.source, drel.target)
-    #             rel_matches = [] if rel_matches is None else rel_matches
-    #             #print(f"Found potential matches: {rel_matches}")
-
-    #             if any(
-    #                 rm.valence == drel.valence
-    #                 and DialecticalType.GROUNDED in rm.dialectics
-    #                 for rm in rel_matches
-    #             ):
-    #                 continue
-
-    #             if not any(rm.valence == drel.valence for rm in rel_matches):
-    #                 msgs.append(
-    #                     f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
-    #                     f"in argument map is not matched by any relation in the argument reconstruction."
-    #                 )
-    #                 continue
-    #             msgs.append(
-    #                 f"Dialectical {drel.valence.name} relation from node '{drel.source}' to node '{drel.target}' "
-    #                 f"in argument map is not grounded in logical argument reconstructions."
-    #             )
-
-    #     for drel in argdown_reco.dialectical_relations:
-    #         if drel.source not in map_alabels+map_prop_labels or drel.target not in map_alabels+map_prop_labels:
-    #             continue
-    #         if DialecticalType.GROUNDED in drel.dialectics:
-    #             if drel.valence == Valence.SUPPORT:
-    #                 if not ArgmapPlusLogrecoJudge.indirectly_supports(drel.source, drel.target, argdown_map):
-    #                     msgs.append(
-    #                         f"According to the argument reconstructions, item '{drel.source}' supports item '{drel.target}', "
-    #                         f"but this dialectical relation is not captured in the argument map."
-    #                     )
-    #             elif drel.valence == Valence.ATTACK:
-    #                 if not ArgmapPlusLogrecoJudge.indirectly_attacks(drel.source, drel.target, argdown_map):
-    #                     msgs.append(
-    #                         f"According to the argument reconstructions, item '{drel.source}' attacks item '{drel.target}', "
-    #                         f"but this dialectical relation is not captured in the argument map."
-    #                     )
-
-    #     if msgs:
-    #         eval_data["relations_correspondence"] = " - ".join(msgs)
-
-    #     return eval_data
-
+    @staticmethod
     def _evaluate_solution(
-        self, problem: ArgmapPlusLogrecoProblem, solution: ArgmapPlusLogreco
+        solution: Solution,
+        problem: Problem | None = None,
+        original_solution: Solution | None = None,
+        feedback: Feedback | None = None,
     ) -> Evaluation:
+        assert isinstance(problem, ArgmapPlusLogrecoProblem), "Problem must be an ArgmapPlusLogrecoProblem"
+        assert isinstance(solution, ArgmapPlusLogreco), "Solution must be an ArgmapPlusLogreco"
+
         map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
         reco_filter = BaseHandler.create_metadata_filter(
             "filename", ["reconstructions.ad"]
@@ -381,32 +285,80 @@ class ArgmapPlusLogrecoJudge(Judge):
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
 
-    async def arun(
-        self,
-        problem: Problem,
-        solutions: Sequence[Solution],
-        original_solution: Solution | None = None,
-        feedback: Feedback | None = None,
-    ) -> Sequence[Evaluation]:
-        assert isinstance(problem, ArgmapPlusLogrecoProblem), (
-            "Problem must be an ArgannoPlusLogRecoProblem"
-        )
-        assert (
-            isinstance(original_solution, ArgmapPlusLogreco)
-            or original_solution is None
-        )
-        assert feedback or original_solution is None, (
-            "Feedback is required for evaluating revised solutions"
-        )
 
-        evaluations = []
-        for solution in solutions:
-            assert isinstance(solution, ArgmapPlusLogreco), (
-                "All solutions must be ArgmapPlusLogreco"
-            )
-            evaluations.append(self._evaluate_solution(problem, solution))
+# class ArgmapPlusLogrecoJudge2(Judge):
+#     """Judge for the argmap plus infreco task."""
 
-        return evaluations
+#     def _evaluate_solution(
+#         self, problem: ArgmapPlusLogrecoProblem, solution: ArgmapPlusLogreco
+#     ) -> Evaluation:
+#         map_filter = BaseHandler.create_metadata_filter("filename", ["map.ad"])
+#         reco_filter = BaseHandler.create_metadata_filter(
+#             "filename", ["reconstructions.ad"]
+#         )
+
+#         infreco_handler = InfRecoCompositeHandler(
+#             handlers=[
+#                 # Argument existence handlers
+#                 HasAtLeastNArgumentsHandler(name="InfReco.HasAtLeastNArgumentsHandler",filter=reco_filter, N=2),
+#                 HasPCSHandler(name="InfReco.HasPCSHandler", filter=reco_filter),
+#                 # Argument form handlers
+#                 StartsWithPremiseHandler(name="InfReco.StartsWithPremiseHandler", filter=reco_filter),
+#                 EndsWithConclusionHandler(name="InfReco.EndsWithConclusionHandler", filter=reco_filter),
+#                 NoDuplicatePCSLabelsHandler(name="InfReco.NoDuplicatePCSLabelsHandler", filter=reco_filter),
+#                 # Label and gist handlers
+#                 HasLabelHandler(name="InfReco.HasLabelHandler", filter=reco_filter),
+#                 # Inference data handlers
+#                 HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler", filter=reco_filter),
+#                 PropRefsExistHandler(name="InfReco.PropRefsExistHandler", filter=reco_filter),
+#                 UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler", filter=reco_filter),
+#                 # Extra material handlers
+#                 NoExtraPropositionsHandler(name="InfReco.NoExtraPropositionsHandler", filter=reco_filter),
+#             ]
+#         )
+#         main_handler = CompositeHandler(
+#             handlers=[
+#                 DefaultProcessingHandler(),
+#                 HasArgdownHandler(name="HasArgdownHandler.map", filter=map_filter),
+#                 HasArgdownHandler(name="HasArgdownHandler.reco", filter=reco_filter),
+#                 ArgMapCompositeHandler(filter=map_filter),
+#                 infreco_handler,
+#                 LogRecoCompositeHandler(filter=reco_filter),
+#                 ArgmapInfrecoCoherenceHandler(),
+#                 ArgmapLogrecoCoherenceHandler(),
+#             ]
+#         )
+#         request = VerificationRequest(inputs=str(solution), source=problem.sources)
+#         result = main_handler.process(request)
+#         evaluation = Evaluation.from_verification_request(result)
+#         return evaluation
+
+#     async def arun(
+#         self,
+#         problem: Problem,
+#         solutions: Sequence[Solution],
+#         original_solution: Solution | None = None,
+#         feedback: Feedback | None = None,
+#     ) -> Sequence[Evaluation]:
+#         assert isinstance(problem, ArgmapPlusLogrecoProblem), (
+#             "Problem must be an ArgannoPlusLogRecoProblem"
+#         )
+#         assert (
+#             isinstance(original_solution, ArgmapPlusLogreco)
+#             or original_solution is None
+#         )
+#         assert feedback or original_solution is None, (
+#             "Feedback is required for evaluating revised solutions"
+#         )
+
+#         evaluations = []
+#         for solution in solutions:
+#             assert isinstance(solution, ArgmapPlusLogreco), (
+#                 "All solutions must be ArgmapPlusLogreco"
+#             )
+#             evaluations.append(self._evaluate_solution(problem, solution))
+
+#         return evaluations
 
 
 class GlobalFormalizationsFaithfulnessPreferencePairGenerator(

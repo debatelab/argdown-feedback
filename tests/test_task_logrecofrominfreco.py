@@ -74,7 +74,7 @@ def example_problem() -> LogrecoFromInfrecoProblem:
             (2) Eating animals is wrong.
             ```
             """)
-        infreco_evaluation = InfRecoJudge()._evaluate_infreco(InfRecoProblem(argdown_snippet), InformalReco(argdown_snippet))
+        infreco_evaluation = InfRecoJudge()._evaluate_solution(InformalReco(argdown_snippet), InfRecoProblem(argdown_snippet))
         return LogrecoFromInfrecoProblem(
             argdown_snippet=argdown_snippet,
             argdown_infreco=infreco_evaluation.artifacts.get("argdown"),
