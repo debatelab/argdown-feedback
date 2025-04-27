@@ -1004,11 +1004,18 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             feedbacks = await self.feedback_generator.arun(problem, cs, e)
             # revisions: list[Sequence[Solution]] = []
 
-            coros = [
-                run_revision_workflow(problem, cs, e, feedback)
-                for feedback in feedbacks
-            ]
-            for pairs_rev_wf, revision_evals in await asyncio.gather(*coros):
+            # coros = [
+            #     run_revision_workflow(problem, cs, e, feedback)
+            #     for feedback in feedbacks
+            # ]
+            # for pairs_rev_wf, revision_evals in await asyncio.gather(*coros):
+            #     revision_evaluations.append(revision_evals)
+            #     pairs.extend(pairs_rev_wf)
+
+            for feedback in feedbacks:
+                pairs_rev_wf, revision_evals = await run_revision_workflow(
+                    problem, cs, e, feedback
+                )
                 revision_evaluations.append(revision_evals)
                 pairs.extend(pairs_rev_wf)
 
@@ -1058,13 +1065,18 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         if self.feedback_generator is None:
             return []
 
-        coros = [
-            run_selfcritique_workflow(problem, cs, e)
-            for cs, e in zip(candidate_solutions, evaluations)
-            if not e.is_valid
-        ]
-        for p in await asyncio.gather(*coros):
-            pairs_all.extend(p)
+        # coros = [
+        #     run_selfcritique_workflow(problem, cs, e)
+        #     for cs, e in zip(candidate_solutions, evaluations)
+        #     if not e.is_valid
+        # ]
+        # for p in await asyncio.gather(*coros):
+        #     pairs_all.extend(p)
+
+        for cs, e in zip(candidate_solutions, evaluations):
+            if not e.is_valid:
+                pairs = await run_selfcritique_workflow(problem, cs, e)
+                pairs_all.extend(pairs)
 
         return pairs_all
 
