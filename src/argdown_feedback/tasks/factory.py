@@ -41,7 +41,7 @@ class HIRPOFactory:
             elif issubclass(pg_class, HIRAbstractGenerator):
                 pg_instance = pg_class()
             else:
-                raise TypeError(f"Invalid problem generator class: {pg_class} of type {type(pg_class)}")
+                raise ValueError(f"Invalid problem generator class: {pg_class} of type {type(pg_class)}")
 
             sg_instance = GenericSolutionGenerator(
                 solution_class=registry.get_class(solution),
@@ -55,7 +55,7 @@ class HIRPOFactory:
             elif issubclass(jg_class, HIRAbstractGenerator):
                 jg_instance = jg_class()
             else:
-                raise TypeError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
+                raise ValueError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 
             fg_kwargs = feedback_generator_kwargs or {}
             if feedback_generator is None:
@@ -67,7 +67,7 @@ class HIRPOFactory:
                 elif issubclass(fg_class, HIRAbstractGenerator):
                     fg_instance = fg_class(**fg_kwargs)
                 else:
-                    raise TypeError(f"Invalid feedback generator class: {fg_class} of type {type(fg_class)}")
+                    raise ValueError(f"Invalid feedback generator class: {fg_class} of type {type(fg_class)}")
 
             if virtue_preference_pair_generator is None:
                 virtue_preference_pair_generator = []
@@ -116,7 +116,7 @@ class HIRPOFactory:
             elif issubclass(pg_class, HIRAbstractGenerator):
                 pg_instance = pg_class()
             else:
-                raise TypeError(f"Invalid problem generator class: {pg_class} of type {type(pg_class)}")
+                raise ValueError(f"Invalid problem generator class: {pg_class} of type {type(pg_class)}")
 
             sg_instance = GenericSolutionGenerator(
                 solution_class=registry.get_class(solution),
@@ -130,7 +130,7 @@ class HIRPOFactory:
             elif issubclass(jg_class, HIRAbstractGenerator):
                 jg_instance = jg_class()
             else:
-                raise TypeError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
+                raise ValueError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 
             return HIREvaluator(
                 problem_generator=pg_instance,

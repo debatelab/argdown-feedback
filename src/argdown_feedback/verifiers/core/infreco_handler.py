@@ -60,7 +60,7 @@ class HasArgumentsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
             
         if not argdown.arguments:
             return VerificationResult(
@@ -85,7 +85,7 @@ class HasUniqueArgumentHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
 
         msg = None
 
@@ -120,7 +120,7 @@ class HasAtLeastNArgumentsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
 
         msg = None
 
@@ -144,7 +144,7 @@ class HasPCSHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
             
         if not argdown.arguments:
             return None
@@ -174,7 +174,7 @@ class StartsWithPremiseHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         invalid_args = []
         for argument in argdown.arguments:
@@ -201,7 +201,7 @@ class EndsWithConclusionHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         invalid_args = []
         for argument in argdown.arguments:
@@ -229,7 +229,7 @@ class NotMultipleGistsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         invalid_args = []
         for argument in argdown.arguments:
@@ -256,7 +256,7 @@ class NoDuplicatePCSLabelsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         invalid_args = []
         for argument in argdown.arguments:
@@ -293,7 +293,7 @@ class HasLabelHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         unlabeled_args = []
         for idx, argument in enumerate(argdown.arguments):
@@ -322,7 +322,7 @@ class HasGistHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         invalid_args = []
         for argument in argdown.arguments:
@@ -353,7 +353,7 @@ class HasInferenceDataHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         msgs = []
         for argument in argdown.arguments:
@@ -408,7 +408,7 @@ class PropRefsExistHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         msgs = []
         for argument in argdown.arguments:
@@ -453,7 +453,7 @@ class UsesAllPropsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         msgs = []
         for argument in argdown.arguments:
@@ -501,7 +501,7 @@ class NoExtraPropositionsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
             
         pcs_props = set(
             [p.proposition_label for argument in argdown.arguments for p in argument.pcs]
@@ -537,7 +537,7 @@ class OnlyGroundedDialecticalRelationsHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
             
         if any(
             set(d.dialectics) != {DialecticalType.GROUNDED}
@@ -567,7 +567,7 @@ class NoPropInlineDataHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
             
         if any(prop.data for prop in argdown.propositions):
             return VerificationResult(
@@ -594,7 +594,7 @@ class NoArgInlineDataHandler(InfRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
             
         if any(arg.data for arg in argdown.arguments):
             return VerificationResult(

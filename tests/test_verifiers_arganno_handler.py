@@ -417,7 +417,7 @@ def test_handle_invalid_data_type():
     for handler in handlers:
         vdata = PrimaryVerificationData(id="test", dtype=VerificationDType.xml, data="not a soup")
         request = VerificationRequest(inputs="", source="")
-        with pytest.raises(TypeError):
+        with pytest.raises(ValueError):
             handler.evaluate(vdata, request)
 
 

@@ -56,7 +56,7 @@ class SourceTextIntegrityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
         msgs = []
         source = ctx.source
         if not source:
@@ -92,7 +92,7 @@ class NestedPropositionHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         nested_props = [
             f"'{shorten(str(proposition), 256)}'"
@@ -121,7 +121,7 @@ class PropositionIdPresenceHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         props_without_id = [
             f"'{shorten(str(proposition), 64)}'"
@@ -150,7 +150,7 @@ class PropositionIdUniquenessHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         ids = [
             str(proposition.get("id"))  # type: ignore
@@ -179,7 +179,7 @@ class SupportReferenceValidityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         ids = [
             proposition.get("id")  # type: ignore
@@ -212,7 +212,7 @@ class AttackReferenceValidityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         ids = [
             proposition.get("id")  # type: ignore
@@ -245,7 +245,7 @@ class AttributeValidityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         unknown_attrs = []
         for proposition in soup.find_all("proposition"):
@@ -280,7 +280,7 @@ class ElementValidityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
 
         unknown_elements = []
         for element in soup.find_all():
@@ -318,7 +318,7 @@ class ArgumentLabelValidityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
         
         # If no legal labels are set, we can get them from context
         legal_labels = self.legal_labels
@@ -364,7 +364,7 @@ class RefRecoLabelValidityHandler(ArgannoHandler):
         if soup is None:
             return None
         if not isinstance(soup, BeautifulSoup):
-            raise TypeError("soup must be of type BeautifulSoup")
+            raise ValueError("soup must be of type BeautifulSoup")
         
         # If no legal labels are set, we can get them from context
         legal_labels = self.legal_labels

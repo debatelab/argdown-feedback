@@ -59,7 +59,7 @@ class CompleteClaimsHandler(ArgMapHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
 
         incomplete_claims: list[str] = []
         for claim in argdown.propositions:
@@ -92,7 +92,7 @@ class NoDuplicateLabelsHandler(ArgMapHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
 
         duplicate_labels: list[str] = []
         for claim in argdown.propositions:
@@ -124,7 +124,7 @@ class NoPCSHandler(ArgMapHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
 
         arguments_with_pcs = [
             argument for argument in argdown.arguments if argument.pcs

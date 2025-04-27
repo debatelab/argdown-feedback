@@ -526,7 +526,7 @@ def test_handle_none_data():
 def test_handle_wrong_data_type():
     handler = WellFormedFormulasHandler()
 
-    with pytest.raises(TypeError):
+    with pytest.raises(ValueError):
         handler.evaluate(
             PrimaryVerificationData(
                 id="test", dtype=VerificationDType.argdown, data="not a graph"

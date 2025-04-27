@@ -94,7 +94,7 @@ class WellFormedFormulasHandler(BaseLogRecoHandler):
         if vdata.data is None:
             return None
         if not isinstance(vdata.data, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: vdata.data is not a ArgdownMultiDiGraph")
+            raise ValueError("Internal error: vdata.data is not a ArgdownMultiDiGraph")
 
         argdown = vdata.data
         all_expressions: Dict[str, Expression] = {}  # proposition_label to Expression
@@ -193,7 +193,7 @@ class GlobalDeductiveValidityHandler(BaseLogRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         all_expressions, all_declarations = self.cached_formalizations(vdata.id, ctx)        
 
@@ -268,7 +268,7 @@ class LocalDeductiveValidityHandler(BaseLogRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         all_expressions, all_declarations = self.cached_formalizations(vdata.id, ctx)
         
@@ -348,7 +348,7 @@ class AllPremisesRelevantHandler(BaseLogRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         all_expressions, all_declarations = self.cached_formalizations(vdata.id, ctx)
         # Skip if there are formalization errors
@@ -433,7 +433,7 @@ class PremisesConsistentHandler(BaseLogRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         msgs = []
 
@@ -501,7 +501,7 @@ class FormallyGroundedRelationsHandler(BaseLogRecoHandler):
         if argdown is None:
             return None
         if not isinstance(argdown, ArgdownMultiDiGraph):
-            raise TypeError("Internal error: Argdown is not a MultiDiGraph")
+            raise ValueError("Internal error: Argdown is not a MultiDiGraph")
         
         # Skip if no dialectical relations
         if not argdown.dialectical_relations:
