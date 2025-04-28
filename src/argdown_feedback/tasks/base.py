@@ -1157,10 +1157,12 @@ class HIREvaluator(HIRAbstractGenerator):
         metric_keys = set(
             key for evaluation in evaluations for key in evaluation.metrics.keys()
         )
-        eval_result: dict[str, Any] = {
-            f"{key}_counts": sum(bool(e.metrics.get(key)) for e in evaluations)
-            for key in metric_keys
-        }
+        eval_result: dict[str, Any] = {}
+        for key in metric_keys:
+            counts = sum(bool(e.metrics.get(key)) for e in evaluations)
+            eval_result[f"{key}_counts"] = counts
+            eval_result[f"{key}_frequency"] = (counts / len(evaluations)) if evaluations else 0.0
+
         eval_result["accuracy"] = (
             sum(int(e.is_valid) for e in evaluations) / len(evaluations)
             if evaluations
