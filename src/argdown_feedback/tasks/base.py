@@ -11,7 +11,7 @@ import logging
 import random
 from statistics import mean
 from textwrap import dedent
-from typing import Any, Sequence, TypedDict
+from typing import Any, Awaitable, Callable, Sequence, TypedDict
 
 from bs4 import BeautifulSoup
 from openai import AsyncOpenAI, BadRequestError, OpenAI
@@ -1140,11 +1140,20 @@ class HIREvaluator(HIRAbstractGenerator):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def arun(self, inputs) -> dict[str, Any]:
+    async def arun(self, inputs, log_samples_callback: Callable[..., Awaitable[None]] | None = None) -> dict[str, Any]:
         """evaluate inputs and returns average accuracy of the candidate solutions"""
         problem = await self.problem_generator.arun(inputs)
         candidate_solutions = await self.solution_generator.arun(problem)
         evaluations = await self.judge.arun(problem, candidate_solutions)
+        if log_samples_callback is not None:
+            try:
+                await log_samples_callback(
+                    problem=problem,
+                    solutions=candidate_solutions,
+                    evaluations=evaluations,
+                )
+            except Exception as e:
+                logger.error(f"Failed to log generated eval samples in log_samples_callback: {e}")
         metric_keys = set(
             key for evaluation in evaluations for key in evaluation.metrics.keys()
         )
