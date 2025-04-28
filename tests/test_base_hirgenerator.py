@@ -319,12 +319,12 @@ def hirp_factory(solution_generator_class: type[NumberSolutionGenerator], feedba
 @pytest.mark.asyncio
 async def test_always_false():
     hirp_gen = hirp_factory(AllIncorrectGen)
-    pairs = await hirp_gen.arun(1)
+    pairs, _ = await hirp_gen.arun(1)
     pprint.pprint(pairs)
     assert not pairs
 
     hirp_gen_magic_fbk = hirp_factory(AllIncorrectGen, MagicFeedbackGenerator)
-    pairs = await hirp_gen_magic_fbk.arun(1)
+    pairs, _ = await hirp_gen_magic_fbk.arun(1)
     pprint.pprint(pairs)
     assert not pairs
 
@@ -332,12 +332,12 @@ async def test_always_false():
 @pytest.mark.asyncio
 async def test_always_true():
     hirp_generator = hirp_factory(AllCorrectGen)
-    pairs = await hirp_generator.arun(1)
+    pairs, _ = await hirp_generator.arun(1)
     pprint.pprint(pairs)
     assert not pairs
 
     hirp_gen_magic_fbk = hirp_factory(AllCorrectGen, MagicFeedbackGenerator)
-    pairs = await hirp_gen_magic_fbk.arun(1)
+    pairs, _ = await hirp_gen_magic_fbk.arun(1)
     pprint.pprint(pairs)
     assert not pairs
 
@@ -345,17 +345,18 @@ async def test_always_true():
 @pytest.mark.asyncio
 async def test_first_correct():
     hirp_generator = hirp_factory(FirstCorrectGen)
-    pairs = await hirp_generator.arun(1)
+    pairs, stats = await hirp_generator.arun(1)
     pprint.pprint(pairs)
     assert len(pairs) == 1  # since NumberVirtuePreferencePairGenerator returns one pair and doesn't do symmetric HIRP
     assert pairs[0]["chosen"][-1]["content"] == "n"
     assert pairs[0]["rejected"][-1]["content"] == "y"
+    assert stats["n_total"] == 1
 
 
 @pytest.mark.asyncio
 async def test_first_valid():
     hirp_generator = hirp_factory(YXGen)
-    pairs = await hirp_generator.arun(1)
+    pairs, _ = await hirp_generator.arun(1)
     pprint.pprint(pairs)
     if pairs:
         len(pairs) == 2  # symmetric HIRP
@@ -369,7 +370,7 @@ async def test_correct_incorrect_invalid():
     hirp_generator = hirp_factory(YNXGen)
 
     # number = 1
-    pairs = await hirp_generator.arun(1)
+    pairs, _ = await hirp_generator.arun(1)
     pprint.pprint(pairs)
     assert 1 <= len(pairs) <= 2 # depending on whether validity/virtue pairs are created
     if len(pairs) == 2:
@@ -382,7 +383,7 @@ async def test_correct_incorrect_invalid():
         assert pairs[0]["rejected"][-1]["content"] == "y"
 
     # number = 2
-    pairs = await hirp_generator.arun(2)
+    pairs, _ = await hirp_generator.arun(2)
     pprint.pprint(pairs)
     assert 1 <= len(pairs) <= 2 # depending on whether validity/virtue pairs are created
     if len(pairs) == 2:
@@ -397,13 +398,13 @@ async def test_correct_incorrect_invalid():
 @pytest.mark.asyncio
 async def test_valid_after_magic():
     hirp_gen = hirp_factory(ValidAfterMagicGen)
-    pairs = await hirp_gen.arun(1)
+    pairs, _ = await hirp_gen.arun(1)
     pprint.pprint(pairs)
     assert not pairs
     
     # problem = 1
     hirp_gen_magic_fbk = hirp_factory(ValidAfterMagicGen, MagicFeedbackGenerator)
-    pairs = await hirp_gen_magic_fbk.arun(1)
+    pairs, _ = await hirp_gen_magic_fbk.arun(1)
     pprint.pprint(pairs)
     # as the feedback is always the same, we will never get feeback preferences
     assert not any("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs)))
@@ -418,7 +419,7 @@ async def test_valid_after_magic():
     )
 
     # problem = 2
-    pairs = await hirp_gen_magic_fbk.arun(2)
+    pairs, _ = await hirp_gen_magic_fbk.arun(2)
     pprint.pprint(pairs)
     # as the feedback is always the same, we will never get feeback preferences
     assert not any("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs)))
@@ -434,7 +435,7 @@ async def test_valid_after_magic():
 
     # problem = 1
     hirp_gen_zero_magic_fbk = hirp_factory(ValidAfterMagicGen, MixFeedbackGenerator)
-    pairs = await hirp_gen_zero_magic_fbk.arun(1)
+    pairs, _ = await hirp_gen_zero_magic_fbk.arun(1)
     pprint.pprint(pairs)
     assert pairs
     # as the first feedback is magic and the second is empty, we will get one feedback preference pair for each
@@ -460,22 +461,22 @@ async def test_correct_after_magic():
     """
 
     hirp_gen = hirp_factory(CorrectAfterMagicGen)
-    pairs = await hirp_gen.arun(1)
+    pairs, _ = await hirp_gen.arun(1)
     pprint.pprint(pairs)
     assert not pairs
 
     hirp_gen_magic_fbk = hirp_factory(CorrectAfterMagicGen, MagicFeedbackGenerator)
-    pairs = await hirp_gen_magic_fbk.arun(1)
+    pairs, _ = await hirp_gen_magic_fbk.arun(1)
     pprint.pprint(pairs)
     assert not pairs
 
     hirp_gen_mix_fbk = hirp_factory(CorrectAfterMagicGen, MixFeedbackGenerator)
 
-    pairs = await hirp_gen_mix_fbk.arun(1)
+    pairs, _ = await hirp_gen_mix_fbk.arun(1)
     pprint.pprint(pairs)
     assert not pairs  # all solutions are valid, no pref pairs for training
 
-    pairs = await hirp_gen_mix_fbk.arun(2)
+    pairs, _ = await hirp_gen_mix_fbk.arun(2)
     pprint.pprint(pairs)
     assert not pairs  # all solutions are valid, no pref pairs for training
 

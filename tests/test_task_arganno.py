@@ -4,7 +4,7 @@ import pytest
 import textwrap
 import warnings
 
-from argdown_feedback.tasks.base import Evaluation, Feedback, HIRPreferencePairGenerator, GenericSolutionGenerator, Solution
+from argdown_feedback.tasks.base import Evaluation, Feedback, HIRPOGenStats, HIRPreferencePairGenerator, GenericSolutionGenerator, Solution
 from argdown_feedback.tasks.core.arganno import(
     Annotation,
     AnnotationProblem,
@@ -397,13 +397,16 @@ async def test_self_critique(model_kwargs, invalid_annotations1, source_texts):
 
 
     hirp_generator = hirp_factory(model_kwargs)
-    pairs = await hirp_generator.run_self_critique(
+    pairs, stats = await hirp_generator.run_self_critique(
         problem=problem,
         candidate_solutions=invalid_annotations,
         evaluations=evaluations
     )
     pprint(pairs)
+    pprint(stats)
     assert isinstance(pairs, list)
+    assert isinstance(stats, HIRPOGenStats)
+    assert stats.n_total == len(pairs)
 
 @pytest.mark.asyncio
 class TestAnnotationPreferencePairGenerators:
