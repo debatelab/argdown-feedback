@@ -1226,8 +1226,7 @@ class HIREvaluator(HIRAbstractGenerator):
         for key in metric_keys:
             counts = sum(bool(e.metrics.get(key)) for e in evaluations)
             eval_result[f"{key}_counts"] = counts
-            eval_result[f"{key}_frequency"] = (counts / len(evaluations)) if evaluations else 0.0
-
+        eval_result["n_solutions"] = len(evaluations)
         eval_result["accuracy"] = (
             sum(int(e.is_valid) for e in evaluations) / len(evaluations)
             if evaluations
