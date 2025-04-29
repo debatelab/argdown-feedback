@@ -5,6 +5,7 @@ from typing import Optional, Sequence
 import logging
 
 from bs4 import BeautifulSoup
+import textdistance
 
 
 from argdown_feedback.verifiers.verification_request import (
@@ -51,6 +52,19 @@ class ArgannoHandler(BaseHandler):
 class SourceTextIntegrityHandler(ArgannoHandler):
     """Handler that checks if the source text has been altered."""
 
+    _LEVINSHTEIN_TOLERANCE = 0.01
+
+    def _are_roughly_equal(self, str1: str, str2: str) -> bool:
+        """Check if two strings are roughly equal using Levenshtein distance."""
+        if str1 == str2:
+            return True
+        # remove whitespace and newlines
+        str1 = str1.replace("\n", "").replace("\t", "").replace(" ", "")
+        str2 = str2.replace("\n", "").replace("\t", "").replace(" ", "")
+        distance = textdistance.levenshtein.distance(str1, str2)
+        max_len = max(len(str1), len(str2))
+        return distance / max_len <= self._LEVINSHTEIN_TOLERANCE
+
     def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
         soup = vdata.data
         if soup is None:
@@ -65,14 +79,16 @@ class SourceTextIntegrityHandler(ArgannoHandler):
             source = source.strip()
         lines_o = " ".join(source.split()).splitlines(keepends=True)
         lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
-        lines_o = [line for line in lines_o if line.strip()]
-        lines_a = [line for line in lines_a if line.strip()]
+        lines_o = [line for line in lines_o if line.strip(" \n\t")]
+        lines_a = [line for line in lines_a if line.strip(" \n\t")]
 
-        diff = list(unified_diff(lines_o, lines_a, n=0))
-        if diff:
-            msgs.append(
-                f"Source text '{shorten(source, 40)}' was altered. Diff:\n" + "".join(diff),
-            )
+        # tolerance edit-distance threshold
+        if not self._are_roughly_equal("".join(lines_o), "".join(lines_a)):
+            diff = list(unified_diff(lines_o, lines_a, n=0))
+            if diff:
+                msgs.append(
+                    f"Source text '{shorten(source, 40)}' was altered. Diff:\n" + "".join(diff),
+                )
 
         is_valid = False if msgs else True
         return VerificationResult(

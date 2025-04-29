@@ -154,6 +154,66 @@ def test_source_text_integrity_handler_invalid(valid_soup):
     assert "was altered" in result.message
 
 
+
+"""
+test the following helper function:
+
+class SourceTextIntegrityHandler(ArgannoHandler):
+
+    _LEVINSHTEIN_TOLERANCE = 0.01
+
+    def _are_roughly_equal(self, str1: str, str2: str) -> bool:
+        '''Check if two strings are roughly equal using Levenshtein distance.'''
+        if str1 == str2:
+            return True
+        # remove whitespace and newlines
+        str1 = str1.replace("\n", "").replace(" ", "")
+        str2 = str2.replace("\n", "").replace(" ", "")
+        distance = textdistance.levenshtein.distance(str1, str2)
+        max_len = max(len(str1), len(str2))
+        return distance / max_len <= self._LEVINSHTEIN_TOLERANCE
+
+"""
+def test_source_text_integrity_handler_roughly_equal():
+    handler = SourceTextIntegrityHandler()
+    str1 = "We should stop eating meat."
+    str2 = "We should stop eating  meat."
+    str3 = "We should stop\n\n eating meat.  "
+    str4 = "We      should stop eating meat. \n"
+    str5 = "We should stop  \teating meat."
+
+    str01 = "We should stoop eating meat."
+
+    assert handler._are_roughly_equal(str1, str2) is True
+    assert handler._are_roughly_equal(str1, str3) is True
+    assert handler._are_roughly_equal(str1, str4) is True
+    assert handler._are_roughly_equal(str1, str5) is True
+    assert handler._are_roughly_equal(str1, str01) is False
+
+    str10 = (
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+    )
+    str11 = (
+        "I should stop eating meat. Animals suffer. Some animals are raised humanely. \n"
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely.\n"
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely.\n"
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely.\n"
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely.\n"
+    )
+    str010 = (
+        "We should stop eating meat. Rabbits suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely. "
+        "We should stop eating meat. Animals suffer. Some animals are raised humanely."
+    )
+    assert handler._are_roughly_equal(str10, str11) is True
+    assert handler._are_roughly_equal(str10, str010) is False
+
+
 def test_nested_proposition_handler_valid(valid_soup):
     handler = NestedPropositionHandler()
     vdata = PrimaryVerificationData(id="test", dtype=VerificationDType.xml, data=valid_soup)
