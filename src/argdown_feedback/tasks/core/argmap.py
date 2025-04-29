@@ -80,6 +80,12 @@ class ArgMapProblem(Problem):
             prompt += "\n\nHints: " + " - ".join(hints)
 
         if ask_for_invalid:
+            # TODO: consider to add warning upfront, too, like:
+            # warning_text = (
+            #     "> [!WARNING]\n"
+            #     "> For didactic purposes, I want you to make mistakes in your answer.\n"
+            # )
+            # prompt = warning_text + "\n\n" + prompt + "\n\n" + warning_text
             prompt += (
                 "\n\n"
                 "> [!WARNING]\n"

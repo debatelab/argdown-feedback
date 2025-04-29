@@ -67,19 +67,24 @@ class HasArgdownHandler(BaseHandler):
 
     def handle(self, request: VerificationRequest) -> VerificationRequest:
         message = None
-        if not any(
-            self.filter(vdata)
-            and vdata.dtype == VerificationDType.argdown
-            and vdata.code_snippet
-            for vdata in request.verification_data
-        ):
-            error_msg = "Input data has no properly formatted fenced codeblocks with Argdown code."
-            if request.inputs.count("```argdown") == 0:
-                error_msg += " No fenced code block starting with '```argdown'."
-            if "```\n" not in request.inputs:
-                error_msg += " No closing '```'."
-            message = error_msg
-            
+        try:
+            if not any(
+                self.filter(vdata)
+                and vdata.dtype == VerificationDType.argdown
+                and vdata.code_snippet
+                for vdata in request.verification_data
+            ):
+                error_msg = "Input data has no properly formatted fenced codeblocks with Argdown code."
+                if request.inputs.count("```argdown") == 0:
+                    error_msg += " No fenced code block starting with '```argdown'."
+                if "```\n" not in request.inputs:
+                    error_msg += " No closing '```'."
+                message = error_msg
+        except Exception as e:
+            message = f"Error while checking for argdown content: {str(e)}"
+            self.logger.error(message)
+            raise e
+
         vresult = VerificationResult(
             verifier_id=self.name,
             verification_data_references=[],

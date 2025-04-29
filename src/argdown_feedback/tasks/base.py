@@ -269,8 +269,11 @@ class HIRAbstractGeneratorLLM(ABC):
                 stream=stream,
                 **gen_kwargs,
             )
-            answers = [choice.message.content for choice in completion.choices]
-            answers = [a for a in answers if a is not None]
+            answers = [
+                choice.message.content
+                for choice in completion.choices
+                if choice.message.content is not None
+            ]
             return answers
         except Exception as e:
             if isinstance(e, BadRequestError):
@@ -417,7 +420,7 @@ class GenericSolutionGenerator(SolutionGenerator):
         )
 
         # remove empty and duplicate answers
-        answers = [a for a in answers if a]
+        answers = [a for a in answers if a and isinstance(a, str)]
         answers = list(set(answers))
 
         # remove repetitive blocs of text at the end of the answer
@@ -1011,13 +1014,20 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     problem, original_solution=cs, feedback=feedback
                 )
                 if not candidate_revisions:
+                    logger.info(
+                        "No candidate revisions generated. Skipping revision workflow."
+                    )
                     return pairs_rev_wf, [], stats
-                revision_evals = await self.judge.arun(
-                    problem,
-                    candidate_revisions,
-                    original_solution=cs,
-                    feedback=feedback,
-                )
+                try:
+                    revision_evals = await self.judge.arun(
+                        problem,
+                        candidate_revisions,
+                        original_solution=cs,
+                        feedback=feedback,
+                    )
+                except Exception as exc:
+                    logger.warning(f"Failed to evaluate revisions ({str(exc)}). Skipping revision workflow.")
+                    return pairs_rev_wf, [], stats
 
                 # run revision-specific HIRP to generate solution preference pairs
 
