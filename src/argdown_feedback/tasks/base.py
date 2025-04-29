@@ -1215,7 +1215,7 @@ class HIREvaluator(HIRAbstractGenerator):
                 await log_samples_callback(
                     problem=problem.instruct_prompt(),
                     solutions=[str(s) for s in candidate_solutions],
-                    evaluations=[dataclasses.asdict(e) for e in evaluations],
+                    evaluations=[{"is_valid": e.is_valid, **e.metrics} for e in evaluations],
                 )
             except Exception as e:
                 logger.error(f"Failed to log generated eval samples in log_samples_callback: {e}")
