@@ -1216,10 +1216,10 @@ class HIREvaluator(HIRAbstractGenerator):
                     problem=problem.instruct_prompt(),
                     solutions=[str(s) for s in candidate_solutions],
                     evaluations=[
-                        {
-                            "is_valid": e.is_valid,
-                            **{k: v for k, v in e.metrics.items() if v is not None},
-                        }
+                        [
+                            ("is_valid", e.is_valid),
+                            *[(k,v) for k, v in e.metrics.items() if v is not None],
+                        ]
                         for e in evaluations
                     ],
                 )
