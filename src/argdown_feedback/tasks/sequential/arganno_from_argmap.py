@@ -77,7 +77,7 @@ class ArgannoFromArgmapProblem(AnnotationProblem):
 
             In particular:           
         
-            1. Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way.                        
+            1. Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).                        
             2. Use the `argument_label` attribute to relate the annotated text segments to the given informal argument map.
             3. Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
             """)

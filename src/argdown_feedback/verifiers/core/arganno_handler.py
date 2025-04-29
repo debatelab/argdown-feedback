@@ -52,7 +52,23 @@ class ArgannoHandler(BaseHandler):
 class SourceTextIntegrityHandler(ArgannoHandler):
     """Handler that checks if the source text has been altered."""
 
-    _LEVINSHTEIN_TOLERANCE = 0.01
+    _LEVENSHTEIN_TOLERANCE = 0.01
+    _ALLOW_SOURCE_TEXT_SHORTENING_WC_THRESHOLD = 200
+
+    def __init__(
+        self,
+        name: Optional[str] = None,
+        logger: Optional[logging.Logger] = None,
+        filter: Optional[VDFilter] = None,
+        **kwargs,
+    ):
+        super().__init__(name, logger, filter)
+        self.levenshtein_tolerance = kwargs.get("levenshtein_tolerance", self._LEVENSHTEIN_TOLERANCE)
+        self.allow_source_text_shortening_wc_threshold = kwargs.get(
+            "allow_source_text_shortening_wc_threshold",
+            self._ALLOW_SOURCE_TEXT_SHORTENING_WC_THRESHOLD,
+        )
+
 
     def _are_roughly_equal(self, str1: str, str2: str) -> bool:
         """Check if two strings are roughly equal using Levenshtein distance."""
@@ -61,22 +77,12 @@ class SourceTextIntegrityHandler(ArgannoHandler):
         # remove whitespace and newlines
         str1 = str1.replace("\n", "").replace("\t", "").replace(" ", "")
         str2 = str2.replace("\n", "").replace("\t", "").replace(" ", "")
-        distance = textdistance.levenshtein.distance(str1, str2)
+        distance = textdistance.damerau_levenshtein.distance(str1, str2)
         max_len = max(len(str1), len(str2))
-        return distance / max_len <= self._LEVINSHTEIN_TOLERANCE
+        return distance / max_len <= self.levenshtein_tolerance
 
-    def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
-        soup = vdata.data
-        if soup is None:
-            return None
-        if not isinstance(soup, BeautifulSoup):
-            raise ValueError("soup must be of type BeautifulSoup")
+    def _check_strict(self, source: str, soup: BeautifulSoup) -> tuple[bool, list[str]]:
         msgs = []
-        source = ctx.source
-        if not source:
-            return None
-        if isinstance(source, str):
-            source = source.strip()
         lines_o = " ".join(source.split()).splitlines(keepends=True)
         lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
         lines_o = [line for line in lines_o if line.strip(" \n\t")]
@@ -91,6 +97,52 @@ class SourceTextIntegrityHandler(ArgannoHandler):
                 )
 
         is_valid = False if msgs else True
+        return is_valid, msgs
+
+    def _check_shortening_allowed(self, source: str, soup: BeautifulSoup) -> tuple[bool, list[str]]:
+        """only checks whether every annotated text passage is present in the source text, in the right order"""
+
+        def clean(text: str) -> str:
+            return text.replace("\n", "").replace("\t", "").replace(" ", "")
+
+        propositions = soup.find_all("proposition")
+        msgs = []
+        is_valid = True
+
+        current_index = 0
+        for proposition in propositions:
+            if clean(str(proposition.get_text())) not in clean(source)[current_index:]:
+                is_valid = False
+                if clean(str(proposition.get_text())) not in clean(source):
+                    msgs.append(f"Annotated proposition '{shorten(str(proposition), 40)}' is missing from the source text.")
+                else:
+                    msgs.append(
+                        f"Text flow mixup: Annotated proposition '{shorten(str(proposition), 40)}' does not appear _after_ the previous annotation in the source text."
+                    )
+            else:
+                current_index += len(clean(str(proposition.get_text())))
+
+        return is_valid, msgs
+
+    def evaluate(self, vdata: PrimaryVerificationData, ctx: VerificationRequest) -> VerificationResult | None:
+        soup = vdata.data
+        if soup is None:
+            return None
+        if not isinstance(soup, BeautifulSoup):
+            raise ValueError("soup must be of type BeautifulSoup")
+
+        source = ctx.source
+        if not source:
+            return None
+        if isinstance(source, str):
+            source = source.strip()
+
+        # route to the appropriate check depending on the length of the source
+        if len(source.split()) <= self.allow_source_text_shortening_wc_threshold:
+            is_valid, msgs = self._check_strict(source, soup)
+        else:
+            is_valid, msgs = self._check_shortening_allowed(source, soup)
+
         return VerificationResult(
             verifier_id=self.name,
             verification_data_references=[vdata.id],

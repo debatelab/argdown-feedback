@@ -81,7 +81,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
 
             {annotation_scheme}
 
-            Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way.
+            Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
                         
             Enclose the annotated text in a fenced codeblock, starting with '```xml' and ending with '```'. If you provide multiple xml-codeblocks (e.g., improved versions or revisions), we will use and evaluate the last one only.
                    

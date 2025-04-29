@@ -626,7 +626,7 @@ class DiverseLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
                 l1 = l1 if l1 else ""
                 l2 = labels[j]
                 l2 = l2 if l2 else ""
-                lds.append(textdistance.levenshtein.normalized_distance(l1, l2))
+                lds.append(textdistance.damerau_levenshtein.normalized_distance(l1, l2))
 
         return round(min(lds), 2) if lds else 0
 

@@ -17,7 +17,7 @@ dependencies = [
     "openai>=1.66.3",
     "pyargdown @ git+https://github.com/debatelab/pyargdown.git",
     "tenacity>=9.0.0",
-    "textdistance>=4.6.3",
+    "textdistance[dameraulevenshtein]>=4.6.3",
     "z3-solver>=4.14.1.0",
 ]
 
