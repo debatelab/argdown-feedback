@@ -57,7 +57,8 @@ class ArgmapFromArgannoProblem(ArgMapProblem):
             - to use square/angled brackets for labels to distinguish arguments/claims;
             - to indicate support and attack relations between nodes in accordance with Argdown syntax conventions;
             - to refer, in your argument, to text segments in the annotation through yaml inline data with an `annotation_ids` attribute that contains a list of proposition `ids`.
-            - NOT to include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
+            
+            DO NOT to include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
 
             Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
         """)
