@@ -90,18 +90,7 @@ class LogrecoFromInfrecoProblem(LogRecoProblem):
             prompt += "\n\nHints: " + " - ".join(hints)
 
         if ask_for_invalid:
-            prompt += (
-                "\n\n"
-                "> [!WARNING]\n"
-                "> For didactic purposes, I want you to make mistakes in your answer, violating the above instructions.\n"
-            )
-
-            if evaluation:
-                metrics = {k: v for k, v in evaluation.metrics.items() if v}
-                if metrics:
-                    prompt += "> Expected errors:\n"
-                    for k, v in metrics.items():
-                        prompt += f"> - {k}: {v}\n"
+            prompt = self.ask_for_invalid_prompt(prompt, evaluation)
 
         return prompt
 

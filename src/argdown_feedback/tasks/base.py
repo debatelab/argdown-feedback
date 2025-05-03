@@ -55,6 +55,50 @@ class Problem(ABC):
     ) -> str:
         """Instruction to revise earlier mentioned solution of the problem."""
 
+    def ask_for_invalid_prompt(
+        self, prompt: str, evaluation
+    ) -> str:
+        """string transformation that reverts prompt instruction, asking llm to make specific mistakes"""
+        warning_text = (
+            "> [!WARNING]\n"
+            "> For didactic purposes, I want you to make mistakes in your answer.\n"
+        )
+        prompt = warning_text + "\n\n" + prompt + "\n\n" + warning_text
+
+        if evaluation:
+            metrics = {k: v for k, v in evaluation.metrics.items() if v}
+            if metrics:
+                prompt += "> Expected errors:\n"
+                for k, msg in metrics.items():
+                    # format multi-line arror messages
+                    msg = "\n".join([f">   {line}" for line in str(msg).splitlines()])
+                    msg = msg[4:]  # rm ">   " in first line
+                    prompt += f"> - {k}: {msg}\n"
+
+        return prompt
+
+    def ask_for_invalid_revise_prompt(
+        self, prompt: str, evaluation
+    ) -> str:
+        """string transformation that reverts revise prompt instruction, asking llm to make specific mistakes"""
+        prompt = prompt + (
+            "\n\n"
+            "> [!WARNING]\n"
+            "> For didactic purposes, I still want you to make mistakes in your revised answer, violating the above instructions.\n"
+        )
+
+        if evaluation:
+            metrics = {k: v for k, v in evaluation.metrics.items() if v}
+            if metrics:
+                prompt += "> Expected errors:\n"
+                for k, msg in metrics.items():
+                    # format multi-line arror messages
+                    msg = "\n".join([f">   {line}" for line in str(msg).splitlines()])
+                    msg = msg[4:]  # rm ">   " in first line
+                    prompt += f"> - {k}: {msg}\n"
+
+        return prompt
+
 
 class Solution(ABC):
     """Abstract base class representing a solution."""
