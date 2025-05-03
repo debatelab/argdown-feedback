@@ -189,6 +189,7 @@ class HirpoTester:
         model_kwargs,
     ):
         source_text = source_texts[0]
+        invalid_recos = invalid_recos[:3]
         if issubclass(problem_generator_class, HIRAbstractGeneratorLLM):
             assert model_kwargs is not None, "model_kwargs must be provided for HIRAbstractGeneratorLLM"
             pg = problem_generator_class(**model_kwargs)
@@ -204,10 +205,10 @@ class HirpoTester:
             feedbacks = await fg.arun(problem, reco, evaluation)
             assert len(feedbacks) == 1
             feedback = feedbacks[0]
+            print(feedback)
             assert isinstance(feedback, Feedback)
             assert problem.instruct_prompt() in feedback.prompt
             assert str(reco) in feedback.prompt
-            print(feedback)
 
     @staticmethod
     async def test_revised_solution_generator(
