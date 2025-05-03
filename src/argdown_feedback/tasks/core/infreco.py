@@ -189,9 +189,9 @@ class InfRecoJudge(MPJudge):
         assert feedback or original_solution is None, (
             "Feedback is required for evaluating revised solutions"
         )
-        assert all(
-            isinstance(solution, InformalReco) for solution in solutions
-        ), "All solutions must be InformalReco objects"
+        assert all(isinstance(solution, InformalReco) for solution in solutions), (
+            "All solutions must be InformalReco objects"
+        )
 
     @staticmethod
     def _evaluate_solution(
@@ -227,65 +227,11 @@ class InfRecoJudge(MPJudge):
         return evaluation
 
 
-
-# class InfRecoJudge2(Judge):
-#     """Judge for the informal argument reconstruction task."""
-
-#     def _evaluate_infreco(
-#         self, problem: InfRecoProblem, reco: InformalReco
-#     ) -> Evaluation:
-#         infreco_handler = InfRecoCompositeHandler()
-#         # remove UsesAllPropsHandler
-#         infreco_handler.handlers = [
-#             h
-#             for h in infreco_handler.handlers
-#             if not isinstance(h, UsesAllPropsHandler)
-#         ]
-#         handler = CompositeHandler(
-#             handlers=[
-#                 DefaultProcessingHandler(),
-#                 HasArgdownHandler(),
-#                 infreco_handler,
-#             ]
-#         )
-#         request = VerificationRequest(
-#             inputs=reco.argdown_snippet, source=problem.sources
-#         )
-#         result = handler.process(request)
-#         evaluation = Evaluation.from_verification_request(result)
-#         if evaluation.artifacts.get("argdown_reco") is None:
-#             evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")
-#         return evaluation
-
-#     async def arun(
-#         self,
-#         problem: Problem,
-#         solutions: Sequence[Solution],
-#         original_solution: Solution | None = None,
-#         feedback: Feedback | None = None,
-#     ) -> Sequence[Evaluation]:
-#         assert isinstance(problem, InfRecoProblem), "Problem must be an InfRecoProblem"
-#         assert isinstance(original_solution, InformalReco) or original_solution is None
-#         assert feedback or original_solution is None, (
-#             "Feedback is required for evaluating revised solutions"
-#         )
-
-#         evaluations = []
-#         for solution in solutions:
-#             assert isinstance(solution, InformalReco), (
-#                 "All solutions must be InformalReco objects"
-#             )
-#             evaluations.append(self._evaluate_infreco(problem, solution))
-
-#         return evaluations
-
-
 class InfRecoFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
-        self.temperature = kwargs.get("temperature", 0.7)
-        self.max_tokens = kwargs.get("max_tokens", 4096)
+        self.gen_kwargs = kwargs.get("gen_kwargs", {"max_tokens": 1024})
 
     async def arun(
         self,
@@ -336,9 +282,8 @@ class InfRecoFeedbackGenerator(FeedbackGenerator):
                     "content": prompt,
                 }
             ],
-            max_tokens=self.max_tokens,
             n=self.n_feedbacks,
-            temperature=self.temperature,
+            **self.gen_kwargs,
         )
         # remove empty and duplicate answers
         answers = [a for a in answers if a]

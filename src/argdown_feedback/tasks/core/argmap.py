@@ -21,7 +21,6 @@ from argdown_feedback.tasks.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    Judge,
     FeedbackGenerator,
 )
 from argdown_feedback.verifiers.base import CompositeHandler
@@ -55,7 +54,7 @@ class ArgMapProblem(Problem):
     ) -> str:
         prompt = (
             dedent("""
-            Assignment: Reconstruct a source text's argumentation as an informal Argdown argument map.
+            Assignment: Reconstruct a source text's argumentation as an Argdown argument map.
                         
             Analyse the argumentation in the following source text by creating an Argdown argument map.
 
@@ -68,7 +67,8 @@ class ArgMapProblem(Problem):
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
             - indicate support and attack relations between nodes in accordance with Argdown syntax conventions;
-            - do not include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
+            
+            DO NOT include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
 
             Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
         """)
@@ -213,57 +213,11 @@ class ArgMapJudge(MPJudge):
 
 
 
-
-# class ArgMapJudge2(Judge):
-#     """Judge for the argument mapping task."""
-
-#     def _evaluate_argmap(
-#         self, problem: ArgMapProblem, argmap: ArgumentMap
-#     ) -> Evaluation:
-#         handler = CompositeHandler(
-#             handlers=[
-#                 DefaultProcessingHandler(),
-#                 HasArgdownHandler(),
-#                 ArgMapCompositeHandler(),
-#             ]
-#         )
-#         request = VerificationRequest(
-#             inputs=argmap.argdown_snippet, source=problem.sources
-#         )
-#         result = handler.process(request)
-#         evaluation = Evaluation.from_verification_request(result)
-#         if evaluation.artifacts.get("argdown_map") is None:
-#             evaluation.artifacts["argdown_map"] = evaluation.artifacts.get("argdown")
-#         return evaluation
-
-#     async def arun(
-#         self,
-#         problem: Problem,
-#         solutions: Sequence[Solution],
-#         original_solution: Solution | None = None,
-#         feedback: Feedback | None = None,
-#     ) -> Sequence[Evaluation]:
-#         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-#         assert isinstance(original_solution, ArgumentMap) or original_solution is None
-#         assert feedback or original_solution is None, (
-#             "Feedback is required for evaluating revised solutions"
-#         )
-
-#         evaluations = []
-#         for solution in solutions:
-#             assert isinstance(solution, ArgumentMap), (
-#                 "All solutions must be ArgumentMaps"
-#             )
-#             evaluations.append(self._evaluate_argmap(problem, solution))
-
-#         return evaluations
-
 class ArgMapFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
-        self.temperature = kwargs.get("temperature", 0.7)
-        self.max_tokens = kwargs.get("max_tokens", 4096)
+        self.gen_kwargs = kwargs.get("gen_kwargs", {"max_tokens": 1024})
 
     async def arun(
         self,
@@ -314,9 +268,8 @@ class ArgMapFeedbackGenerator(FeedbackGenerator):
                     "content": prompt,
                 }
             ],
-            max_tokens=self.max_tokens,
             n=self.n_feedbacks,
-            temperature=self.temperature,
+            **self.gen_kwargs,
         )
         # remove empty and duplicate answers
         answers = [a for a in answers if a]

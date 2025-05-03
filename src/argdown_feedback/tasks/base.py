@@ -330,8 +330,8 @@ class GenericSolutionGenerator(SolutionGenerator):
         self.n_solutions = kwargs.get("n_solutions", 10)
         n_revisions = max(round(self.n_solutions / 2), 1)
         self.n_revisions = kwargs.get("n_revisions", n_revisions)
-        self.temperature = kwargs.get("temperature", 0.5)
-        self.max_tokens = kwargs.get("max_tokens", 4096)
+        self.remove_duplicates = kwargs.get("remove_duplicates", True)
+        self.gen_kwargs = kwargs.get("gen_kwargs", {"max_tokens": 4096})
 
     def remove_repetitions(
         self, answer: str, keep: int = 3, min_lines: int = 16
@@ -414,14 +414,13 @@ class GenericSolutionGenerator(SolutionGenerator):
 
         answers = await self._generate(
             messages,
-            max_tokens=self.max_tokens,
             n=n,
-            temperature=self.temperature,
+            **self.gen_kwargs,
         )
 
         # remove empty and duplicate answers
         answers = [a for a in answers if a and isinstance(a, str)]
-        answers = list(set(answers))
+        answers = list(set(answers)) if self.remove_duplicates else answers
 
         # remove repetitive blocs of text at the end of the answer
         answers = [self.remove_repetitions(answer) for answer in answers]
@@ -536,8 +535,7 @@ class GenericFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
-        self.temperature = kwargs.get("temperature", 0.7)
-        self.max_tokens = kwargs.get("max_tokens", 1024)
+        self.gen_kwargs = kwargs.get("gen_kwargs", {"temperature": 0.8, "max_tokens": 1024})
 
     async def arun(
         self,
@@ -586,9 +584,8 @@ class GenericFeedbackGenerator(FeedbackGenerator):
                     "content": prompt,
                 }
             ],
-            max_tokens=self.max_tokens,
             n=self.n_feedbacks,
-            temperature=self.temperature,
+            **self.gen_kwargs,
         )
         # remove empty and duplicate answers
         answers = [a for a in answers if a]

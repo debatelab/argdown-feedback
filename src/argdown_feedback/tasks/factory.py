@@ -118,10 +118,12 @@ class HIRPOFactory:
             else:
                 raise ValueError(f"Invalid problem generator class: {pg_class} of type {type(pg_class)}")
 
+            solution_generator_kwargs = solution_generator_kwargs.copy() if solution_generator_kwargs else {}
+            solution_generator_kwargs["remove_duplicates"] = False
             sg_instance = GenericSolutionGenerator(
                 solution_class=registry.get_class(solution),
                 **model_kwargs,
-                **(solution_generator_kwargs or {}),
+                **solution_generator_kwargs,
             )
 
             jg_class = registry.get_class(judge)

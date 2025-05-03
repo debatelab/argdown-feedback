@@ -288,8 +288,7 @@ class LogRecoFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
-        self.temperature = kwargs.get("temperature", 0.7)
-        self.max_tokens = kwargs.get("max_tokens", 4096)
+        self.gen_kwargs = kwargs.get("gen_kwargs", {"max_tokens": 1024})
 
     async def arun(
         self,
@@ -340,9 +339,8 @@ class LogRecoFeedbackGenerator(FeedbackGenerator):
                     "content": prompt,
                 }
             ],
-            max_tokens=self.max_tokens,
             n=self.n_feedbacks,
-            temperature=self.temperature,
+            **self.gen_kwargs,
         )
         # remove empty and duplicate answers
         answers = [a for a in answers if a]
