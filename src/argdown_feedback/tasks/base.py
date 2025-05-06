@@ -1195,9 +1195,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 pairs_all.extend(pairs)
                 stats_all += stats
 
-        # Deduplicate
+        # Deduplicate (ignoring differences in rejected conversations)
+        random.shuffle(pairs_all)
         pairs_all = [
-            pair for enum, pair in enumerate(pairs_all) if pair not in pairs_all[:enum]
+            pair for enum, pair in enumerate(pairs_all)
+            if not any(p["chosen"]==pair["chosen"] for p in pairs_all[:enum])
         ]
         # NOTE
         # We're only adjusting total counts
