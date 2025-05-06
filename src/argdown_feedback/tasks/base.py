@@ -55,9 +55,7 @@ class Problem(ABC):
     ) -> str:
         """Instruction to revise earlier mentioned solution of the problem."""
 
-    def ask_for_invalid_prompt(
-        self, prompt: str, evaluation
-    ) -> str:
+    def ask_for_invalid_prompt(self, prompt: str, evaluation) -> str:
         """string transformation that reverts prompt instruction, asking llm to make specific mistakes"""
         warning_text = (
             "> [!WARNING]\n"
@@ -77,9 +75,7 @@ class Problem(ABC):
 
         return prompt
 
-    def ask_for_invalid_revise_prompt(
-        self, prompt: str, evaluation
-    ) -> str:
+    def ask_for_invalid_revise_prompt(self, prompt: str, evaluation) -> str:
         """string transformation that reverts revise prompt instruction, asking llm to make specific mistakes"""
         prompt = prompt + (
             "\n\n"
@@ -323,7 +319,9 @@ class HIRAbstractGeneratorLLM(ABC):
             if isinstance(e, BadRequestError):
                 if "maximum context length" in e.message:
                     hash = hashlib.sha256(str(messages).encode()).hexdigest()
-                    logger.warning(f"Request with hash {hash} is exceeding maximum context length. Will not retry.")
+                    logger.warning(
+                        f"Request with hash {hash} is exceeding maximum context length. Will not retry."
+                    )
                     logger.debug(f"Error message: {str(e)}")
                     return []
             logger.error(f"Error calling the inference server: {str(e)}")
@@ -531,7 +529,6 @@ class MPJudge(Judge):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> Sequence[Evaluation]:
-
         self._check_inputs(
             problem,
             solutions,
@@ -556,13 +553,14 @@ class MPJudge(Judge):
 
         with ProcessPoolExecutor(max_workers=self.max_workers) as executor:
             for solution in solutions:
-                tasks.append(loop.run_in_executor(executor, evaluate_solution, solution))
+                tasks.append(
+                    loop.run_in_executor(executor, evaluate_solution, solution)
+                )
 
         # wait for all tasks to finish
         evaluations = await asyncio.gather(*tasks)
 
         return evaluations
-
 
 
 class FeedbackGenerator(HIRAbstractGeneratorLLM):
@@ -579,7 +577,9 @@ class GenericFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.n_feedbacks = kwargs.get("n_feedbacks", 5)
-        self.gen_kwargs = kwargs.get("gen_kwargs", {"temperature": 0.8, "max_tokens": 1024})
+        self.gen_kwargs = kwargs.get(
+            "gen_kwargs", {"temperature": 0.8, "max_tokens": 1024}
+        )
 
     async def arun(
         self,
@@ -833,6 +833,7 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
 # MAIN GENERATORS
 ######################
 
+
 @dataclasses.dataclass
 class HIRPOGenStats:
     """
@@ -929,7 +930,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             (cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid), None
         )
         top_invalid_solution, top_invalid_evaluation = next(
-            ((cs, e) for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid),
+            (
+                (cs, e)
+                for cs, e in zip(candidate_solutions, evaluations)
+                if not e.is_valid
+            ),
             (None, None),
         )
 
@@ -1067,7 +1072,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                         feedback=feedback,
                     )
                 except Exception as exc:
-                    logger.warning(f"Failed to evaluate revisions ({str(exc)}). Skipping revision workflow.")
+                    logger.warning(
+                        f"Failed to evaluate revisions ({str(exc)}). Skipping revision workflow."
+                    )
                     return pairs_rev_wf, [], stats
 
                 # run revision-specific HIRP to generate solution preference pairs
@@ -1125,9 +1132,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             #     pairs.extend(pairs_rev_wf)
 
             for feedback in feedbacks:
-                pairs_rev_wf, revision_evals, stats_rev_wf = await run_revision_workflow(
-                    problem, cs, e, feedback
-                )
+                (
+                    pairs_rev_wf,
+                    revision_evals,
+                    stats_rev_wf,
+                ) = await run_revision_workflow(problem, cs, e, feedback)
                 revision_evaluations.append(revision_evals)
                 pairs.extend(pairs_rev_wf)
                 stats += stats_rev_wf
@@ -1198,8 +1207,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         # Deduplicate (ignoring differences in rejected conversations)
         random.shuffle(pairs_all)
         pairs_all = [
-            pair for enum, pair in enumerate(pairs_all)
-            if not any(p["chosen"]==pair["chosen"] for p in pairs_all[:enum])
+            pair
+            for i, pair in enumerate(pairs_all)
+            if not any(p["chosen"] == pair["chosen"] for p in pairs_all[:i])
         ]
         # NOTE
         # We're only adjusting total counts
@@ -1267,7 +1277,9 @@ class HIREvaluator(HIRAbstractGenerator):
         for k, v in kwargs.items():
             setattr(self, k, v)
 
-    async def arun(self, inputs, log_samples_callback: Callable[..., Awaitable[None]] | None = None) -> dict[str, Any]:
+    async def arun(
+        self, inputs, log_samples_callback: Callable[..., Awaitable[None]] | None = None
+    ) -> dict[str, Any]:
         """evaluate inputs and returns average accuracy of the candidate solutions"""
         problem = await self.problem_generator.arun(inputs)
         candidate_solutions = await self.solution_generator.arun(problem)
@@ -1280,7 +1292,11 @@ class HIREvaluator(HIRAbstractGenerator):
                     evaluations=[
                         [
                             ("is_valid", str(e.is_valid)),
-                            *[(k,str(v)) for k, v in e.metrics.items() if v is not None],
+                            *[
+                                (k, str(v))
+                                for k, v in e.metrics.items()
+                                if v is not None
+                            ],
                         ]
                         for e in evaluations
                     ],
