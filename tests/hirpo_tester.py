@@ -31,28 +31,27 @@ class HirpoTester:
             assert source_texts[0] in problem.instruct_prompt(ask_for_invalid=True)
         assert "super cool hint" in problem.instruct_prompt(hints=["super cool hint"])
 
-        assert "!WARNING" in problem.instruct_prompt(ask_for_invalid=True)
-        assert "!WARNING" in problem.revise_prompt(ask_for_invalid=True)
+        mock_evaluation = Evaluation(
+            is_valid=False,
+            artifacts={},
+            metrics={"fake_metric": "fake_error"},
+        )
 
         inv_prompt = problem.instruct_prompt(
             ask_for_invalid=True,
-            evaluation=Evaluation(
-                is_valid=False, artifacts={}, metrics={"level": "AAA"}
-            ),
+            evaluation=mock_evaluation,
         )
         assert "!WARNING" in inv_prompt
-        assert "level" in inv_prompt
-        assert "AAA" in inv_prompt
+        assert "fake_error" in inv_prompt
+        assert "fake_metric" in inv_prompt
 
         inv_prompt = problem.revise_prompt(
             ask_for_invalid=True,
-            evaluation=Evaluation(
-                is_valid=False, artifacts={}, metrics={"level": "AAA"}
-            ),
+            evaluation=mock_evaluation,
         )
         assert "!WARNING" in inv_prompt
-        assert "level" in inv_prompt
-        assert "AAA" in inv_prompt
+        assert "fake_error" in inv_prompt
+        assert "fake_metric" in inv_prompt
 
     @staticmethod
     async def test_solution_generator(

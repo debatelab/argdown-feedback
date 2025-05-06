@@ -928,9 +928,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         top_valid_solution = next(
             (cs for cs, e in zip(candidate_solutions, evaluations) if e.is_valid), None
         )
-        top_invalid_solution = next(
-            (cs for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid),
-            None,
+        top_invalid_solution, top_invalid_evaluation = next(
+            ((cs, e) for cs, e in zip(candidate_solutions, evaluations) if not e.is_valid),
+            (None, None),
         )
 
         if top_valid_solution is None or top_invalid_solution is None:
@@ -960,13 +960,13 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     solution=top_invalid_solution,
                     original_solution=original_solution,
                     feedback=feedback,
-                ).as_chat(ask_for_invalid=True),
+                ).as_chat(ask_for_invalid=True, evaluation=top_invalid_evaluation),
                 rejected=ProblemSolutionChat(
                     problem=problem,
                     solution=top_valid_solution,
                     original_solution=original_solution,
                     feedback=feedback,
-                ).as_chat(ask_for_invalid=True),
+                ).as_chat(ask_for_invalid=True, evaluation=top_invalid_evaluation),
             )
         )
 
@@ -1194,6 +1194,15 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 pairs, stats = await run_selfcritique_workflow(problem, cs, e)
                 pairs_all.extend(pairs)
                 stats_all += stats
+
+        # Deduplicate
+        pairs_all = [
+            pair for enum, pair in enumerate(pairs_all) if pair not in pairs_all[:enum]
+        ]
+        # NOTE
+        # We're only adjusting total counts
+        # In consequence, pair_type_counts include duplicates and might not add up to total count
+        stats_all.n_total = len(pairs_all)
 
         return pairs_all, stats_all
 
