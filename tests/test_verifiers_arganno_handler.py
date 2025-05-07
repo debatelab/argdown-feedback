@@ -152,6 +152,7 @@ def test_source_text_integrity_handler_invalid(valid_soup):
     assert result is not None
     assert result.is_valid is False
     assert "was altered" in result.message
+    assert "Diff:" in result.message
 
 
 

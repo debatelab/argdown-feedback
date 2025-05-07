@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from difflib import unified_diff
-from textwrap import shorten
+from textwrap import shorten, wrap
 from typing import Optional, Sequence
 import logging
 
@@ -87,10 +87,13 @@ class SourceTextIntegrityHandler(ArgannoHandler):
         lines_a = " ".join(soup.get_text().split()).splitlines(keepends=True)
         lines_o = [line for line in lines_o if line.strip(" \n\t")]
         lines_a = [line for line in lines_a if line.strip(" \n\t")]
+        # hard wrap lines
+        lines_o = [wrapped_line for line in lines_o for wrapped_line in wrap(line, 60)]
+        lines_a = [wrapped_line for line in lines_a for wrapped_line in wrap(line, 60)]
 
         # tolerance edit-distance threshold
         if not self._are_roughly_equal("".join(lines_o), "".join(lines_a)):
-            diff = list(unified_diff(lines_o, lines_a, n=0))
+            diff = list(unified_diff(lines_o, lines_a, fromfile='original', tofile='annotated', n=2))
             if diff:
                 msgs.append(
                     f"Source text '{shorten(source, 40)}' was altered. Diff:\n" + "".join(diff),
