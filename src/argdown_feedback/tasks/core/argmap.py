@@ -27,6 +27,7 @@ from argdown_feedback.verifiers.base import CompositeHandler
 from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_feedback.verifiers.core.content_check_handler import HasArgdownHandler
 from argdown_feedback.verifiers.processing_handler import (
+    ArgdownParser,
     DefaultProcessingHandler,
     FencedCodeBlockExtractor,
 )
@@ -169,7 +170,8 @@ class ArgMapJudge(MPJudge):
         assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
         handler = CompositeHandler(
             handlers=[
-                DefaultProcessingHandler(),
+                FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+                ArgdownParser(name="ArgdownParser"),
                 HasArgdownHandler(),
                 ArgMapCompositeHandler(),
             ]

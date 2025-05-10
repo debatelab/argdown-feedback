@@ -28,6 +28,7 @@ from argdown_feedback.verifiers.core.infreco_handler import (
 )
 from argdown_feedback.verifiers.core.content_check_handler import HasArgdownHandler
 from argdown_feedback.verifiers.processing_handler import (
+    ArgdownParser,
     DefaultProcessingHandler,
     FencedCodeBlockExtractor,
 )
@@ -190,7 +191,8 @@ class InfRecoJudge(MPJudge):
         ]
         handler = CompositeHandler(
             handlers=[
-                DefaultProcessingHandler(),
+                FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+                ArgdownParser(name="ArgdownParser"),
                 HasArgdownHandler(),
                 infreco_handler,
             ]

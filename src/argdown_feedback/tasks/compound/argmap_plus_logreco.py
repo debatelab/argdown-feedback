@@ -8,7 +8,6 @@ from pyargdown import (
 import textdistance
 
 from argdown_feedback.tasks.base import (
-    Judge,
     MPJudge,
     Problem,
     Solution,
@@ -51,7 +50,8 @@ from argdown_feedback.verifiers.core.infreco_handler import (
 )
 from argdown_feedback.verifiers.core.logreco_handler import LogRecoCompositeHandler
 from argdown_feedback.verifiers.processing_handler import (
-    DefaultProcessingHandler,
+    ArgdownParser,
+    FencedCodeBlockExtractor,
 )
 from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
@@ -248,7 +248,8 @@ class ArgmapPlusLogrecoJudge(MPJudge):
         )
         main_handler = CompositeHandler(
             handlers=[
-                DefaultProcessingHandler(),
+                FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+                ArgdownParser(name="ArgdownParser"),
                 HasArgdownHandler(name="HasArgdownHandler.map", filter=map_filter),
                 HasArgdownHandler(name="HasArgdownHandler.reco", filter=reco_filter),
                 ArgMapCompositeHandler(filter=map_filter),

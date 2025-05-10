@@ -25,6 +25,7 @@ from argdown_feedback.verifiers.verification_request import (
 from argdown_feedback.verifiers.processing_handler import (
     DefaultProcessingHandler,
     FencedCodeBlockExtractor,
+    XMLParser,
 )
 from argdown_feedback.verifiers.base import CompositeHandler
 
@@ -197,7 +198,8 @@ class AnnotationJudge(MPJudge):
 
         handler = CompositeHandler(
             handlers=[
-                DefaultProcessingHandler(),
+                FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+                XMLParser(name="XMLAnnotationParser"),
                 HasAnnotationsHandler(),
                 ArgannoCompositeHandler(),
             ]

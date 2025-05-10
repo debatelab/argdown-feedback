@@ -28,7 +28,7 @@ from argdown_feedback.verifiers.base import CompositeHandler
 from argdown_feedback.verifiers.core.infreco_handler import InfRecoCompositeHandler, NoPropInlineDataHandler
 from argdown_feedback.verifiers.core.logreco_handler import LogRecoCompositeHandler
 from argdown_feedback.verifiers.core.content_check_handler import HasArgdownHandler
-from argdown_feedback.verifiers.processing_handler import DefaultProcessingHandler, FencedCodeBlockExtractor
+from argdown_feedback.verifiers.processing_handler import ArgdownParser, DefaultProcessingHandler, FencedCodeBlockExtractor
 from argdown_feedback.verifiers.verification_request import VerificationDType, VerificationRequest
     
 
@@ -192,7 +192,8 @@ class LogRecoJudge(MPJudge):
 
         handler = CompositeHandler(
             handlers=[
-                DefaultProcessingHandler(),
+                FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+                ArgdownParser(name="ArgdownParser"),
                 HasArgdownHandler(),
                 infreco_handler,
                 LogRecoCompositeHandler(),
