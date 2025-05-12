@@ -368,20 +368,20 @@ class HasInferenceDataHandler(InfRecoHandler):
                     
                 inf_data = c.inference_data
                 if not inf_data:
-                    msgs.append(f"In {arg_label}: Conclusion {c.label} lacks yaml inference information.")
+                    msgs.append(f"In {arg_label}: Inference to conclusion {c.label} lacks yaml inference information.")
                 else:
                     from_list = inf_data.get(self.from_key)
                     if from_list is None:
                         msgs.append(
-                            f"In {arg_label}: Conclusion {c.label} inference information lacks '{self.from_key}' key."
+                            f"In {arg_label}: Inference to conclusion {c.label} inference information lacks '{self.from_key}' key."
                         )
                     elif not isinstance(from_list, list):
                         msgs.append(
-                            f"In {arg_label}: Conclusion {c.label} inference information '{self.from_key}' value is not a list."
+                            f"In {arg_label}: Inference to conclusion {c.label} inference information '{self.from_key}' value is not a list."
                         )
                     elif len(from_list) == 0:
                         msgs.append(
-                            f"In {arg_label}: Conclusion {c.label} inference information '{self.from_key}' value is empty."
+                            f"In {arg_label}: Inference to conclusion {c.label} inference information '{self.from_key}' value is empty."
                         )
         
         if msgs:
