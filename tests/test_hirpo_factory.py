@@ -17,6 +17,7 @@ def config_data():
             "problem": "arganno.AnnotationProblem",
             "problem_generator": "arganno.AnnotationProblemGenerator",
             "judge": "arganno.AnnotationJudge",
+            "max_workers": 16,
             "feedback_generator": "arganno.AnnotationFeedbackGenerator",
             "feedback_generator_kwargs": {"n_feedbacks": 3},
             "virtue_preference_pair_generator": [
@@ -41,6 +42,7 @@ def test_hirgen_fromconfig(config_data):
         assert isinstance(hirgen, HIRPreferencePairGenerator)
         assert hirgen.solution_generator.n_solutions == config["solution_generator_kwargs"]["n_solutions"]
         assert hirgen.feedback_generator.n_feedbacks == config["feedback_generator_kwargs"]["n_feedbacks"]
+        assert hirgen.judge.max_workers == config["max_workers"]
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 def test_hirevaluator_fromconfig(config_data):
@@ -53,3 +55,4 @@ def test_hirevaluator_fromconfig(config_data):
         # Check if the instance is created successfully
         assert isinstance(hireval, HIREvaluator)
         assert hireval.solution_generator.n_solutions == config["solution_generator_kwargs"]["n_solutions"]
+        assert hireval.judge.max_workers == config["max_workers"]

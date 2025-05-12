@@ -30,6 +30,7 @@ class HIRPOFactory:
         failure_type_preference_pair_generator: str | None = None,
         solution_generator_kwargs: dict[str, Any] | None = None,
         feedback_generator_kwargs: dict[str, Any] | None = None,
+        max_workers: int = 8,
         **kwargs,
     ) -> HIRPreferencePairGenerator | None:
         """Create a HIRPreferencePairGenerator from config."""
@@ -51,9 +52,9 @@ class HIRPOFactory:
 
             jg_class = registry.get_class(judge)
             if issubclass(jg_class, HIRAbstractGeneratorLLM):
-                jg_instance = jg_class(**model_kwargs)
+                jg_instance = jg_class(max_workers=max_workers, **model_kwargs)
             elif issubclass(jg_class, HIRAbstractGenerator):
-                jg_instance = jg_class()
+                jg_instance = jg_class(max_workers=max_workers)
             else:
                 raise ValueError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 
@@ -106,6 +107,7 @@ class HIRPOFactory:
         judge: str,
         model_kwargs: dict[str, Any],
         solution_generator_kwargs: dict[str, Any] | None = None,
+        max_workers: int = 8,
         **kwargs
     ) -> HIREvaluator | None:
         """Create an evaluator from config."""
@@ -128,9 +130,9 @@ class HIRPOFactory:
 
             jg_class = registry.get_class(judge)
             if issubclass(jg_class, HIRAbstractGeneratorLLM):
-                jg_instance = jg_class(**model_kwargs)
+                jg_instance = jg_class(max_workers=max_workers, **model_kwargs)
             elif issubclass(jg_class, HIRAbstractGenerator):
-                jg_instance = jg_class()
+                jg_instance = jg_class(max_workers=max_workers)
             else:
                 raise ValueError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 

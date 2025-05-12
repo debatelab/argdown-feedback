@@ -274,6 +274,10 @@ class ProblemSolutionChat:
 
 
 class HIRAbstractGenerator(ABC):
+
+    def __init__(self, *args, **kwargs):
+        pass
+
     @abstractmethod
     async def arun(self, *args, **kwargs) -> Any:
         pass
