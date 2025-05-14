@@ -768,10 +768,22 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
         )
         pairs: list[ChatPreferencePair] = []
 
+        # consolidate metric keys
+        metrics_batch: list[dict[str, Any]] = []
+        for evaluation in evaluations:
+            metrics: dict[str, Any] = {}
+            for k, v in evaluation.metrics.items():
+                key = k.split("_", 1)[1] if "_" in k else k
+                if metrics.get(key) is None:
+                    metrics[key] = v
+                elif v:
+                    metrics[key] = metrics[key] + " " + v
+            metrics_batch.append(metrics)
+
         # count error types
         error_counts: dict[str, int] = {}
-        for key in evaluations[0].metrics.keys():
-            error_counts[key] = len([1 for e in evaluations if e.metrics[key]])
+        for key in set([k for m in metrics_batch for k in m.keys()]):
+            error_counts[key] = len([1 for metrics in metrics_batch if metrics.get(key)])
         # dismiss errors that are never avoided, i.e. always present
         error_counts = {
             k: v for k, v in error_counts.items() if 0 < v < len(evaluations)
@@ -790,24 +802,24 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
         chosen_idx = random.choice(
             [
                 idx
-                for idx, eval in enumerate(evaluations)
-                if not eval.metrics[most_common_type]
+                for idx, metrics in enumerate(metrics_batch)
+                if not metrics.get(most_common_type)
             ]
         )
         # rejected solution commits most common error
         rejected_idx = random.choice(
             [
                 idx
-                for idx, eval in enumerate(evaluations)
-                if eval.metrics[most_common_type]
+                for idx, metrics in enumerate(metrics_batch)
+                if metrics.get(most_common_type)
             ]
         )
 
         # list all errors avoided by the chosen solution
         errors_avoided = {
             k: v
-            for k, v in evaluations[rejected_idx].metrics.items()
-            if v and not evaluations[chosen_idx].metrics[k]
+            for k, v in metrics_batch[rejected_idx].items()
+            if v and not metrics_batch[chosen_idx].get(k)
         }
 
         hint = self.avoid_errors_hint + "\n".join(
@@ -1087,7 +1099,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     if self.failure_type_preference_pair_generator is not None:
                         new_pairs = (
                             await self.failure_type_preference_pair_generator.arun(
-                                problem, candidate_solutions, evaluations
+                                problem, candidate_revisions, revision_evals
                             )
                         )
                         pairs_rev_wf.extend(new_pairs)
@@ -1144,6 +1156,14 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 revision_evaluations.append(revision_evals)
                 pairs.extend(pairs_rev_wf)
                 stats += stats_rev_wf
+
+                # stop if we have at least one valid revision
+                if any(ev.is_valid for ev in revision_evals):
+                    break
+
+            # discard all feedbacks that have not been used
+            feedbacks = feedbacks[: len(revision_evaluations)]
+
 
             # generate feedback preference pair
 

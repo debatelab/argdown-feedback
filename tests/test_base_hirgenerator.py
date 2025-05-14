@@ -253,6 +253,19 @@ class MixFeedbackGenerator(FeedbackGenerator):
     ) -> list[Feedback]:
         print(f"MagicFeedbackGenerator: arun ({solution})")
         return [
+            Feedback(feedback="empty", prompt="empty"),
+            Feedback(feedback="magic", prompt=f"magic: improve {solution}"),
+        ]
+
+class MixFeedbackGenerator2(FeedbackGenerator):
+    async def arun(
+        self,
+        problem: Problem,
+        solution: Solution,
+        evaluation: Evaluation,
+    ) -> list[Feedback]:
+        print(f"MagicFeedbackGenerator: arun ({solution})")
+        return [
             Feedback(feedback="magic", prompt=f"magic: improve {solution}"),
             Feedback(feedback="empty", prompt="empty"),
         ]
@@ -418,7 +431,15 @@ async def test_valid_after_magic():
         for i in range(len(pairs))
     )
 
+@pytest.mark.asyncio
+async def test_valid_after_magic2():
+    hirp_gen = hirp_factory(ValidAfterMagicGen)
+    pairs, _ = await hirp_gen.arun(1)
+    pprint.pprint(pairs)
+    assert not pairs
+    
     # problem = 2
+    hirp_gen_magic_fbk = hirp_factory(ValidAfterMagicGen, MagicFeedbackGenerator)
     pairs, _ = await hirp_gen_magic_fbk.arun(2)
     pprint.pprint(pairs)
     # as the feedback is always the same, we will never get feeback preferences
@@ -433,25 +454,54 @@ async def test_valid_after_magic():
         for i in range(len(pairs))
     )
 
+@pytest.mark.asyncio
+async def test_valid_after_magic3():
+    hirp_gen = hirp_factory(ValidAfterMagicGen)
+    pairs, _ = await hirp_gen.arun(1)
+    pprint.pprint(pairs)
+    assert not pairs
+
     # problem = 1
     hirp_gen_zero_magic_fbk = hirp_factory(ValidAfterMagicGen, MixFeedbackGenerator)
     pairs, _ = await hirp_gen_zero_magic_fbk.arun(1)
     pprint.pprint(pairs)
     assert pairs
-    # as the first feedback is magic and the second is empty, we will get one feedback preference pair for each
+    # as the first feedback is empty and the second is magic, we will get one feedback preference pair for each
     # original solution
     assert sum("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs))) == 3
     assert sum(len(pair["chosen"]) == 4 for pair in pairs) == 3
     # but the "magic" feedback is never rejected
     assert not any("magic" in pairs[i]["rejected"][-1]["content"] for i in range(len(pairs)))
-    # moreover, we have 3 original solutions, and 2*3=6 revised solutions
-    # 3 revised solutions are based on magic feedback, 3 on empty feedback
-    # ...
     # (in)valid answer is never preferred to (in)valid answer
     assert not any(
         pairs[i]["chosen"][-1]["content"] in ["y", "n"] == pairs[i]["rejected"][-1]["content"] in ["y", "n"]
         for i in range(len(pairs))
     )
+
+@pytest.mark.asyncio
+async def test_valid_after_magic4():
+    hirp_gen = hirp_factory(ValidAfterMagicGen)
+    pairs, _ = await hirp_gen.arun(1)
+    pprint.pprint(pairs)
+    assert not pairs
+
+    # problem = 1
+    hirp_gen_zero_magic_fbk = hirp_factory(ValidAfterMagicGen, MixFeedbackGenerator2)
+    pairs, _ = await hirp_gen_zero_magic_fbk.arun(1)
+    pprint.pprint(pairs)
+    assert pairs
+    # as the first feedback is magic and the second is empty, revision will stop after first feedback
+    # we will get no feedback preference pairs for any original solution
+    assert sum("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs))) == 0
+    assert sum(len(pair["chosen"]) == 4 for pair in pairs) == 0
+    # but the "magic" feedback is never rejected
+    assert not any("magic" in pairs[i]["rejected"][-1]["content"] for i in range(len(pairs)))
+    # (in)valid answer is never preferred to (in)valid answer
+    assert not any(
+        pairs[i]["chosen"][-1]["content"] in ["y", "n"] == pairs[i]["rejected"][-1]["content"] in ["y", "n"]
+        for i in range(len(pairs))
+    )
+
 
 @pytest.mark.asyncio
 async def test_correct_after_magic():
