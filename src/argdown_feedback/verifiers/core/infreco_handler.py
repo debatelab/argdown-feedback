@@ -368,7 +368,7 @@ class HasInferenceDataHandler(InfRecoHandler):
                     
                 inf_data = c.inference_data
                 if not inf_data:
-                    msgs.append(f"In {arg_label}: Inference to conclusion {c.label} lacks yaml inference information.")
+                    msgs.append(f"In {arg_label}: Inference to conclusion {c.label} lacks properly formatted yaml inference information.")
                 else:
                     from_list = inf_data.get(self.from_key)
                     if from_list is None:
