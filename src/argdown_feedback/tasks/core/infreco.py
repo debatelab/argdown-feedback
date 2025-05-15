@@ -71,8 +71,9 @@ class InfRecoProblem(Problem):
             - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
               conclusion, and possible intermediate conclusions).
             - For each conclusion in the argument, provide information about which previously introduced premises or 
-              conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
-              where the list items refer to the respective premise or conclusion labels.
+              intermediary conclusions it is inferred *from*: Use yaml inline data in the corresponding inference line right
+              above the inferred conclusion, e.g. `-- {{'from': ['1','3']}} --`. The list items refer to the respective 
+              premise or conclusion labels used in the inference step.
             - You may, but are in no way required to add additional information about which inference rules or argumentation
               schemes are applied in each sub-argument.
             - In addition, at the beginning of your Argdown code block, provide a succinct label (title) for the argument and 
