@@ -61,7 +61,7 @@ class LogrecoFromInfrecoProblem(LogRecoProblem):
             Note in particular:
 
             - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
-              ending with '```'. Just include a single Argdown codeblock in your answer.                                            
+              ending with '```'. Just include a single Argdown codeblock in your answer.
 
             - In your Argdown snippet, only include *a single argument* which re-analyzes the informal reconstruction (adding/removing or revising 
               premises, final conclusion, and possible intermediate conclusions as required).

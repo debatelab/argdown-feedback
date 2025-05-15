@@ -63,7 +63,7 @@ class LogRecoProblem(Problem):
             Note in particular:
 
             - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
-              ending with '```'. Just include a single Argdown codeblock in your answer.                                            
+              ending with '```'. Just include a single Argdown codeblock in your answer.
 
             - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
               conclusion, and possible intermediate conclusions).
