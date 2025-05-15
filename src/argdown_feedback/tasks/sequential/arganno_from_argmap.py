@@ -233,7 +233,7 @@ class ArgmapGraphProximityPreferencePairGenerator(ScoringVirtuePreferencePairGen
         #print("MATCHED_N", matched_n)
 
         return round(
-            matched_n / len(argdown_map.dialectical_relations),
+            matched_n / len(argdown_map.dialectical_relations) if len(argdown_map.dialectical_relations) > 0 else 0,
             1,
         )
 
