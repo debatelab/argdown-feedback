@@ -80,7 +80,7 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
                         
             Analyse the argumentation in the following **source text**. Create two coherent Argdown code snippets: One with an informal argument map, and another one with logical reconstructions of all the arguments in standard form (as deductively valid inferences).
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

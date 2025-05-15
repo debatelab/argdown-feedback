@@ -81,7 +81,7 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
                         
             Analyse the argumentation in the following **source text**. Create a coherent argumentative text annotation and a corresponding logical argument reconstruction in standard form (premise-conclusion structure).
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

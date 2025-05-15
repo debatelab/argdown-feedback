@@ -71,7 +71,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
                         
             Analyse the argumentation in the following **source text**. Create a coherent argumentative text annotation and a corresponding Argdown argument map.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

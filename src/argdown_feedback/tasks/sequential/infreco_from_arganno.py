@@ -47,7 +47,7 @@ class InfRecoFromArgAnnoProblem(InfRecoProblem):
                         
             Use the argumentative annotation to identify the main argument in the following source text and reconstruct it as premise-conclusion structure using Argdown.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

@@ -91,7 +91,7 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
                         
             Analyse the argumentation in the following **source text**. Create three coherent code artifacts: an argumentative text annotation, an informal argument map, and logical reconstructions of all the arguments in standard form (as deductively valid inferences).
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

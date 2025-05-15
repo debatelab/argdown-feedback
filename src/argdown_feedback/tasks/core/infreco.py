@@ -60,7 +60,7 @@ class InfRecoProblem(Problem):
                         
             Identify the main argument in the following source text and reconstruct it as premise-conclusion structure using Argdown.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

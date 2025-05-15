@@ -63,7 +63,7 @@ class ArgannoFromArgmapProblem(AnnotationProblem):
                         
             Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

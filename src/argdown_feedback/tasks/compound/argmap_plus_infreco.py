@@ -75,7 +75,7 @@ class ArgmapPlusInfrecoProblem(InfRecoProblem, ArgMapProblem):
                         
             Analyse the argumentation in the following **source text**. Create two coherent Argdown code snippets: One with an informal argument map, and another one with reconstructions of all the arguments in standard form (premise-conclusion structure).
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

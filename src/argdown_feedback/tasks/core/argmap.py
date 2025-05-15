@@ -59,7 +59,7 @@ class ArgMapProblem(Problem):
                         
             Analyse the argumentation in the following source text by creating an Argdown argument map.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

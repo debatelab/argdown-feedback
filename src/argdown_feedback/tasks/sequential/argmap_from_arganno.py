@@ -47,7 +47,7 @@ class ArgmapFromArgannoProblem(ArgMapProblem):
                         
             Use the following argumentative annotation to reconstruct the text's arguments as an informal Argdown argument map.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 

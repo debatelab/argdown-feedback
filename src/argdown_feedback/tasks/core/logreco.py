@@ -56,7 +56,7 @@ class LogRecoProblem(Problem):
             Logically reconstruct the main argument in the following source text. Formalize all the premises and conclusions.
             Make sure the reconstructed argument is deductively valid and all premises are relevant.
 
-            ::: {{.source_text}}              
+            ::: {{.source_text}}
             {sources}
             :::
 
