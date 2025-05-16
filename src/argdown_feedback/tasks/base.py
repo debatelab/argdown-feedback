@@ -1058,6 +1058,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         problem: Problem,
         candidate_solutions: Sequence[Solution],
         evaluations: Sequence[Evaluation],
+        generate_revision_failure_type_pairs: bool = False,
     ) -> tuple[list[ChatPreferencePair], HIRPOGenStats]:
         """self-critique branch"""
 
@@ -1096,7 +1097,10 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 # run revision-specific HIRP to generate solution preference pairs
 
                 if not any(re.is_valid for re in revision_evals):
-                    if self.failure_type_preference_pair_generator is not None:
+                    if (
+                        generate_revision_failure_type_pairs
+                        and self.failure_type_preference_pair_generator is not None
+                    ):
                         new_pairs = (
                             await self.failure_type_preference_pair_generator.arun(
                                 problem, candidate_revisions, revision_evals
