@@ -18,7 +18,6 @@ from argdown_feedback.tasks.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    Judge,
     FeedbackGenerator,
 )
 from argdown_feedback.verifiers.base import CompositeHandler
@@ -29,7 +28,6 @@ from argdown_feedback.verifiers.core.infreco_handler import (
 from argdown_feedback.verifiers.core.content_check_handler import HasArgdownHandler
 from argdown_feedback.verifiers.processing_handler import (
     ArgdownParser,
-    DefaultProcessingHandler,
     FencedCodeBlockExtractor,
 )
 from argdown_feedback.verifiers.verification_request import (
