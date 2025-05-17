@@ -298,7 +298,7 @@ class HIRAbstractGeneratorLLM(ABC):
                 logging.getLogger(__name__).warning(
                     f"Model {self.model_id} not found in OpenAI API. Model served: {models}. Will proceed with first of these models."
                 )
-                self.model_id = next(models.data[0].id)
+                self.model_id = next(iter(models.data)).id
 
     @tenacity.retry(
         wait=tenacity.wait_random_exponential(min=1, max=30),
@@ -354,7 +354,7 @@ class SolutionGenerator(HIRAbstractGeneratorLLM):
     @abstractmethod
     async def arun(
         self,
-        Problem,
+        problem,
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
     ) -> Sequence[Solution]:
@@ -856,6 +856,8 @@ class HIRPOGenStats:
     Statistics for preference pairs generated with HIRPOGen.
     """
 
+    n_solutions: int = 0
+    n_solutions_valid: int = 0
     n_total: int = 0
     n_validity_preference_pairs: int = 0
     n_virtue_preference_pairs: int = 0
@@ -870,6 +872,8 @@ class HIRPOGenStats:
         if not isinstance(other, HIRPOGenStats):
             raise TypeError("Can only add HIRPOGenStats objects")
         return HIRPOGenStats(
+            n_solutions=self.n_solutions + other.n_solutions,
+            n_solutions_valid=self.n_solutions_valid + other.n_solutions_valid,
             n_total=self.n_total + other.n_total,
             n_validity_preference_pairs=self.n_validity_preference_pairs
             + other.n_validity_preference_pairs,
@@ -1260,7 +1264,10 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         evaluations = await self.judge.arun(problem, candidate_solutions)
 
         pairs: list[ChatPreferencePair] = []
-        stats = HIRPOGenStats()
+        stats = HIRPOGenStats(
+            n_solutions=len(evaluations),
+            n_solutions_valid=len([e for e in evaluations if e.is_valid])
+        )
 
         do_self_critique, skip_self_critique = self.self_critique_router(evaluations)
 
