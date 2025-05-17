@@ -83,10 +83,10 @@ class HIRPOFactory:
                 ftppg_instance = GenericFailureDiffPreferencePairGenerator()
 
             return HIRPreferencePairGenerator(
-                problem_generator=pg_instance,
+                problem_generator=pg_instance,  # type: ignore
                 solution_generator=sg_instance,
-                judge=jg_instance,
-                feedback_generator=fg_instance,
+                judge=jg_instance,  # type: ignore
+                feedback_generator=fg_instance,  # type: ignore
                 virtue_preference_pair_generator=vppg_instances,
                 failure_type_preference_pair_generator=ftppg_instance,
                 **kwargs,
@@ -137,9 +137,9 @@ class HIRPOFactory:
                 raise ValueError(f"Invalid judge class: {jg_class} of type {type(jg_class)}")
 
             return HIREvaluator(
-                problem_generator=pg_instance,
+                problem_generator=pg_instance,  # type: ignore
                 solution_generator=sg_instance,
-                judge=jg_instance,
+                judge=jg_instance,  # type: ignore
                 **kwargs,
             )
 
