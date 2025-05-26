@@ -138,9 +138,10 @@ class ArgmapTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     def _score(
         self,
         problem: Problem,
-        anno: Solution,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        anno = reco
         assert isinstance(problem, ArgannoFromArgmapProblem)
         assert isinstance(anno, Annotation)
 
@@ -173,9 +174,10 @@ class ArgmapGraphProximityPreferencePairGenerator(ScoringVirtuePreferencePairGen
     def _score(
         self,
         problem: Problem,
-        anno: Solution,
+        reco: Solution,
         evaluation: Evaluation,
     ) -> float:
+        anno = reco
         assert isinstance(problem, ArgannoFromArgmapProblem)
         assert isinstance(anno, Annotation)
 

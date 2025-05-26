@@ -106,11 +106,11 @@ class LogrecoFromInfrecoProblemGenerator(ProblemGeneratorLLM):
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
             infreco_problem = await self._infreco_pg.arun(inputs)
-            infreco_solution = await self._infreco_sg.arun(infreco_problem)
+            infreco_solution = await self._infreco_sg.arun(infreco_problem)            
             infreco_evaluation = InfRecoJudge()._evaluate_solution(infreco_solution[0], infreco_problem)
             argdown_infreco = infreco_evaluation.artifacts.get("argdown_reco")
             return LogrecoFromInfrecoProblem(
-                argdown_snippet=str(argdown_infreco),
+                argdown_snippet=str(infreco_solution[0]),
                 argdown_infreco=argdown_infreco,
                 infreco_evaluation=infreco_evaluation,
             )

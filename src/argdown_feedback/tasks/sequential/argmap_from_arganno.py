@@ -1,5 +1,5 @@
 from textwrap import dedent
-from typing import Any
+from typing import Any, Sequence
 from bs4 import BeautifulSoup
 from pyargdown import ArgdownMultiDiGraph, Argument, Proposition, Valence
 import textdistance
@@ -87,9 +87,9 @@ class ArgmapFromArgannoProblemGenerator(ProblemGeneratorLLM):
         ):
             arganno_problem = await self._arganno_pg.arun(inputs)
             arganno_solution = await self._arganno_sg.arun(arganno_problem)
-            soup_anno, _ = AnnotationJudge().parse_xml_snippet(arganno_solution[0].annotated_source_text)
+            soup_anno, _ = AnnotationJudge().parse_xml_snippet(arganno_solution[0].annotated_source_text)  # type: ignore
             return ArgmapFromArgannoProblem(
-                annotated_text=str(arganno_solution),
+                annotated_text=str(arganno_solution[0]),
                 soup_anno=soup_anno,
             )
         raise ValueError(
