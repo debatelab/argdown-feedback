@@ -321,15 +321,16 @@ class AttributeValidityHandler(ArgannoHandler):
         unknown_attrs = []
         for proposition in soup.find_all("proposition"):
             for attr in proposition.attrs:  # type: ignore
-                if attr not in {
+                legal_attributes = {
                     "id",
                     "supports",
                     "attacks",
                     "argument_label",
                     "ref_reco_label",
-                }:
+                }
+                if attr not in legal_attributes:
                     unknown_attrs.append(
-                        f"Unknown attribute '{attr}' in proposition '{shorten(str(proposition), 64)}'"
+                        f"Unknown attribute '{attr}' in proposition '{shorten(str(proposition), 64)}'. Legal attributes are: {', '.join(legal_attributes)}"
                     )
         
         is_valid = len(unknown_attrs) == 0
