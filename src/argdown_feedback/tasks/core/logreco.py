@@ -209,60 +209,6 @@ class LogRecoJudge(MPJudge):
         return evaluation
 
 
-# class LogRecoJudge2(Judge):
-#     """Judge for the informal argument reconstruction task."""
-
-#     def _evaluate_logreco(
-#         self, problem: LogRecoProblem, reco: LogicalReco
-#     ) -> Evaluation:
-
-#         infreco_handler = InfRecoCompositeHandler()
-#         infreco_handler.handlers = [
-#             h for h in infreco_handler.handlers if not isinstance(h, NoPropInlineDataHandler)
-#         ]
-
-#         handler = CompositeHandler(
-#             handlers=[
-#                 DefaultProcessingHandler(),
-#                 HasArgdownHandler(),
-#                 infreco_handler,
-#                 LogRecoCompositeHandler(),
-#             ]
-#         )
-#         request = VerificationRequest(
-#             inputs=reco.argdown_snippet, source=problem.sources
-#         )
-#         result = handler.process(request)
-#         evaluation = Evaluation.from_verification_request(result)
-#         if evaluation.artifacts.get("argdown_reco") is None:
-#             evaluation.artifacts["argdown_reco"] = evaluation.artifacts.get("argdown")
-#         return evaluation
-
-
-
-#     async def arun(
-#         self,
-#         problem: Problem,
-#         solutions: Sequence[Solution],
-#         original_solution: Solution | None = None,
-#         feedback: Feedback | None = None,
-#     ) -> Sequence[Evaluation]:
-#         assert isinstance(problem, LogRecoProblem), "Problem must be an LogRecoProblem"
-#         assert isinstance(original_solution, LogicalReco) or original_solution is None
-#         assert feedback or original_solution is None, (
-#             "Feedback is required for evaluating revised solutions"
-#         )
-
-#         evaluations = []
-#         for solution in solutions:
-#             assert isinstance(solution, LogicalReco), (
-#                 "All solutions must be LogicalReco objects"
-#             )
-#             evaluations.append(self._evaluate_logreco(problem, solution))
-
-#         return evaluations
-
-
 class LogRecoFeedbackGenerator(FeedbackGenerator):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
