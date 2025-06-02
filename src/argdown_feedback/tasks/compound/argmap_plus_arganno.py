@@ -69,7 +69,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
             dedent("""
             # Assignment: Annotate a source text and reconstruct its argumentation as an informal Argdown argument map.
                         
-            Analyse the argumentation in the following **source text**. Create a coherent argumentative text annotation and a corresponding Argdown argument map.
+            Analyse the argumentation in the following **source text**. Your answer is supposed to contain (1) an argumentative text annotation and, in addition, (2) an Argdown argument map. Both, annotation and Argdown argument map, must cohere with each other.
 
             ::: {{.source_text}}
             {sources}
@@ -93,9 +93,9 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
             - use square/angled brackets for labels to distinguish arguments/claims;
             - indicate support and attack relations between nodes in accordance with Argdown syntax conventions.
 
-            Importantly, enclose your Argdown argument map in a fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
+            Importantly, enclose your Argdown argument map in a separate fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
-            ## Required Coherence of Annotation and Argument Map                                                
+            ## Required Coherence of Annotation and Argument Map
 
             The argument map and the annotated source text must cohere with each other. There should be a one-to-many correspondence between argument map nodes and annotated text segments. Moreover, the support and attack relations in the argument map should reflect the annotated dialectical relations.
                    

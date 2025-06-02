@@ -43,9 +43,9 @@ class ArgmapFromArgannoProblem(ArgMapProblem):
     ) -> str:
         prompt = (
             dedent("""
-            Assignment: Reconstruct a source text's argumentation as a argument map.
+            Assignment: Reconstruct a source text's argumentation as an argument map.
                         
-            Use the following argumentative annotation to reconstruct the text's arguments as an informal Argdown argument map.
+            I will show you an annotated source text. The annotation identifies the argumentative function of different text segments. Your task is to reconstruct the text's arguments as an informal Argdown argument map.
 
             ::: {{.source_text}}
             {sources}

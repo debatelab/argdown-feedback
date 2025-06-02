@@ -61,17 +61,19 @@ class ArgannoFromArgmapProblem(AnnotationProblem):
             dedent("""
             Assignment: Apply a given annotation scheme to a source text.
                         
-            Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
+            I will show you a **source text** and an argument map. Your task is to annotate the **source text** in order to highlight the argumentative function of different parts in the text. The argument map is merely supposed to help you with this task.
 
+            The source text to be annotated is:
+                   
             ::: {{.source_text}}
             {sources}
             :::
 
-            This {qualifier}argument map sketches the source text's argumentative structure:
+            The {qualifier}argument map which sketches the source text's argumentative structure:
 
             {argdown_snippet}
-                                      
-            Annotate the source text above according to the following schema:
+
+            Use the following schema to annotate the source text above:
 
             {annotation_scheme}
 
