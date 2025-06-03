@@ -14,6 +14,16 @@ flowchart LR
     PP -->|empty?| HIR1[HIRP<br/>FailureType] 
 ```
 
+flowchart LR
+    A[Problem<br/>statement] -->|LLM| B@{ shape: docs, label: "Solutions<br/>S<sub>1</sub>....S<sub>k</sub>"}
+    B -->|VR| E@{ shape: docs, label: "Evaluations<br/>E<sub>1</sub>...E<sub>k</sub>"} --> C{Correct?}
+    C -->|None| SC(Self-Critique)
+    C -->|Some or All| H(HIRPO)
+    H --> PP
+    SC --> PP@{ shape: docs, label: "Pref pairs"}
+
+
+
 ### How does Self-Critique work?
 
 ```mermaid
@@ -27,6 +37,28 @@ flowchart LR
     C -.->|ranked by| HIR
     B -.->|ranked by| SCP
 ```
+
+flowchart LR
+    OS[Solution S<sub>i</sub><br/>_–incorrect–_]
+    OE[Evaluation E<sub>i</sub>]
+    A(LLM<br/>Feedback<br/>Prompt)
+    B(LLM<br/>Revision<br/>Prompt)
+    F@{ shape: docs, label: "Feedbacks<br/>F<sub>1</sub>...F<sub>k</sub>"}
+    R@{ shape: docs, label: "Revisions<br/>R<sub>11</sub>...R<sub>1l</sub><br/>...<br/>R<sub>k1</sub>...R<sub>kl</sub>"}
+    ER@{ shape: docs, label: "Evaluations<br/>E<sub>11</sub>...E<sub>1l</sub><br/>...<br/>E<sub>k1</sub>...E<sub>kl</sub>"}
+    FE(Feedback<br/>Effectiveness)
+    HIRPO(HIRPO)
+    PP[Preference<br/>Pairs]
+    OS --> A
+    OE --> A
+    A --> F --> B
+    B -->R -->|VR| ER
+    ER --> FE --> PP
+    ER --> HIRPO --> PP
+    R -.->|ranked by| HIRPO
+    F -.->|ranked by| FE
+
+
 
 ### Symmetric HIRP (illustration of key idea)
 
@@ -47,7 +79,7 @@ flowchart LR
 
 
 ```mermaid
-flowchart LR
+flowchart TB
 
 %%Top comprehensive tasks%%
 
