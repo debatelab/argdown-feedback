@@ -750,10 +750,19 @@ class FailureTypePreferencePairGenerator(HIRAbstractGenerator):
 class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerator):
     """Generate failure-type-preference pairs based on the differences in failure profiles."""
 
-    avoid_errors_hint = (
-        "Very important! No matter whether your solution fully satisfies the above instructions or not, "
-        "make sure to avoid the following mistakes:\n"
-    )
+    avoid_errors_hints = [
+        (
+            "Very important! It is acceptable if you make these kinds of errors: {common_errors}. "
+            "But no matter whether your solution is flawless or not, "
+            "you should definitely avoid the following mistakes:\n"
+        ),
+        (
+            "> [!WARNING]\n"
+            "> For didactic purposes, I want you to make mistakes in your answer.\n"
+            "> Specifically, I expect your answer to contain the following mistakes: {common_errors}.\n"
+            "> However, I want you to AVOID the following errors:\n"
+        )
+    ]
 
     async def arun(
         self,
@@ -784,7 +793,10 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
         error_counts: dict[str, int] = {}
         for key in set([k for m in metrics_batch for k in m.keys()]):
             error_counts[key] = len([1 for metrics in metrics_batch if metrics.get(key)])
-        # dismiss errors that are never avoided, i.e. always present
+        common_errors: list[str] = [
+            k for k, v in error_counts.items() if v == len(evaluations)
+        ]
+        # dismiss errors that are always or never avoided, i.e. always present
         error_counts = {
             k: v for k, v in error_counts.items() if 0 < v < len(evaluations)
         }
@@ -793,7 +805,7 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
             return pairs
 
         # get error type that is most common
-        most_common_type, _ = max(
+        most_frequent_type, _ = max(
             error_counts.items(),
             key=lambda x: x[1],
         )
@@ -803,7 +815,7 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
             [
                 idx
                 for idx, metrics in enumerate(metrics_batch)
-                if not metrics.get(most_common_type)
+                if not metrics.get(most_frequent_type)
             ]
         )
         # rejected solution commits most common error
@@ -811,7 +823,7 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
             [
                 idx
                 for idx, metrics in enumerate(metrics_batch)
-                if metrics.get(most_common_type)
+                if metrics.get(most_frequent_type)
             ]
         )
 
@@ -822,7 +834,11 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
             if v and not metrics_batch[chosen_idx].get(k)
         }
 
-        hint = self.avoid_errors_hint + "\n".join(
+        avoid_errors_hint = random.choice(self.avoid_errors_hints)
+        avoid_errors_hint = avoid_errors_hint.format(
+            common_errors=", ".join(common_errors) if common_errors else "none"
+        )
+        hint = avoid_errors_hint + "\n".join(
             f"- {k}: {v}" for k, v in errors_avoided.items()
         )
 

@@ -286,7 +286,13 @@ class HirpoTester:
         cpps = await ppg.arun(problem, candidate_solutions, evaluations)
         pprint(cpps)
         assert len(cpps) == 1
-        assert ppg.avoid_errors_hint in cpps[0]["chosen"][0]["content"]
-        assert ppg.avoid_errors_hint in cpps[0]["rejected"][0]["content"]
+        assert any(
+            avoid_error_hint[:20] in cpps[0]["chosen"][0]["content"]
+            for avoid_error_hint in ppg.avoid_errors_hints
+        )
+        assert any(
+            avoid_error_hint[:20] in cpps[0]["rejected"][0]["content"]
+            for avoid_error_hint in ppg.avoid_errors_hints
+        )
         assert str(chosen) in cpps[0]["chosen"][-1]["content"]
         assert str(rejected) in cpps[0]["rejected"][-1]["content"]
