@@ -132,7 +132,7 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
             - Re-use the labels of claims in the argument map for the corresponding premises and conclusions (if any) in the argument reconstruction. 
             - In the argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label.
             - In the argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if a corresponding logical relation between them is defined in the argdown snippet (e.g., with "><" or "->" syntax).
-        """)
+            """)
             .strip()
             .format(sources=self.sources)
         )

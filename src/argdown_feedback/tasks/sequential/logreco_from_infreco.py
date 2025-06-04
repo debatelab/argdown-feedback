@@ -81,7 +81,7 @@ class LogrecoFromInfrecoProblem(LogRecoProblem):
 
             - In addition, at the beginning of your Argdown code block, provide a succinct label (title) for the argument and 
               summarize its gist in line with Argdown syntax conventions. 
-        """)
+            """)
             .strip()
             .format(argdown_snippet=self.argdown_snippet)
         )

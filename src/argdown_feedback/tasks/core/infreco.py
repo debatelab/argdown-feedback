@@ -83,8 +83,7 @@ class InfRecoProblem(Problem):
             - Do NOT add any inline dialectical relations in the premise conclusion structure.
             - Do NOT add any yaml inline data besides the required inference information.
             - Do NOT add any formalization of the argument's propositions (premises or conclusions) in your Argdown code.
-
-        """)
+            """)
             .strip()
             .format(sources=self.sources)
         )

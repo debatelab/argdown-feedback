@@ -23,7 +23,6 @@ from argdown_feedback.verifiers.verification_request import (
     VerificationRequest,
 )
 from argdown_feedback.verifiers.processing_handler import (
-    DefaultProcessingHandler,
     FencedCodeBlockExtractor,
     XMLParser,
 )
@@ -75,7 +74,7 @@ class AnnotationProblem(Problem):
             Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
                         
             Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
-        """)
+            """)
             .strip()
             .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
         )

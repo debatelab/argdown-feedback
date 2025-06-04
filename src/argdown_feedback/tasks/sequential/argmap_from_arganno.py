@@ -61,7 +61,7 @@ class ArgmapFromArgannoProblem(ArgMapProblem):
             DO NOT to include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
 
             Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
-        """)
+            """)
             .strip()
             .format(sources=self.annotated_text)
         )

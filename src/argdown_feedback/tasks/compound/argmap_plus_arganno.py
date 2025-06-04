@@ -105,7 +105,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
             - Every node in the Argdown argument map has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> element in the annotation.
             - Two nodes in the argument map support each other if and only if the corresponding <proposition> elements are annotated to support each other (`support` attribute).
             - Two nodes in the argument map attack each other if and only if the corresponding <proposition> elements are annotated to attack each other (`support` attribute).
-        """)
+            """)
             .strip()
             .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
         )
