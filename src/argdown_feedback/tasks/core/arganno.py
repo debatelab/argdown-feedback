@@ -1,6 +1,5 @@
 import dataclasses
 from textwrap import dedent
-from typing import Sequence
 
 from bs4 import BeautifulSoup
 
@@ -12,7 +11,6 @@ from argdown_feedback.tasks.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    Judge,
     FeedbackGenerator,
 )
 
@@ -36,6 +34,223 @@ ANNOTATION_SCHEME = dedent("""
     <!ATTLIST proposition   argument_label  CDATA   #IMPLIED    -- unique label of argument or thesis in external argdown document -->
     <!ATTLIST proposition   ref_reco_label  CDATA   #IMPLIED    -- unique item label of premise or conclusion in external argdown argument -->
 """)
+
+_ANNOTATION_PROMPT_TEMPLATES = [
+    # Default template
+    dedent("""
+        Assignment: Apply a given annotation scheme to a source text.
+                    
+        Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
+
+        ::: {{.source_text}}
+        {sources}
+        :::
+
+        Annotate the source text above according to the following schema:
+
+        {annotation_scheme}
+
+        Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
+
+        Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
+        """).strip(),
+    # elementary school style
+    dedent("""
+        Hello there, my smart AI helper! Today we're going to play a fun detective game with some text!
+
+        Your assignment: Put on your detective hat and look for clues in a piece of text!
+                    
+        Please read this **story** below very carefully:
+
+        ::: {{.source_text}}
+        {sources}
+        :::
+
+        Now, I want you to be a text detective! Using the special tags below, mark the parts of the story that make arguments:
+
+        {annotation_scheme}
+
+        Remember, dear AI: Just add the tags around the words - don't change any of the words in the story! (If the story is super long, you can shorten parts that don't have arguments.)
+
+        When you're done, put your marked-up text between these special markers:
+        ```xml at the beginning
+        ``` at the end
+
+        You're such a clever helper! I know you'll do a wonderful job with this! 🌟
+        """).strip(),
+    dedent("""
+        Hey there, could you help me out with something when you get a minute? I've got this annotation task that needs doing.
+                    
+        So basically, I need you to go through this text document and mark up the argumentative parts:
+
+        ::: {{.source_text}}
+        {sources}
+        :::
+
+        The boss wants us to use this specific annotation scheme - I know it looks complicated but you're good at this stuff:
+
+        {annotation_scheme}
+
+        Just add those tags where needed but don't change any of the actual wording. If there are long sections with no arguments, you can abbreviate those parts.
+
+        When you're done, could you put the whole thing in one of those code blocks? Start with ```xml and end with ```. Makes it easier to process later. -- Don't forget the final ``` at the end! 
+
+        Thanks so much for this - I owe you a coffee!
+        """).strip(),
+    dedent("""
+        Task: Argumentative Structure Annotation (25 points)
+                        
+        Analyze the following passage by identifying its argumentative structure. Apply the appropriate XML annotation tags to demarcate propositions and their logical relationships.
+
+        ::: {{.source_text}}
+        {sources}
+        :::
+
+        Annotation Requirements:
+        • Use the formal annotation scheme as specified in class:
+        
+        {annotation_scheme}
+        
+        • Add XML tags to identify propositions and their argumentative relationships
+        • Clearly indicate support and attack relationships between propositions
+        • Maintain the integrity of the original text (though you may abbreviate non-argumentative passages)
+        • Ensure each proposition has a unique identifier
+        
+        Submission Format:
+        Your annotated text must be enclosed within a code block demarcated by ```xml at the beginning and ``` at the end, i.e.,
+
+        ```xml
+        (your annotated text here)
+        ```
+        
+        Note: Careful attention to the logical relationships between claims will be essential for full credit.
+        """).strip(),
+    dedent("""
+        Good day, AI assistant. I require your analytical capabilities for an annotation task related to my current research.
+        
+        I'm working with a text that needs precise argumentative annotation for an upcoming publication. Could you assist me in applying an annotation scheme to identify argumentative structures?
+
+        Here's the passage I'm analyzing:
+
+        ::: {{.source_text}}
+        {sources}
+        :::
+
+        Please apply the following XML-based annotation scheme that my colleagues and I have developed for our research:
+        
+        {annotation_scheme}
+        
+        For methodological rigor, please adhere to the following protocols:
+        1. Mark all argumentative propositions with appropriate tags
+        2. Preserve the exact wording of the original text
+        3. Identify all support and attack relationships between propositions
+        4. Assign unique identifiers to each proposition
+        5. You may abbreviate non-argumentative passages if necessary
+        
+        Present your analysis in a machine-readable format by enclosing the annotated text in a code block with ```xml at the beginning and ``` at the end.
+
+        Thank you for your assistance with this scholarly endeavor. This will significantly advance my research timeline.
+        """).strip(),
+    dedent("""
+        Hey AI, I need to process this text for an argument analysis tool I'm building.
+        
+        // Task: Parse text and identify argument structures using the XML schema below
+        
+        /**
+        * @input - Raw text document containing argumentative content (SOURCE TEXT)
+        * @output - XML-annotated version with proposition tags and relationships
+        */
+        
+        Implementation Notes:
+        - Mark all propositions with appropriate tags
+        - Each proposition needs a unique ID attribute
+        - Link related propositions using supports/attacks attributes
+        - Maintain the original text content (do not modify wording)
+        - Non-argumentative sections can be abbreviated with [...] notation
+        
+        SOURCE TEXT:
+        ::: {{.source_text}}
+        {sources}
+        :::
+        
+        /* Schema definition - implement this exactly */
+        {annotation_scheme}
+        
+        // Return annotated text as valid XML within code block
+        // Format: ```xml at start, ``` at end
+        
+        This is for a critical module in my project - thanks for the help!
+        """).strip(),        
+    dedent("""
+        Please help me in understanding the following TEXT:
+
+        TEXT:
+        :::
+        {sources}
+        :::
+
+        I fail to see how the argumentation is structured in the TEXT:
+           
+        - Which propositions have an argumentative function?
+        - How are they related to each other?
+
+        I came across the following scheme (XML annotation scheme):
+
+        {annotation_scheme}
+
+        ... and these implementation notes:
+        - Mark all propositions with appropriate tags
+        - Each proposition needs a unique ID attribute
+        - Link related propositions using supports/attacks attributes
+        - Maintain the original text content (do not modify wording)
+        - Non-argumentative sections can be abbreviated with [...] notation
+        - Embed the annotated text within a code block (```xml at start, ``` at end)
+
+        Please provide the annotated text in the specified format.
+        """).strip(),
+    dedent("""
+        CODEBOOK: ARGUMENTATIVE STRUCTURE ANNOTATION PROTOCOL
+        Version 1.2
+        
+        SECTION 1: OVERVIEW AND PURPOSE
+        This protocol guides the systematic identification and annotation of argumentative structures within texts. The annotation process involves marking propositions and their logical relationships using a standardized XML tagging scheme.
+        
+        SECTION 2: SOURCE MATERIAL
+        Please annotate the following text according to the protocol described below:
+        
+        ::: {{.source_text}}
+        {sources}
+        :::
+        
+        SECTION 3: ANNOTATION SCHEMA
+        Apply the following formal annotation scheme to identify argumentative elements:
+        
+        {annotation_scheme}
+        
+        SECTION 4: CODING PROCEDURES
+        4.1 Identification Phase
+        - Identify all propositions that serve an argumentative function
+        - Assign unique identifier attributes to each proposition
+        - Preserve exact wording of the original text
+        
+        4.2 Relationship Coding
+        - For each proposition, determine if it supports or attacks other propositions
+        - Record support relationships using the "supports" attribute (space-separated IDs)
+        - Record attack relationships using the "attacks" attribute (space-separated IDs)
+        
+        4.3 Technical Guidelines
+        - Non-argumentative segments may be abbreviated with [...] notation
+        - Do not modify any text within identified propositions
+        - Ensure all XML tags are properly nested and closed
+        
+        SECTION 5: SUBMISSION FORMAT
+        Submit the completed annotation as a single XML document enclosed in a code block:
+        - Begin with ```xml
+        - End with ```
+        
+        NOTE: Intercoder reliability assessment will be conducted using automated verification tools.
+        """).strip(),
+]
 
 
 class AnnotationProblem(Problem):
@@ -353,7 +568,7 @@ class AnnotationScopePreferencePairGenerator(ScoringVirtuePreferencePairGenerato
     hints = ["Try to identify as many proposition elements as possible"]
 
     def _score(
-        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+        self, problem: Problem, solution: Solution, evaluation: Evaluation
     ) -> float:
         return len(evaluation.artifacts["soup"].find_all("proposition"))
 
@@ -365,7 +580,7 @@ class AnnotationSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGener
     hints = ["Try to identify as many support relations as possible"]
 
     def _score(
-        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+        self, problem: Problem, solution: Solution, evaluation: Evaluation
     ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         supports = sum(
@@ -381,7 +596,7 @@ class AnnotationAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenera
     hints = ["Try to identify as many attack / disconfirmation relations as possible"]
 
     def _score(
-        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+        self, problem: Problem, solution: Solution, evaluation: Evaluation
     ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         attacks = sum(
@@ -397,7 +612,7 @@ class AnnotationNoAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGene
     hints = ["Avoid using attack / disconfirmation relations"]
 
     def _score(
-        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+        self, problem: Problem, solution: Solution, evaluation: Evaluation
     ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         attacks = sum(
@@ -413,7 +628,7 @@ class AnnotationCoveragePreferencePairGenerator(ScoringVirtuePreferencePairGener
     hints = ["Try to cover as much of the source text as possible"]
 
     def _score(
-        self, problem: Problem, annotation: Solution, evaluation: Evaluation
+        self, problem: Problem, solution: Solution, evaluation: Evaluation
     ) -> float:
         propositions = evaluation.artifacts["soup"].find_all("proposition")
         coverage = sum(len(proposition.get_text()) for proposition in propositions)

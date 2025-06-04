@@ -28,13 +28,251 @@ from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandle
 from argdown_feedback.verifiers.core.content_check_handler import HasArgdownHandler
 from argdown_feedback.verifiers.processing_handler import (
     ArgdownParser,
-    DefaultProcessingHandler,
     FencedCodeBlockExtractor,
 )
 from argdown_feedback.verifiers.verification_request import (
     VerificationDType,
     VerificationRequest,
 )
+
+
+
+_ARGMAP_PROMPT_TEMPLATES = [
+    # Default template
+    dedent("""
+    Assignment: Reconstruct a source text's argumentation as an Argdown argument map.
+                
+    Analyse the argumentation in the following source text by creating an Argdown argument map.
+
+    ::: {{.source_text}}
+    {sources}
+    :::
+
+    In particular, I ask you to
+
+    - explicitly label all nodes in the argument map;
+    - use square/angled brackets for labels to distinguish arguments/claims;
+    - indicate support and attack relations between nodes in accordance with Argdown syntax conventions;
+    
+    DO NOT include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
+
+    Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
+    """).strip(),
+    # Elementary school style
+    dedent("""
+    Hello there! Today we're going to be argument detectives! 🕵️‍♀️🕵️‍♂️
+                
+    I want you to read this story carefully and find all the arguments hidden inside:
+
+    ::: {{.source_text}}
+    {sources}
+    :::
+
+    Now, let's make an argument map using Argdown! Here's how:
+
+    1. Find all the main ideas (we'll call them "claims")
+    2. Find all the reasons people give (we'll call them "arguments")
+    3. Draw lines to show which arguments support or attack which claims
+
+    Remember these special rules:
+    - Give every idea a clear label
+    - Put square brackets [ ] around claim labels
+    - Put angled brackets < > around argument labels
+    - Use arrows (+ and -) to show which ideas support or attack other ideas
+    
+    Please don't write out all the details of each argument - just the key points and main connections!
+
+    When you're finished, put your argument map inside a special box:
+    ```argdown
+    (your map goes here)
+    ```
+
+    I can't wait to see what you discover! 🌟
+    """).strip(),
+    # Casual/friendly style
+    dedent("""
+    Hey there! Mind helping me map out the arguments in this text?
+                
+    I'm trying to understand the reasoning structure in this passage:
+
+    ::: {{.source_text}}
+    {sources}
+    :::
+
+    Could you create an Argdown argument map that shows how everything connects? Nothing too fancy - just:
+
+    - Label each argument and claim clearly
+    - Use square brackets [like this] for claims and angled brackets <like this> for arguments
+    - Show which arguments support or attack which claims using Argdown's syntax
+    
+    Just focus on the big picture connections between arguments - no need to break down each argument into premises and conclusions.
+
+    When you're done, just drop your map in a code block starting with ```argdown and ending with ```.
+
+    Thanks a ton for your help with this!
+    """).strip(),
+    # Academic style
+    dedent("""
+    Argumentative Structure Analysis Assignment
+                
+    INSTRUCTIONS: Conduct a thorough analysis of the argumentative structure present in the following text by constructing an Argdown argument map that accurately represents the dialectical relationships between claims and arguments.
+
+    SOURCE TEXT:
+    ::: {{.source_text}}
+    {sources}
+    :::
+
+    REQUIREMENTS:
+    1. Identify and explicitly label all argumentative nodes (both claims and arguments)
+    2. Employ proper syntactic conventions:
+       a. Utilize square brackets for claim labels
+       b. Utilize angled brackets for argument labels
+    3. Accurately represent the dialectical relations (support/attack) between nodes
+    4. Adhere to Argdown syntactic conventions for representing these relations
+    
+    CONSTRAINTS:
+    Do not include detailed argument reconstructions as premise-conclusion structures.
+
+    SUBMISSION FORMAT:
+    Present your argument map within a fenced code block demarcated by triple backticks and the argdown language identifier (```argdown) at the beginning and triple backticks (```) at the conclusion.
+
+    NOTE: Your grade will be determined by the accuracy and comprehensiveness of your argumentative reconstruction.
+    """).strip(),
+    # Research-oriented style
+    dedent("""
+    Research Task: Argument Mapping for Dialectical Analysis
+                
+    OBJECTIVE: To produce a formal representation of the argumentative structure embedded in the provided source text using Argdown notation.
+
+    SOURCE MATERIAL:
+    ::: {{.source_text}}
+    {sources}
+    :::
+
+    METHODOLOGY:
+    1. Conduct a thorough argumentation analysis of the provided text
+    2. Identify all relevant claims and arguments constituting the dialectical structure
+    3. Represent this structure as an Argdown argument map
+
+    TECHNICAL SPECIFICATIONS:
+    - All nodes must be explicitly labeled for clarity and reference
+    - Distinguish between claims and arguments using syntactic conventions:
+      * Claims: [square bracket notation]
+      * Arguments: <angled bracket notation>
+    - Document all inferential and dialectical relationships between nodes using standard Argdown conventions
+    - Focus on macro-level argumentation relations rather than micro-level argument structure
+    - Avoid detailed premise-conclusion breakdowns within arguments
+    
+    OUTPUT FORMAT:
+    The resulting argument map must be enclosed within a fenced code block using appropriate markup (```argdown to begin, ``` to end).
+
+    NOTE: This analysis will inform subsequent computational processing for automated reasoning assessment.
+    """).strip(),
+    # Developer-focused style
+    dedent("""
+    # Argdown Argument Map Generation
+    
+    ## Input
+    Process the following text for argumentative content:
+    
+    ```
+    {sources}
+    ```
+    
+    ## Requirements
+    
+    Generate an argument map in Argdown syntax that meets the following specifications:
+    
+    * Extract all claims and arguments from source
+    * Label format:
+      - Claims: [square_brackets]
+      - Arguments: <angled_brackets>
+    * Document all support/attack relationships
+    * Focus on graph structure, not internal argument composition
+    
+    ## Expected Output
+    
+    Return a valid Argdown map enclosed in a code block:
+    
+    ```argdown
+    // Your argument map here
+    ```
+    
+    ## Notes
+    
+    * Do not include premise-conclusion structures within arguments
+    * Ensure consistent labeling across all nodes
+    * Follow standard Argdown syntax conventions for directional relationships
+    """).strip(),
+    # Step-by-step guidance style
+    dedent("""
+    # Argument Mapping Exercise
+    
+    Let's create an Argdown argument map from this text:
+    
+    ::: {{.source_text}}
+    {sources}
+    :::
+    
+    ## Step 1: Identify Key Claims
+    First, identify all key claims in the text. These are the main points being argued for or against.
+    
+    ## Step 2: Identify Arguments
+    Next, identify the arguments that are being made to support or attack these claims.
+    
+    ## Step 3: Create Labels
+    For each claim and argument, create a descriptive label:
+    - Use [square brackets] for claim labels
+    - Use <angled brackets> for argument labels
+    
+    ## Step 4: Map Relationships
+    Show how arguments and claims relate to each other:
+    - Use `+>`/`<+` to show support relationships
+    - Use `->`/`<-` to show attack relationships
+
+    ## Step 5: Format Your Map
+    Put your completed map in a code block:
+    ```argdown
+    // Your argument map goes here
+    ```
+    
+    Remember: Focus on the relationships between arguments and claims - don't break down any argument into premises and conclusions.
+    """).strip(),
+    # Visualization-focused style
+    dedent("""
+    VISUALIZATION REQUEST: Argument Network Structure
+                
+    Please generate a textual representation of the argument network contained within the following source material:
+
+    ::: {{.source_text}}
+    {sources}
+    :::
+
+    REPRESENTATION FORMAT: Argdown Notation
+
+    The visualization should fulfill these criteria:
+
+    1. NODE IDENTIFICATION
+       • Extract all argumentative nodes (claims and arguments)
+       • Apply descriptive labels to each node
+       • Format: [square_brackets] for claims, <angled_brackets> for arguments
+
+    2. EDGE REPRESENTATION
+       • Map support relationships between nodes
+       • Map attack relationships between nodes
+       • Adhere to Argdown directional syntax conventions
+
+    3. STRUCTURAL FOCUS
+       • Prioritize inter-argument relationships
+       • Omit internal argument structures (premise-conclusion details)
+
+    4. OUTPUT FORMAT
+       • Enclose in fenced code block (```argdown ... ```)
+       • Ensure valid Argdown syntax for processing
+
+    This representation will serve as input to a visual argument mapping tool.
+    """).strip(),
+]
 
 
 class ArgMapProblem(Problem):
@@ -263,7 +501,7 @@ class ConnectednessPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown = evaluation.artifacts.get("argdown_map")
@@ -284,7 +522,7 @@ class MaxArgsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown = evaluation.artifacts.get("argdown_map")
@@ -304,11 +542,11 @@ class BalancePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         drs: list[ArgdownEdge] = argdown.dialectical_relations
@@ -328,7 +566,7 @@ class MaxSupportsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
@@ -345,7 +583,7 @@ class MaxAttacksPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
@@ -362,11 +600,11 @@ class MaxDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         if argdown.number_of_nodes() == 0:
@@ -392,11 +630,11 @@ class MinDiameterPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         if argdown.number_of_nodes() == 0:
@@ -422,11 +660,11 @@ class DensityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
@@ -447,11 +685,11 @@ class MaxInDegreePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
@@ -470,11 +708,11 @@ class MaxOutDegreePreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
@@ -493,11 +731,11 @@ class MinLeafsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         H = nx.DiGraph(argdown)
@@ -516,11 +754,11 @@ class ShortLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
@@ -542,11 +780,11 @@ class DiverseLabelsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator)
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
@@ -575,11 +813,11 @@ class ShortClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         claims: list[Proposition] = argdown.propositions
@@ -598,11 +836,11 @@ class LongClaimsPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         claims: list[Proposition] = argdown.propositions
@@ -621,11 +859,11 @@ class ArgumentClaimSizePreferencePairGenerator(ScoringVirtuePreferencePairGenera
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
@@ -656,11 +894,11 @@ class IndependentWordingPreferencePairGenerator(ScoringVirtuePreferencePairGener
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
 
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         arguments: list[Argument] = argdown.arguments
@@ -696,14 +934,14 @@ class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     def _score(
         self,
         problem: Problem,
-        argmap: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert isinstance(problem, ArgMapProblem), "Problem must be an ArgMapProblem"
-        assert isinstance(argmap, ArgumentMap), "Solution must be an ArgumentMap"
+        assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
         return round(
             textdistance.damerau_levenshtein.normalized_similarity(
-                problem.sources, argmap.argdown_snippet
+                problem.sources, solution.argdown_snippet
             ),
             1,
         )
