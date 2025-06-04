@@ -15,7 +15,6 @@ from argdown_feedback.tasks.base import (
     Evaluation,
     Feedback,
     ProblemGenerator,
-    Judge,
     ScoringVirtuePreferencePairGenerator,
 )
 from argdown_feedback.tasks.core.arganno import (
@@ -67,9 +66,13 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
     ) -> str:
         prompt = (
             dedent("""
-            # Assignment: Annotate a source text and reconstruct its argumentation as an informal Argdown argument map.
+            # Assignment: Annotate a source text and reconstruct its argumentation as an Argdown argument map.
                         
-            Analyse the argumentation in the following **source text**. Your answer is supposed to contain (1) an argumentative text annotation and, in addition, (2) an Argdown argument map. Both, annotation and Argdown argument map, must cohere with each other.
+            Analyse the argumentation in the following **source text**. Your answer is supposed to contain 
+            1. an argumentative text annotation and, in addition,
+            2. a separate Argdown argument map.
+                   
+            Both, annotation and Argdown argument map, must cohere with each other.
 
             ::: {{.source_text}}
             {sources}
@@ -87,7 +90,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
                    
             ## Argument Mapping Task Details                   
 
-            Create a syntactically correct informal Argdown argument map that reconstructs the overall argumentation in the text. In particular, you should
+            Create a syntactically correct Argdown argument map that represents the overall argumentation in the text. In particular, you should
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
@@ -105,6 +108,21 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
             - Every node in the Argdown argument map has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> element in the annotation.
             - Two nodes in the argument map support each other if and only if the corresponding <proposition> elements are annotated to support each other (`support` attribute).
             - Two nodes in the argument map attack each other if and only if the corresponding <proposition> elements are annotated to attack each other (`support` attribute).
+                   
+            ## Output Format
+                   
+            Your answer must contain at least two fenced codeblocks: one for the annotated source text and one for the Argdown argument map. For example:
+                   
+            ```xml
+            // Annotated source text here
+            ``` 
+                   
+            ```argdown
+            // Argdown argument map here
+            ```
+                   
+            Don't forget the three closing backticks for the fenced codeblocks!
+
             """)
             .strip()
             .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
@@ -264,7 +282,7 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     def _score(
         self,
         problem: Problem,
-        reco: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         soup = evaluation.artifacts.get("soup")
