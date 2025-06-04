@@ -315,7 +315,7 @@ class SimplicityPreferencePairGenerator(ScoringVirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        reco: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         assert "argdown_reco" in evaluation.artifacts, (
@@ -350,7 +350,7 @@ class ConnectednessPreferencePairGeneratorCT(ConnectednessPreferencePairGenerato
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
             problem=problem,
-            argmap=solution.partial_argmap(),
+            solution=solution.partial_argmap(),  # type: ignore
             evaluation=Evaluation(
                 is_valid=True, artifacts={"argdown_map": argdown}, metrics={}
             ),
@@ -375,7 +375,7 @@ class MaxArgsPreferencePairGeneratorCT(MaxArgsPreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
             problem=problem,
-            argmap=solution.partial_argmap(),
+            solution=solution.partial_argmap(),  # type: ignore
             evaluation=Evaluation(
                 is_valid=True, artifacts={"argdown_map": argdown}, metrics={}
             ),
@@ -400,7 +400,7 @@ class MaxSupportsPreferencePairGeneratorCT(MaxSupportsPreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
             problem=problem,
-            argmap=solution.partial_argmap(),
+            solution=solution.partial_argmap(),  # type: ignore
             evaluation=Evaluation(
                 is_valid=True, artifacts={"argdown_map": argdown}, metrics={}
             ),
@@ -425,7 +425,7 @@ class MaxAttacksPreferencePairGeneratorCT(MaxAttacksPreferencePairGenerator):
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
             problem=problem,
-            argmap=solution.partial_argmap(),
+            solution=solution.partial_argmap(),  # type: ignore
             evaluation=Evaluation(
                 is_valid=True, artifacts={"argdown_map": argdown}, metrics={}
             ),
@@ -452,7 +452,7 @@ class SourceTextProximityPreferencePairGeneratorCT(
         argdown: ArgdownMultiDiGraph = evaluation.artifacts["argdown_map"]
         return super()._score(
             problem=problem,
-            argmap=solution.partial_argmap(),
+            solution=solution.partial_argmap(),  # type: ignore
             evaluation=Evaluation(
                 is_valid=True, artifacts={"argdown_map": argdown}, metrics={}
             ),
