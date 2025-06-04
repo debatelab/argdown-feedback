@@ -670,7 +670,7 @@ class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
     def _score(
         self,
         problem: Problem,
-        reco: Solution,
+        solution: Solution,
         evaluation: Evaluation,
     ) -> float:
         pass
