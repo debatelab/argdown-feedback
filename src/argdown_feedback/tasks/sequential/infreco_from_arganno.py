@@ -45,7 +45,7 @@ class InfRecoFromArgAnnoProblem(InfRecoProblem):
             dedent("""
             Assignment: Reconstruct a source text's main argument in standard form.
                         
-            Use the argumentative annotation to identify the main argument in the following source text and reconstruct it as premise-conclusion structure using Argdown.
+            Use the argumentative annotation to identify the main argument in the following source text, and reconstruct the argument in Argdown standard form (as premise-conclusion-structure).
 
             ::: {{.source_text}}
             {sources}
