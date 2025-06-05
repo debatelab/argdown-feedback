@@ -5,7 +5,6 @@ from textwrap import dedent
 from bs4 import BeautifulSoup
 
 from argdown_feedback.tasks.base import (
-    Judge,
     MPJudge,
     Problem,
     Solution,
@@ -78,14 +77,24 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
         prompt = (
             dedent("""
             # Assignment: Annotate a source text and logically reconstruct its main argument in standard form using Argdown syntax.
-                        
-            Analyse the argumentation in the following **source text**. Create a coherent argumentative text annotation and a corresponding logical argument reconstruction in standard form (premise-conclusion structure).
+            
+            Analyse the argumentation in the given **source text**. Your submission is supposed to contain two artifacts:
+            1. an argumentative text annotation and
+            2. an Argdown snippet with logical reconstructions of the argumentation in standard form (as deductively valid inferences).
+
+            In the following, you find
+            * the source text to analyse,
+            * detailed instructions for how to annotate the source text (first artifact),
+            * detailed instructions for how to logically reconstruct and formalize the main argumentation (second artifact),
+            * a description of how both artifacts are supposed to cohere with each other,
+            * formatting instructions for your answer.
+            
+            ## Source Text
 
             ::: {{.source_text}}
             {sources}
             :::
 
-                   
             ## Annotation Task Details                   
                    
             Annotate the source text above according to the following schema:
@@ -96,35 +105,38 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
                         
             Enclose the annotated text in a fenced codeblock, starting with '```xml' and ending with '```'. If you provide multiple xml-codeblocks (e.g., improved versions or revisions), we will use and evaluate the last one only.
                    
+            ## Formal Argument Reconstruction Task Details                   
 
-            ## Argument Reconstruction Task Details                   
+            Logically analyse and formally reconstruct the text's main argumentation as deductively valid argument(s) with Argdown.
 
-            Logically analyse and reconstruct the text's main argumentation as deductively valid inference with Argdown.
-
-            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
-              syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.
-              Only declare variables that are used in the corresponding formalization and that have not been declared before.
-              Ensure that your formalizations are consistent with each other.
-
-            - For each inference step in the argument, provide information about which previously introduced premises or 
-              conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
-              where the list items refer to the respective premise or conclusion labels.
-            
+            - Reconstruct *at least one argument* in standard form (including premises, final conclusion, and possible intermediate conclusions).                   
+            - For each proposition in your reconstruction (premises and conclusions), provide an adequate propositional logic / FOL formalization in NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Only declare variables that are used in the corresponding formalization and that have not been declared before. Ensure that your formalizations are consistent with each other.
+            - For each inference step in the argument(s), provide information about which previously introduced premises or conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.            
             - Provide a succinct label (title) for each argument and summarize its gist in line with Argdown syntax conventions. 
                   
             Importantly, enclose your Argdown snippet in a fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
                    
-            ## Required Coherence of Annotation and Argument Reconstruction                                                
+            ## Required Coherence of Annotation and Formal Argument Reconstruction                                                
 
-            The argument reconstruction and the annotated source text must cohere with each other. There should be one-to-many correspondence between premises/conclusion(s) and annotated text segments. Moreover, the inferential relations in the reconstructed argument should reflect the annotated support relations.
+            The argument reconstruction, on the one hand, and the annotated source text, on the other hand, must cohere with each other. There should be one-to-many correspondence between premises/conclusion(s) and annotated text segments. Moreover, the inferential relations in the reconstructed argument(s) should reflect the annotated support relations.
                    
             In particular, you should ensure that: 
 
             - Every <proposition> element in the annotation has an `argument_label` attribute, which refers to a label of an argument in the Argdown snippet.
             - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding argument. 
-            - Every premise and conclusion in the Argdown argument has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> elements in the annotation.
-            - If, in the annotation, one <proposition> element supports another one (via its `support` attribute), then, in the Argdown argument, the proposition corresponding to the former element is used to infer the conclusion corresponding to the latter element.                   
+            - Every premise and conclusion in an Argdown argument has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> elements in the annotation.
+            - If, in the annotation, one <proposition> element supports another one (via its `support` attribute), then, in the Argdown argument, the proposition corresponding to the former element is used to infer the conclusion corresponding to the latter element.
+
+            Please encapsulate both artifacts in separate fenced codeblocks, for example:
+                   
+            ```xml
+            <!-- Annotated source text -->
+            ```
+                   
+            ```argdown
+            // Argdown snippet with logical reconstructions
+            ```
             """)
             .strip()
             .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)

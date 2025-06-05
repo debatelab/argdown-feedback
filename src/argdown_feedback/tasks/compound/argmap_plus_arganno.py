@@ -1,3 +1,4 @@
+import random
 from typing import Sequence
 
 import dataclasses
@@ -630,6 +631,8 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
         # remove leading and trailing whitespace
         sources = sources.strip()
         self.sources = sources
+        # randomly choose a prompt template
+        self._prompt_template = random.choice(_ARGMAP_PLUS_ARGANNO_PROMPT_TEMPLATES)
 
     def instruct_prompt(
         self,
@@ -637,76 +640,7 @@ class ArgmapPlusArgannoProblem(ArgMapProblem, AnnotationProblem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = (
-            dedent("""
-            # Assignment: Annotate a source text, and reconstruct its argumentation as an Argdown argument map.
-                        
-            Analyse the argumentation in a given **source text**. Your answer is supposed to contain two artifacts:
-            1. an argumentative text annotation and
-            2. an Argdown argument map.
-                   
-            In the following, you find
-            * the source text to analyse,
-            * detailed instructions for how to annotate the source text (first artifact),
-            * detailed instructions for how to create the Argdown argument map (second artifact),
-            * a description of how both artifacts are supposed to cohere with each other,
-            * formatting instructions for your answer.
-
-            ## Source Text
-
-            ::: {{.source_text}}
-            {sources}
-            :::
-
-            ## Annotation Task Details                   
-                   
-            Annotate the source text above according to the following schema:
-
-            {annotation_scheme}
-
-            Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
-                        
-            Enclose the annotated text in a fenced codeblock, starting with '```xml' and ending with '```'. If you provide multiple xml-codeblocks (e.g., improved versions or revisions), we will use and evaluate the last one only.
-                   
-            ## Argument Mapping Task Details                   
-
-            Create a syntactically correct Argdown argument map that represents the overall argumentation in the text. In particular, you should
-
-            - explicitly label all nodes in the argument map;
-            - use square/angled brackets for labels to distinguish arguments/claims;
-            - indicate support and attack relations between nodes in accordance with Argdown syntax conventions.
-
-            Importantly, enclose your Argdown argument map in a separate fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
-
-            ## Required Coherence of Annotation and Argument Map
-
-            The argument map and the annotated source text must cohere with each other. Every argument map node must correspond to an annotated text segment. Moreover, the support and attack relations in the argument map should reflect the annotated dialectical relations.
-                   
-            In particular, you should ensure that: 
-
-            - Every <proposition> element in the annotation has an `argument_label` attribute that refers to a node (label of claim or argument) in the argument map.
-            - Every node in the Argdown argument map has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> element in the annotation.
-            - Two nodes in the argument map support each other if and only if the corresponding <proposition> elements are annotated to support each other (`support` attribute).
-            - Two nodes in the argument map attack each other if and only if the corresponding <proposition> elements are annotated to attack each other (`support` attribute).
-                   
-            ## Output Format
-                   
-            Your answer must contain at least two fenced codeblocks: one for the annotated source text and one for the Argdown argument map. For example:
-                   
-            ```xml
-            // Annotated source text here
-            ``` 
-                   
-            ```argdown
-            // Argdown argument map here
-            ```
-                   
-            Don't forget the three closing backticks for the fenced codeblocks!
-
-            """)
-            .strip()
-            .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
-        )
+        prompt = self._prompt_template.format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
 
         if hints:
             prompt += "\n\n## Hints: " + " - ".join(hints)

@@ -5,7 +5,6 @@ from textwrap import dedent
 from bs4 import BeautifulSoup
 
 from argdown_feedback.tasks.base import (
-    Judge,
     MPJudge,
     Problem,
     Solution,
@@ -88,15 +87,27 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
         prompt = (
             dedent("""
             # Assignment: Annotate a source text, present its argumentation as an informal Argdown argument map, and logically reconstruct its arguments in standard form using Argdown syntax.
-                        
-            Analyse the argumentation in the following **source text**. Create three coherent code artifacts: an argumentative text annotation, an informal argument map, and logical reconstructions of all the arguments in standard form (as deductively valid inferences).
 
+            Analyse the argumentation in a given **source text**. Your answer is supposed to contain three artifacts:
+            1. an argumentative text annotation,
+            2. an Argdown argument map, and
+            3. logical reconstructions of all the arguments in standard form (as deductively valid inferences).
+
+            In the following, you find
+            * the source text to analyse,
+            * detailed instructions for how to annotate the source text (first artifact),
+            * detailed instructions for how to create the Argdown argument map (second artifact),
+            * detailed instructions for how to logically reconstruct and formalize the arguments in standard form (third artifact),
+            * a description of how the three artifacts are supposed to cohere with each other,
+            * formatting instructions for your answer.
+            
+            ## Source Text
+                   
             ::: {{.source_text}}
             {sources}
             :::
 
-                   
-            ## Annotation Task Details                   
+            ## Annotation Task Details
                    
             Annotate the source text above according to the following schema:
 
@@ -105,11 +116,10 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
             Add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
                         
             Enclose the annotated text in a fenced codeblock, starting with '```xml {{filename="annotation.txt"}}' and ending with '```'. If you provide multiple xml-codeblocks (e.g., improved versions or revisions), we will use and evaluate the last one only.
-
                                       
-            ## Argument Mapping Task Details                   
+            ## Argument Mapping Task Details
                    
-            Create a syntactically correct informal Argdown argument map that reconstructs the argumentation in the text. In particular, you should
+            Create a syntactically correct Argdown argument map that captures the argumentation in the text. In particular, you should
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
@@ -117,32 +127,22 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
 
             Importantly, enclose your Argdown argument map in a fenced codeblock, starting with '```argdown {{filename="map.ad"}}' and ending with '```'. If you provide multiple argdown map codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
+            ## Logical Argument Reconstruction Task Details                   
 
-            ## Argument Reconstruction Task Details                   
+            Logically analyse and formally reconstruct the text's arguments with Argdown, ensuring the inferences are deductively valid.
 
-            Logically analyse and reconstruct the text's arguments with Argdown, ensuring the inferences are deductively valid.
-
-            - Reconstruct *at least two arguments* in standard form (including premises, final 
-              conclusion, and possible intermediate conclusions).
-                   
-            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in
-              NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.
-              Only declare variables that are used in the corresponding formalization and that have not been declared in the 
-              corresponding argument before. Ensure that your formalizations are consistent across different arguments.
-
-            - For each inference step in the argument, provide information about which previously introduced premises or 
-              conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
-              where the list items refer to the respective premise or conclusion labels.
+            - Reconstruct *at least two arguments* in standard form (including premises, final conclusion, and possible intermediate conclusions).                   
+            - For each proposition in your reconstruction (premises and conclusions), provide an adequate propositional logic / FOL formalization in NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Only declare variables that are used in the corresponding formalization and that have not been declared in the corresponding argument before. Ensure that your formalizations are consistent across different arguments.
+            - For each inference step in the argument, provide information about which previously introduced premises or conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.
                   
             Importantly, enclose your Argdown reconstructions in a fenced codeblock, starting with '```argdown {{filename="reconstructions.ad"}}' and ending with '```'. If you provide multiple argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
-                   
-            ## Required Coherence of Annotation, Argument Map, and Argument Reconstructions                                            
+            ## Required Coherence of Annotation, Argument Map, and Argument Reconstructions
 
             The annotation, the argument map and your argument reconstructions must neatly correspond to each other. Meaning that:
 
-            The argument reconstruction and the annotated source text must cohere with each other.    Moreover, the inferential relations in the reconstructed argument should reflect the annotated support relations.
-                   
+            The argument reconstructions and the annotated source text must cohere with each other. Moreover, the inferential relations in the logically reconstructed arguments must reflect the annotated support relations. That is:
+            
             1. Every argument in the argument map is reconstructed in standard form.
             2. Every reconstructed argument is present in the argument map.
             3. Every annotated text segment corresponds to a premise or conclusion in a reconstructed argument.
@@ -152,16 +152,32 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
             7. Whenever a claim A, in the _argdown reconstructions_, is declared to support, attack, or contradict another claim B, then the formalizations of A and B must logically ground this relation.
             8. Whenever a text segment A in the _annotation_ supports another text segment B, then, in the _argdown reconstructions_, B's corresponding proposition is inferred from the proposition corresponding to A, or A refers to an argument that supports the argument referenced by B.
             9. Whenever a text segment A in the _annotation_ attacks another text segment B, then, in the _argdown reconstructions_, A's corresponding argument attacks the argument referenced by B.
-                                      
-            Here are the specific notation instructions which help you to ensure that annotation, argument map and argument reconstructions fully cohere with each other in the above sense: 
+            
+            Here are the specific notation instructions which help you to ensure that annotation (first artifact), argument map (second artifact) and argument reconstructions (third artifact) fully cohere with each other in the above sense: 
 
             - Every <proposition> element in the annotation has an `argument_label` attribute, which refers to a label of an argument in the Argdown snippets.
-            - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding argument reconstruction. 
+            - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding logically reconstructed argument.
             - Every premise and conclusion in the Argdown argument reconstructions has yaml inline data with an `annotation_ids` attribute that contains a (possibly empty) list of `id` attributes of the corresponding <proposition> elements in the annotation.
             - The argument labels in the argument map match (1-to-1) the argument labels in the argument reconstruction.
             - Re-use the labels of claims in the argument map for the corresponding premises and conclusions (if any) in the argument reconstruction. 
             - In the argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label.
             - In the argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if a corresponding logical relation between them is defined in the argdown snippet (e.g., with "><" or "->" syntax).
+            
+            ## Formatting Recommendations
+            
+            To ensure that your submission is complete, it is recommended to format your answer as follows:
+            
+            ```xml {{filename="annotation.txt"}}
+            <!-- annotated source text -->
+            ```
+            
+            ```argdown {{filename="map.ad"}}
+            // argument map
+            ```
+            
+            ```argdown {{filename="reconstructions.ad"}}
+            // formal argument reconstructions
+            ```                   
             """)
             .strip()
             .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)

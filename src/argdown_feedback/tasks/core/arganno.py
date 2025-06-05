@@ -1,4 +1,5 @@
 import dataclasses
+import random
 from textwrap import dedent
 
 from bs4 import BeautifulSoup
@@ -265,6 +266,8 @@ class AnnotationProblem(Problem):
         # remove leading and trailing whitespace
         sources = sources.strip()
         self.sources = sources
+        # randomly choose a prompt template
+        self._prompt_template = random.choice(_ANNOTATION_PROMPT_TEMPLATES)
 
     def instruct_prompt(
         self,
@@ -272,26 +275,8 @@ class AnnotationProblem(Problem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = (
-            dedent("""
-            Assignment: Apply a given annotation scheme to a source text.
-                        
-            Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
-
-            ::: {{.source_text}}
-            {sources}
-            :::
-
-            Annotate the source text above according to the following schema:
-
-            {annotation_scheme}
-
-            Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
-                        
-            Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
-            """)
-            .strip()
-            .format(sources=self.sources, annotation_scheme=ANNOTATION_SCHEME)
+        prompt = self._prompt_template.format(
+            sources=self.sources, annotation_scheme=ANNOTATION_SCHEME
         )
 
         if hints:

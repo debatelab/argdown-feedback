@@ -1,3 +1,4 @@
+import random
 from typing import Sequence
 
 import dataclasses
@@ -284,6 +285,9 @@ class ArgMapProblem(Problem):
         # remove leading and trailing whitespace
         sources = sources.strip()
         self.sources = sources
+        # randomly choose a prompt template
+        self._prompt_template = random.choice(_ARGMAP_PROMPT_TEMPLATES)
+
 
     def instruct_prompt(
         self,
@@ -291,29 +295,7 @@ class ArgMapProblem(Problem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = (
-            dedent("""
-            Assignment: Reconstruct a source text's argumentation as an Argdown argument map.
-                        
-            Analyse the argumentation in the following source text by creating an Argdown argument map.
-
-            ::: {{.source_text}}
-            {sources}
-            :::
-
-            In particular, I ask you to
-
-            - explicitly label all nodes in the argument map;
-            - use square/angled brackets for labels to distinguish arguments/claims;
-            - indicate support and attack relations between nodes in accordance with Argdown syntax conventions;
-            
-            DO NOT include any detailed reconstructions of individual arguments as premise-conclusion-structures in your argdown code.
-
-            Importantly, enclose your Argdown argument map in a single fenced codeblock, starting with '```argdown' and ending with '```'.                                                
-            """)
-            .strip()
-            .format(sources=self.sources)
-        )
+        prompt = self._prompt_template.format(sources=self.sources)
 
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)

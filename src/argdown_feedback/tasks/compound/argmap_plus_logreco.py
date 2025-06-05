@@ -1,4 +1,5 @@
 import dataclasses
+import random
 from typing import Sequence
 
 from textwrap import dedent
@@ -77,59 +78,66 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
         prompt = (
             dedent("""
             # Assignment: Present a text's argumentation as an informal Argdown argument map, and logically reconstruct its arguments in standard form using Argdown syntax.
-                        
-            Analyse the argumentation in the following **source text**. Create two coherent Argdown code snippets: One with an informal argument map, and another one with logical reconstructions of all the arguments in standard form (as deductively valid inferences).
 
+            Analyse the argumentation in the given **source text**. Your answer is supposed to contain two artifacts:
+            1. an Argdown argument map and
+            2. an Argdown snippet with logical reconstructions of all the arguments in standard form (as deductively valid inferences).
+
+            In the following, you find
+            * the source text to analyse,
+            * detailed instructions for how to create the Argdown argument map (first artifact),
+            * detailed instructions for how to logically reconstruct and formalize the arguments (second artifact),
+            * a description of how both artifacts are supposed to cohere with each other,
+            * formatting instructions for your answer.
+                        
+            ## Source Text
+                   
             ::: {{.source_text}}
             {sources}
             :::
-
                    
             ## Argument Mapping Task Details                   
                    
-            Create a syntactically correct informal Argdown argument map that reconstructs the argumentation in the text. In particular, you should
+            Create a syntactically correct Argdown argument map that captures the overall argumentation in the text. In particular, you should
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
             - indicate support and attack relations between nodes in accordance with Argdown syntax conventions.
 
-            Importantly, enclose your Argdown argument map in a fenced codeblock, starting with '```argdown {{filename="map.ad"}}' and ending with '```'. If you provide multiple argdown map codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
-
+            Importantly, enclose your Argdown argument map in a fenced codeblock:
+            ```argdown {{filename="map.ad"}}
+            // your Argdown argument map here
+            ```
+            If you provide multiple argdown map codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
             ## Argument Reconstruction Task Details                   
 
             Logically analyse and reconstruct the text's arguments with Argdown, ensuring the inferences are deductively valid.
-
-            - Reconstruct *at least two arguments* in standard form (including premises, final 
-              conclusion, and possible intermediate conclusions).
-                   
-            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in
-              NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses.
-              Only declare variables that are used in the corresponding formalization and that have not been declared in the 
-              corresponding argument before. Ensure that your formalizations are consistent across different arguments.
-
-            - For each inference step in the argument, provide information about which previously introduced premises or 
-              conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
-              where the list items refer to the respective premise or conclusion labels.
+            - Reconstruct *at least two arguments* in standard form (including premises, final conclusion, and possible intermediate conclusions).      
+            - For each proposition in your reconstruction (premises and conclusions), provide an adequate propositional logic / FOL formalization in NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Only declare variables that are used in the corresponding formalization and that have not been declared in the corresponding argument before. Ensure that your formalizations are consistent across different arguments.
+            - For each inference step in the argument, provide information about which previously introduced premises or conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.
                   
-            Importantly, enclose your Argdown reconstructions in a fenced codeblock, starting with '```argdown {{filename="reconstructions.ad"}}' and ending with '```'. If you provide multiple argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
+            Importantly, enclose your Argdown reconstructions in a fenced codeblock:
+            ```argdown {{filename="reconstructions.ad"}}'
+            // your formal Argdown reconstructions here
+            ```
+            If you provide multiple Argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
-                   
-            ## Required Coherence of Annotation and Argument Reconstruction                                            
+            ## Required Coherence of Annotation and Argument Reconstruction
 
             The argument map and your argument reconstructions must neatly correspond to each other. Meaning that:
-                   
+
             1. Every argument in the argument map is reconstructed in standard form.
             2. Every reconstructed argument is present in the argument map.
-            3. Whenever a claim in the _argument map_ supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the reconstructed argument -- and vice versa.
-            4. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument -- and vice versa.
-            5. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B -- and vice versa.
+            3. Whenever a claim in the _argument map_ supports (attacks) an argument, the corresponding claim (or, respectively, its negation) figures as premise in the reconstructed argument -- and vice versa.
+            4. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) figures as conclusion in the reconstructed argument -- and vice versa.
+            5. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) figures as premise of B -- and vice versa.
             6. Whenever a claim A, in the _argdown reconstructions_, is declared to support, attack, or contradict another claim B, then the formalizations of A and B must logically ground this relation.
                    
-            Here are the specific notation instructions which help you to ensure that argument map and argument reconstructions fully cohere with each other in the above sense: 
+            Here are the specific notation instructions which help you to ensure that your argument map, on the one hand, and your argument reconstructions, on the other hand, fully cohere with each other in the above sense: 
 
-            - The argument labels in the argument map must match (1-to-1) the argument labels in the argument reconstruction.
-            - Re-use the labels of claims in the argument map for the corresponding premises and conclusions (if any) in the argument reconstruction. 
+            - The argument labels in the argument map (angle brackets) must match (1-to-1) the argument labels in the argument reconstruction.
+            - Re-use the labels of claims in the argument map (square brackets) for the corresponding premises and conclusions (if any) in the argument reconstruction.
             - In the argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label.
             - In the argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if a corresponding logical relation between them is defined in the argdown snippet (e.g., with "><" or "->" syntax).
             """)

@@ -1,3 +1,4 @@
+import random
 from typing import Sequence
 
 import dataclasses
@@ -51,7 +52,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
     - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
       conclusion, and possible intermediate conclusions).
 
-    - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
+    - For each proposition in your reconstruction (premises and conclusions), provide an adequate propositional logic / FOL formalization in NLTK
       syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Minimal example:
       `(1) Socrates is mortal. {{formalization: 'F(a)', declarations: {{'a': 'Socrates', 'F': 'being mortal'}} }}`.
       Only declare variables that are used in the corresponding formalization and that have not been declared before.
@@ -121,7 +122,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
     I need to reconstruct the main argument in a way that's logically valid, with everything formalized properly. Here's what I'm looking for:
 
     - Find the main argument and put it in standard form (premises leading to conclusion, possibly via intermediate steps)
-    - For each statement, add a formal logic representation using FOL in NLTK syntax
+    - For each statement, add a formal logic representation using propositional logic / FOL in NLTK syntax
     - Make sure the whole thing is deductively valid (conclusion necessarily follows)
     - Only include premises that are actually needed
 
@@ -260,7 +261,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
         }}
       }}
       ```
-    * Use NLTK syntax for FOL expressions
+    * Use NLTK syntax for propositional logic / FOL expressions
     * Maintain consistent variable/predicate usage across formalizations
 
     ### Inference Documentation
@@ -301,7 +302,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
     ## Step 4: Add Logical Formalization
     For each statement in your reconstruction:
     1. Write the statement in natural language
-    2. Add a formalization using first-order logic (FOL)
+    2. Add a formalization using propositional / first-order logic
     3. Define what each symbol means
 
     Example:
@@ -462,6 +463,9 @@ class LogRecoProblem(Problem):
         # remove leading and trailing whitespace and newlines
         sources = sources.strip("\n ")
         self.sources = sources
+        # randomly choose a prompt template
+        self._prompt_template = random.choice(_LOGRECO_PROMPT_TEMPLATES)
+
 
     def instruct_prompt(
         self,
@@ -469,46 +473,7 @@ class LogRecoProblem(Problem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = (
-            dedent("""
-            Assignment: Reconstruct a source text's main line of reasoning as a deductively valid argument in standard form.
-                        
-            Logically reconstruct the main argument in the following source text. Formalize all the premises and conclusions.
-            Make sure the reconstructed argument is deductively valid and all premises are relevant.
-
-            ::: {{.source_text}}
-            {sources}
-            :::
-
-            Note in particular:
-
-            - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
-              ending with '```'. Just include a single Argdown codeblock in your answer.
-
-            - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
-              conclusion, and possible intermediate conclusions).
-
-            - For each proposition in your reconstruction (premises and conclusions), provide an adequate FOL formalization in NLTK
-              syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Minimal example:
-              `(1) Socrates is mortal. {{formalization: 'F(a)', declarations: {{'a': 'Socrates', 'F': 'being mortal'}} }}`.
-              Only declare variables that are used in the corresponding formalization and that have not been declared before.
-              Ensure that your formalizations are consistent with each other.
-
-            - For each inference step in the argument, provide information about which previously introduced premises or 
-              conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`,
-              where the list items refer to the respective premise or conclusion labels.
-            
-            - You may, but are in no way required to add additional information about which inference rules or argumentation
-              schemes are applied in each sub-argument.
-
-            - In addition, at the beginning of your Argdown code block, provide a succinct label (title) for the argument and 
-              summarize its gist in line with Argdown syntax conventions. 
-
-            - Do NOT include any other analyses (maps or arguments) in your Argdown snippet besides the reconstruction of the main argument.
-            """)
-            .strip()
-            .format(sources=self.sources)
-        )
+        prompt = self._prompt_template.format(sources=self.sources)
 
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)

@@ -1,3 +1,4 @@
+import random
 from typing import Sequence
 
 import dataclasses
@@ -396,6 +397,8 @@ class InfRecoProblem(Problem):
         # remove leading and trailing whitespace and newlines
         sources = sources.strip("\n ")
         self.sources = sources
+        # randomly choose a prompt template
+        self._prompt_template = random.choice(_INFRECO_PROMPT_TEMPLATES)
 
     def instruct_prompt(
         self,
@@ -403,41 +406,7 @@ class InfRecoProblem(Problem):
         hints: list[str] | None = None,
         evaluation: Evaluation | None = None,
     ) -> str:
-        prompt = (
-            dedent("""
-            Assignment: Reconstruct a source text's main argument in standard form.
-                        
-            Identify the main argument in the following source text and reconstruct it as premise-conclusion structure using Argdown.
-
-            ::: {{.source_text}}
-            {sources}
-            :::
-
-            Note in particular:
-
-            - Enclose your Argdown argument reconstruction in a fenced codeblock, starting with '```argdown' and
-              ending with '```'. Just include a single Argdown codeblock in your answer.
-            - In your Argdown snippet, only reconstruct *a single argument* in standard form (including premises, final 
-              conclusion, and possible intermediate conclusions).
-            - For each conclusion in the argument, provide information about which previously introduced premises or 
-              intermediary conclusions it is inferred *from*: Use yaml inline data in the corresponding inference line right
-              above the inferred conclusion, e.g. `-- {{'from': ['1','3']}} --`. The list items refer to the respective 
-              premise or conclusion labels used in the inference step.
-            - You may, but are in no way required to add additional information about which inference rules or argumentation
-              schemes are applied in each sub-argument.
-            - In addition, at the beginning of your Argdown code block, provide a succinct label (title) for the argument and 
-              summarize its gist in line with Argdown syntax conventions. 
-                   
-            Carefully consider the following DON'Ts:
-
-            - Do NOT include any other analyses (maps or arguments) in your Argdown snippet besides the reconstruction of the main argument.
-            - Do NOT add any inline dialectical relations in the premise conclusion structure.
-            - Do NOT add any yaml inline data besides the required inference information.
-            - Do NOT add any formalization of the argument's propositions (premises or conclusions) in your Argdown code.
-            """)
-            .strip()
-            .format(sources=self.sources)
-        )
+        prompt = self._prompt_template.format(sources=self.sources)
 
         if hints:
             prompt += "\n\nHints: " + " - ".join(hints)
