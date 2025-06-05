@@ -105,7 +105,7 @@ class Solution(ABC):
 
     @classmethod
     @abstractmethod
-    def from_raw_answer(cls, answer: str) -> "Solution":
+    def from_raw_answer(cls, raw_answer: str) -> "Solution":
         """Cast a raw answer as a solution."""
 
 

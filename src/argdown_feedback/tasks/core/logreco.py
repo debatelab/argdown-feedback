@@ -546,10 +546,10 @@ class LogicalReco(Solution):
         return self.argdown_snippet
     
     @classmethod
-    def from_raw_answer(cls, answer) -> "LogicalReco":
+    def from_raw_answer(cls, raw_answer) -> "LogicalReco":
         """Extract a LogicalReco from a raw answer string."""
         handler = FencedCodeBlockExtractor()
-        request = VerificationRequest(inputs=answer)
+        request = VerificationRequest(inputs=raw_answer)
         result = handler.process(request)
         code_snippet = next(
             (
@@ -558,7 +558,7 @@ class LogicalReco(Solution):
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else answer 
+        code_snippet = code_snippet if code_snippet is not None else raw_answer
         return cls(argdown_snippet=code_snippet)
     
 

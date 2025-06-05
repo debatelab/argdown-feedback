@@ -350,10 +350,10 @@ class ArgumentMap(Solution):
         return self.argdown_snippet
 
     @classmethod
-    def from_raw_answer(cls, answer) -> "ArgumentMap":
+    def from_raw_answer(cls, raw_answer) -> "ArgumentMap":
         # extract fenced code block
         handler = FencedCodeBlockExtractor()
-        request = VerificationRequest(inputs=answer)
+        request = VerificationRequest(inputs=raw_answer)
         result = handler.process(request)
         code_snippet = next(
             (
@@ -363,7 +363,7 @@ class ArgumentMap(Solution):
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else answer
+        code_snippet = code_snippet if code_snippet is not None else raw_answer
         return cls(argdown_snippet=code_snippet)
 
 

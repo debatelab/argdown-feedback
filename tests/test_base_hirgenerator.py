@@ -52,8 +52,8 @@ class NumberSolution(Solution):
         return self.answer
     
     @classmethod
-    def from_raw_answer(cls, answer):
-        return answer
+    def from_raw_answer(cls, raw_answer):
+        return cls(raw_answer)
 
 
 class NumberProblemGenerator(ProblemGenerator):
@@ -319,7 +319,7 @@ class NumberVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
         return pairs
 
 
-def hirp_factory(solution_generator_class: type[NumberSolutionGenerator], feedback_gen=EmptyFeedbackGenerator):
+def hirp_factory(solution_generator_class: type[NumberSolutionGenerator], feedback_gen: type[FeedbackGenerator]=EmptyFeedbackGenerator):
     return HIRPreferencePairGenerator(
         problem_generator=NumberProblemGenerator(),
         solution_generator=solution_generator_class(n_solutions=3),

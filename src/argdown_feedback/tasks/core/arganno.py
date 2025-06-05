@@ -331,10 +331,10 @@ class Annotation(Solution):
         return self.annotated_source_text
 
     @classmethod
-    def from_raw_answer(cls, answer) -> "Annotation":
+    def from_raw_answer(cls, raw_answer) -> "Annotation":
         """Extract the annotated source text from the answer."""
         handler = FencedCodeBlockExtractor()
-        request = VerificationRequest(inputs=answer)
+        request = VerificationRequest(inputs=raw_answer)
         result = handler.process(request)
         code_snippet = next(
             (
@@ -344,7 +344,7 @@ class Annotation(Solution):
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else answer
+        code_snippet = code_snippet if code_snippet is not None else raw_answer
         return cls(annotated_source_text=code_snippet)
 
 
