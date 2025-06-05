@@ -619,11 +619,11 @@ class GenericFeedbackGenerator(FeedbackGenerator):
 
             
             Given this information, provide feedback to the student and clear instructions for how to improve the solution.
-        """).format(
-            problem=problem.instruct_prompt(),
-            solution=str(solution),
-            evaluation_issues=evaluation_issues,
-        )
+            """).format(
+                problem=problem.instruct_prompt(),
+                solution=str(solution),
+                evaluation_issues=evaluation_issues,
+            )
 
         answers = await self._generate(
             messages=[
