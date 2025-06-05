@@ -601,24 +601,24 @@ class GenericFeedbackGenerator(FeedbackGenerator):
         prompt = dedent("""
             Assignment: Give feedback and provide instructions for how to improve a given argument map.
 
-            You will be shown an argument mapping problem, a student's preliminary solution, and its evaluation. Based on this information, provide feedback to the student and instructions for how to improve the solution.
+            You will be shown an argument analysis problem, a student's preliminary solution, and its evaluation. Based on this information, provide feedback to the student and instructions for how to improve the solution.
 
-                                                
-            ## Problem Statement
+            ########################                                    
+            ## Problem Statement 
             {problem}
 
-            
+            ########################
             ## Student's Solution
             {solution}
 
-            
-            ## Evaluation
+            ########################
+            ## Evaluation 
             The student's solution is NOT valid.
             Particular issues:
             {evaluation_issues}
 
             
-            Given this information, provide feedback to the student and clear instructions for how to improve the solution.
+            Given this information, provide feedback to the student and succinct instructions for how to improve the solution.
             """).format(
                 problem=problem.instruct_prompt(),
                 solution=str(solution),
