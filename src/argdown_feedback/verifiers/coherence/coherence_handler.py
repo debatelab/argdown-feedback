@@ -1,23 +1,11 @@
 from abc import abstractmethod
-from typing import Dict, List, Optional, Tuple
-import logging
-
-from nltk.sem.logic import Expression, NegatedExpression  # type: ignore
-from pyargdown import (
-    ArgdownMultiDiGraph,
-    Conclusion,
-    DialecticalType,
-    Valence,
-)
 
 from ..verification_request import (
     VerificationRequest,
     PrimaryVerificationData,
-    VerificationDType,
     VerificationResult,
 )
-from argdown_feedback.verifiers.base import BaseHandler, CompositeHandler
-from argdown_feedback.verifiers.core.infreco_handler import InfRecoHandler
+from argdown_feedback.verifiers.base import BaseHandler
 
 
 class CoherenceHandler(BaseHandler):
