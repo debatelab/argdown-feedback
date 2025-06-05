@@ -61,7 +61,8 @@ class BaseArgannoInfrecoCoherenceHandler(CoherenceHandler):
             and the second to extract the xml annotation.
             If None, default filters are used.
         """
-        self._next_handler: Optional['CoherenceHandler'] = None
+        #self._next_handler: Optional['CoherenceHandler'] = None
+        super().__init__()
         self.name = name or self.__class__.__name__
         self.logger = logger or logging.getLogger(self.__class__.__module__)
         self.filters = filters
