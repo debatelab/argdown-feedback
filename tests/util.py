@@ -7,7 +7,8 @@ import pytest
 
 MODEL_KWARGS = {
     "inference_base_url": "http://localhost:8000/v1",
-    "model_id": "debatelabkit/llama-3.1-argunaut-1-8b-spin-gguf/llama-3.1-argunaut-1-8b-spin-q4_k_m.gguf",
+    "model_id": "llama-3.2-3b-instruct"
+#    "model_id": "debatelabkit/llama-3.1-argunaut-1-8b-spin-gguf/llama-3.1-argunaut-1-8b-spin-q4_k_m.gguf",
 }
 
 

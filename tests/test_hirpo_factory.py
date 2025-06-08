@@ -26,7 +26,8 @@ def config_data():
                 "arganno.AnnotationNoAttacksPreferencePairGenerator",
                 "arganno.AnnotationScopePreferencePairGenerator",
                 "arganno.AnnotationSupportsPreferencePairGenerator"
-            ]
+            ],
+            "ask_for_invalid_probs": {"HasAnnotations": 0.1}
         }
     ]
 
@@ -43,6 +44,7 @@ def test_hirgen_fromconfig(config_data):
         assert hirgen.solution_generator.n_solutions == config["solution_generator_kwargs"]["n_solutions"]
         assert hirgen.feedback_generator.n_feedbacks == config["feedback_generator_kwargs"]["n_feedbacks"]
         assert hirgen.judge.max_workers == config["max_workers"]
+        assert hirgen.ask_for_invalid_probs.get("HasAnnotations") == config.get("ask_for_invalid_probs").get("HasAnnotations")
 
 @pytest.mark.skipif(not llm_available(), reason="LLM model not available")
 def test_hirevaluator_fromconfig(config_data):

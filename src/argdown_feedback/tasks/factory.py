@@ -30,6 +30,7 @@ class HIRPOFactory:
         failure_type_preference_pair_generator: str | None = None,
         solution_generator_kwargs: dict[str, Any] | None = None,
         feedback_generator_kwargs: dict[str, Any] | None = None,
+        ask_for_invalid_probs: dict[str, float] | None = None,
         max_workers: int = 8,
         **kwargs,
     ) -> HIRPreferencePairGenerator | None:
@@ -89,6 +90,7 @@ class HIRPOFactory:
                 feedback_generator=fg_instance,  # type: ignore
                 virtue_preference_pair_generator=vppg_instances,
                 failure_type_preference_pair_generator=ftppg_instance,
+                ask_for_invalid_probs=ask_for_invalid_probs,
                 **kwargs,
             )
 
