@@ -311,9 +311,14 @@ class Annotation(Solution):
     """Solution to the annotation problem: just an annotated text."""
 
     annotated_source_text: str
+    _raw_answer: str
 
     def __str__(self):
         return self.annotated_source_text
+
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+        return self._raw_answer if self._raw_answer else self.annotated_source_text
 
     @classmethod
     def from_raw_answer(cls, raw_answer) -> "Annotation":
@@ -330,7 +335,7 @@ class Annotation(Solution):
             None,
         )
         code_snippet = code_snippet if code_snippet is not None else raw_answer
-        return cls(annotated_source_text=code_snippet)
+        return cls(annotated_source_text=code_snippet, _raw_answer=raw_answer)
 
 
 class AnnotationProblemGenerator(ProblemGenerator):

@@ -677,12 +677,16 @@ class ArgmapPlusArganno(Annotation, ArgumentMap):
 
     annotated_source_text: str
     argdown_snippet: str
-    unparsed_solution: str | None = None
+    _raw_answer: str
 
     def __str__(self):
-        if self.unparsed_solution:
-            return self.unparsed_solution
-        return self.annotated_source_text + "\n\n" + self.argdown_snippet
+        if self.annotated_source_text and self.argdown_snippet:
+            return self.annotated_source_text + "\n\n" + self.argdown_snippet
+        return self._raw_answer
+
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+        return self._raw_answer if self._raw_answer else str(self)
 
     @classmethod
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusArganno":
@@ -696,7 +700,7 @@ class ArgmapPlusArganno(Annotation, ArgumentMap):
                 for vr in reversed(result.verification_data)
                 if vr.dtype == VerificationDType.xml and vr.code_snippet
             ),
-            None,
+            "",
         )
         argdown_snippet = next(
             (
@@ -704,17 +708,13 @@ class ArgmapPlusArganno(Annotation, ArgumentMap):
                 for vr in reversed(result.verification_data)
                 if vr.dtype == VerificationDType.argdown and vr.code_snippet
             ),
-            None,
+            "",
         )
 
         return cls(
-            annotated_source_text=annotated_source_text
-            if annotated_source_text
-            else raw_answer,
-            argdown_snippet=argdown_snippet if argdown_snippet else raw_answer,
-            unparsed_solution=None
-            if annotated_source_text and argdown_snippet
-            else raw_answer,
+            annotated_source_text=annotated_source_text,
+            argdown_snippet=argdown_snippet,
+            _raw_answer=raw_answer,
         )
 
 

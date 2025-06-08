@@ -181,7 +181,7 @@ class ArgmapPlusLogreco(ArgmapPlusInfreco):
     def partial_logreco(self) -> LogicalReco:
         """Return the informal reconstruction subsolution."""
         return LogicalReco(
-            argdown_snippet=self.argdown_reconstructions_snippet,
+            argdown_snippet=self.argdown_reconstructions_snippet, _raw_answer=self._raw_answer,
         )
 
 

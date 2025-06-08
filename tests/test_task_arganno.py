@@ -128,35 +128,35 @@ def valid_annotations1() -> list[Annotation]:
                         
         Animals suffer. Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" supports="1">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" attacks="">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> <proposition id="3" supports="1 2">Animal farming causes climate change.</proposition>
         ```
-        """)),
+        """), _raw_answer=""),
     ]
 
 
@@ -174,7 +174,7 @@ def valid_annotations2() -> list[Annotation]:
         <proposition id="3">Pro 3: A vegetarian diet is better for the environment.</proposition>
         [...]
         ```
-        """)),
+        """), _raw_answer=""),
     ]
 
 
@@ -188,76 +188,76 @@ def invalid_annotations1() -> list[Annotation]:
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         You should stop eating meat.
                         
         Animals suffer. Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should <proposition id="1a">stop eating meat.</proposition></proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition>We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="1">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" supports="3">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2" attacks="3">Animals suffer.</proposition> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> <proposition id="3" from="1 2">Animal farming causes climate change.</proposition>
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <claim id="2">Animals suffer.</claim> Animal farming causes climate change.
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         <proposition id="1">We should stop eating meat.</proposition>
                         
         <proposition id="2">Animals suffer.</proposition> Animal [...].
         ```
-        """)),
+        """), _raw_answer=""),
     ]
 
 
@@ -276,7 +276,7 @@ def invalid_annotations2() -> list[Annotation]:
         <proposition id="3">Pro 3: A vegetarian diet is better for the environment.</proposition>
         [...]
         ```
-        """)),
+        """), _raw_answer=""),
         Annotation(annotated_source_text=textwrap.dedent("""
         ```xml
         WRONG ORDER
@@ -289,7 +289,7 @@ def invalid_annotations2() -> list[Annotation]:
         <proposition id="3">Pro 3: A vegetarian diet is better for the environment.</proposition>
         [...]
         ```
-        """)),
+        """), _raw_answer=""),
     ]
 
 
@@ -546,7 +546,7 @@ class TestAnnotationPreferencePairGenerators:
         anno01 = '```xml\nA B C\n```'
         anno02 = '```xml\nA <proposition id="1">B</proposition> C\n```'
         anno03 = '```xml\nA <proposition id="1">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        candidate_solutions = [Annotation(annotated_source_text=a, _raw_answer="") for a in [anno01, anno02, anno03]]
         evaluations = await judge.arun(problem, candidate_solutions)
         assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
 
@@ -565,7 +565,7 @@ class TestAnnotationPreferencePairGenerators:
         anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
         anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
         anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        candidate_solutions = [Annotation(annotated_source_text=a, _raw_answer="") for a in [anno01, anno02, anno03]]
         evaluations = await judge.arun(problem, candidate_solutions)
         assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
 
@@ -583,8 +583,9 @@ class TestAnnotationPreferencePairGenerators:
         anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
         anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
         anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        candidate_solutions = [Annotation(annotated_source_text=a, _raw_answer=a) for a in [anno01, anno02, anno03]]
         evaluations = await judge.arun(problem, candidate_solutions)
+        print(evaluations)
         assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
 
         cpps = await ppg.arun(problem, candidate_solutions, evaluations)
@@ -601,7 +602,7 @@ class TestAnnotationPreferencePairGenerators:
         anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
         anno02 = '```xml\nA <proposition id="1" supports="2">B</proposition> <proposition id="2">C</proposition>\n```'
         anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        candidate_solutions = [Annotation(annotated_source_text=a, _raw_answer="") for a in [anno01, anno02, anno03]]
         evaluations = await judge.arun(problem, candidate_solutions)
         assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
 
@@ -619,7 +620,7 @@ class TestAnnotationPreferencePairGenerators:
         anno01 = '```xml\nA <proposition id="1">B</proposition> C\n```'
         anno02 = '```xml\n<proposition id="1" supports="2">A B</proposition> <proposition id="2">C</proposition>\n```'
         anno03 = '```xml\nA <proposition id="1" attacks="2">B</proposition> <proposition id="2">C</proposition>\n```'
-        candidate_solutions = [Annotation(annotated_source_text=a) for a in [anno01, anno02, anno03]]
+        candidate_solutions = [Annotation(annotated_source_text=a, _raw_answer="") for a in [anno01, anno02, anno03]]
         evaluations = await judge.arun(problem, candidate_solutions)
         assert len([e for e in evaluations if e.is_valid]) == len(candidate_solutions)
 

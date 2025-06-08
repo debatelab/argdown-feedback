@@ -831,12 +831,12 @@ class ArgmapPlusInfreco(Solution):
 
     argdown_map_snippet: str
     argdown_reconstructions_snippet: str
-    unparsed_solution: str | None = None
+    _raw_answer: str 
 
     def __str__(self):
-        if self.unparsed_solution:
-            return self.unparsed_solution
-        return self.argdown_map_snippet + "\n\n" + self.argdown_reconstructions_snippet
+        if self.argdown_map_snippet and self.argdown_reconstructions_snippet:
+            return self.argdown_map_snippet + "\n\n" + self.argdown_reconstructions_snippet
+        return self._raw_answer
 
     @classmethod
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusInfreco":
@@ -853,7 +853,7 @@ class ArgmapPlusInfreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "map.ad"
             ),
-            None,
+            "",
         )
         reco_snippet = next(
             (
@@ -864,27 +864,25 @@ class ArgmapPlusInfreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "reconstructions.ad"
             ),
-            None,
+            "",
         )
 
         return cls(
-            argdown_map_snippet=map_snippet if map_snippet else raw_answer,
-            argdown_reconstructions_snippet=reco_snippet
-            if reco_snippet
-            else raw_answer,
-            unparsed_solution=None if map_snippet and reco_snippet else raw_answer,
+            argdown_map_snippet=map_snippet,
+            argdown_reconstructions_snippet=reco_snippet,
+            _raw_answer=raw_answer,
         )
 
     def partial_argmap(self) -> ArgumentMap:
         """Return the argument map subsolution."""
         return ArgumentMap(
-            argdown_snippet=self.argdown_map_snippet,
+            argdown_snippet=self.argdown_map_snippet, _raw_answer=self._raw_answer
         )
 
     def partial_infreco(self) -> InformalReco:
         """Return the informal reconstruction subsolution."""
         return InformalReco(
-            argdown_snippet=self.argdown_reconstructions_snippet,
+            argdown_snippet=self.argdown_reconstructions_snippet, _raw_answer=self._raw_answer,
         )
 
 

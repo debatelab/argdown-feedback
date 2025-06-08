@@ -438,9 +438,14 @@ class InformalReco(Solution):
     """Solution to the argument analysis problem: an argdown snippet."""
 
     argdown_snippet: str
+    _raw_answer: str
 
     def __str__(self):
         return self.argdown_snippet
+
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+        return self._raw_answer if self._raw_answer else self.argdown_snippet
 
     @classmethod
     def from_raw_answer(cls, raw_answer) -> "InformalReco":
@@ -457,7 +462,7 @@ class InformalReco(Solution):
             None,
         )
         code_snippet = code_snippet if code_snippet is not None else raw_answer
-        return cls(argdown_snippet=code_snippet)
+        return cls(argdown_snippet=code_snippet, _raw_answer=raw_answer)
 
 
 class InfRecoProblemGenerator(ProblemGenerator):

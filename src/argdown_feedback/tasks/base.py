@@ -99,14 +99,13 @@ class Problem(ABC):
 class Solution(ABC):
     """Abstract base class representing a solution."""
 
-    # TODO: implement for all subclasses
-    # @abstractmethod
-    # def raw_answer(self) -> str:
-    #     """Returns the full and raw answer as a string, including any reasoning traces"""
-
     @abstractmethod
     def __str__(self) -> str:
         """Cast the solution as a string."""
+
+    @abstractmethod
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
 
     @classmethod
     @abstractmethod
@@ -254,13 +253,14 @@ class ProblemSolutionChat:
     original_solution: Solution | None = None
     feedback: Feedback | None = None
 
-    def as_chat(self, **problem_kwargs) -> list[ChatMessage]:
+    def as_chat(self, use_raw_answer: bool = False, **problem_kwargs) -> list[ChatMessage]:
+        answer_content = str(self.solution) if not use_raw_answer else self.solution.raw_answer()
         if self.original_solution is None or self.feedback is None:
             return [
                 ChatMessage(
                     role="user", content=self.problem.instruct_prompt(**problem_kwargs)
                 ),
-                ChatMessage(role="assistant", content=str(self.solution)),
+                ChatMessage(role="assistant", content=answer_content),
             ]
         return [
             ChatMessage(role="user", content=self.problem.instruct_prompt()),
@@ -270,11 +270,7 @@ class ProblemSolutionChat:
             ChatMessage(
                 role="user", content=self.problem.revise_prompt(**problem_kwargs)
             ),
-            # TODO
-            # In the following (final) step, consider using the full, final and raw answer, 
-            # rather than the parsed and extracted codeblocks!
-            # ChatMessage(role="assistant", content=self.solution.raw_answer()),
-            ChatMessage(role="assistant", content=str(self.solution)),
+            ChatMessage(role="assistant", content=answer_content),
         ]
 
 
@@ -1009,13 +1005,13 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     solution=top_valid_solution,
                     original_solution=original_solution,
                     feedback=feedback,
-                ).as_chat(),
+                ).as_chat(use_raw_answer=True), # we're including full raw answers here
                 rejected=ProblemSolutionChat(
                     problem=problem,
                     solution=top_invalid_solution,
                     original_solution=original_solution,
                     feedback=feedback,
-                ).as_chat(),
+                ).as_chat(use_raw_answer=True), # we're including full raw answers here
             )
         )
 
