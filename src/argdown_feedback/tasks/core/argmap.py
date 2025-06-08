@@ -326,15 +326,17 @@ class ArgMapProblem(Problem):
 class ArgumentMap(Solution):
     """Solution to the argument mapping problem: an argdown snippet."""
 
-    argdown_snippet: str
-    _raw_answer: str
+    argdown_snippet: str | None = None
+    _raw_answer: str | None = None
 
     def __str__(self):
-        return self.argdown_snippet
+        if self.argdown_snippet is not None:
+            return self.argdown_snippet
+        return self._raw_answer if self._raw_answer else "None"
 
     def raw_answer(self) -> str:
         """Returns the full and raw answer as a string, including any reasoning traces"""
-        return self._raw_answer if self._raw_answer else self.argdown_snippet
+        return self._raw_answer if self._raw_answer else str(self)
 
     @classmethod
     def from_raw_answer(cls, raw_answer) -> "ArgumentMap":
@@ -350,7 +352,6 @@ class ArgumentMap(Solution):
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else raw_answer
         return cls(argdown_snippet=code_snippet, _raw_answer= raw_answer)
 
 
@@ -402,7 +403,7 @@ class ArgMapJudge(MPJudge):
             ]
         )
         request = VerificationRequest(
-            inputs=solution.argdown_snippet, source=problem.sources
+            inputs=str(solution), source=problem.sources
         )
         result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)
@@ -928,7 +929,7 @@ class SourceTextProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
         assert isinstance(solution, ArgumentMap), "Solution must be an ArgumentMap"
         return round(
             textdistance.damerau_levenshtein.normalized_similarity(
-                problem.sources, solution.argdown_snippet
+                problem.sources, str(solution)
             ),
             1,
         )

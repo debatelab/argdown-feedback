@@ -216,16 +216,16 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
 
-    annotated_source_text: str
-    argdown_map_snippet: str
-    argdown_reconstructions_snippet: str
-    _raw_answer: str
+    annotated_source_text: str | None = None
+    argdown_map_snippet: str | None = None
+    argdown_reconstructions_snippet: str | None = None
+    _raw_answer: str | None = None
 
     def __str__(self):
         if (
-            self.annotated_source_text
-            and self.argdown_map_snippet
-            and self.argdown_reconstructions_snippet
+            self.annotated_source_text is not None
+            and self.argdown_map_snippet is not None
+            and self.argdown_reconstructions_snippet is not None
         ):
             return (
                 self.annotated_source_text
@@ -234,7 +234,11 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
                 + "\n\n"
                 + self.argdown_reconstructions_snippet
             )
-        return self._raw_answer
+        return self._raw_answer if self._raw_answer else "None"
+
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+        return self._raw_answer if self._raw_answer else str(self)
 
     @classmethod
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusArgannoPlusLogreco":
@@ -251,7 +255,7 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "annotation.txt"
             ),
-            "",
+            None,
         )
         map_snippet = next(
             (
@@ -262,7 +266,7 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "map.ad"
             ),
-            "",
+            None,
         )
         reco_snippet = next(
             (
@@ -273,7 +277,7 @@ class ArgmapPlusArgannoPlusLogreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "reconstructions.ad"
             ),
-            "",
+            None,
         )
 
         return cls(

@@ -54,7 +54,7 @@ class FencedCodeBlockExtractor(ProcessingHandler):
                 splits = needs_to_be_parsed.split(code_marker, 1)[1].split(close_marker, 1)
                 if len(splits) <= 1:
                     break
-                snippet = code_marker + splits[0] + close_marker + "\n"
+                snippet = code_marker + splits[0] + close_marker
                 needs_to_be_parsed = splits[1]
 
                 # try to parse yaml code metadata after code marker

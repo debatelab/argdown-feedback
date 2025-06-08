@@ -829,14 +829,18 @@ class ArgmapPlusInfreco(Solution):
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
 
-    argdown_map_snippet: str
-    argdown_reconstructions_snippet: str
-    _raw_answer: str 
+    argdown_map_snippet: str  | None = None
+    argdown_reconstructions_snippet: str | None = None
+    _raw_answer: str | None = None
 
     def __str__(self):
         if self.argdown_map_snippet and self.argdown_reconstructions_snippet:
             return self.argdown_map_snippet + "\n\n" + self.argdown_reconstructions_snippet
-        return self._raw_answer
+        return self._raw_answer if self._raw_answer is not None else "None"
+
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+        return self._raw_answer if self._raw_answer else str(self)
 
     @classmethod
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusInfreco":
@@ -853,7 +857,7 @@ class ArgmapPlusInfreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "map.ad"
             ),
-            "",
+            None,
         )
         reco_snippet = next(
             (
@@ -864,7 +868,7 @@ class ArgmapPlusInfreco(Solution):
                 and vr.metadata
                 and vr.metadata.get("filename") == "reconstructions.ad"
             ),
-            "",
+            None,
         )
 
         return cls(

@@ -310,15 +310,17 @@ class AnnotationProblem(Problem):
 class Annotation(Solution):
     """Solution to the annotation problem: just an annotated text."""
 
-    annotated_source_text: str
-    _raw_answer: str
+    annotated_source_text: str | None = None
+    _raw_answer: str | None = None
 
     def __str__(self):
-        return self.annotated_source_text
+        if self.annotated_source_text is not None:
+            return self.annotated_source_text
+        return self._raw_answer if self._raw_answer is not None else "None"
 
     def raw_answer(self) -> str:
         """Returns the full and raw answer as a string, including any reasoning traces"""
-        return self._raw_answer if self._raw_answer else self.annotated_source_text
+        return self._raw_answer if self._raw_answer else str(self)
 
     @classmethod
     def from_raw_answer(cls, raw_answer) -> "Annotation":
@@ -334,7 +336,6 @@ class Annotation(Solution):
             ),
             None,
         )
-        code_snippet = code_snippet if code_snippet is not None else raw_answer
         return cls(annotated_source_text=code_snippet, _raw_answer=raw_answer)
 
 
@@ -409,7 +410,7 @@ class AnnotationJudge(MPJudge):
             ]
         )
         request = VerificationRequest(
-            inputs=solution.annotated_source_text, source=problem.sources
+            inputs=str(solution), source=problem.sources
         )
         result = handler.process(request)
         evaluation = Evaluation.from_verification_request(result)

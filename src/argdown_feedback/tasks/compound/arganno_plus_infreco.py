@@ -735,14 +735,10 @@ class ArgannoPlusInfreco(Annotation, InformalReco):
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
 
-    annotated_source_text: str
-    argdown_snippet: str
-    _raw_answer: str
-
     def __str__(self):
         if self.annotated_source_text and self.argdown_snippet:
             return self.annotated_source_text + "\n\n" + self.argdown_snippet
-        return self._raw_answer
+        return self._raw_answer if self._raw_answer is not None else "None"
         
     def raw_answer(self) -> str:
         """Returns the full and raw answer as a string, including any reasoning traces"""
@@ -760,7 +756,7 @@ class ArgannoPlusInfreco(Annotation, InformalReco):
                 for vr in reversed(result.verification_data)
                 if vr.dtype == VerificationDType.xml and vr.code_snippet
             ),
-            "",
+            None,
         )
         argdown_snippet = next(
             (
@@ -768,7 +764,7 @@ class ArgannoPlusInfreco(Annotation, InformalReco):
                 for vr in reversed(result.verification_data)
                 if vr.dtype == VerificationDType.argdown and vr.code_snippet
             ),
-            "",
+            None,
         )
 
         return cls(
