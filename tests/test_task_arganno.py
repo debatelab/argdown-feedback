@@ -293,7 +293,6 @@ def invalid_annotations2() -> list[Annotation]:
     ]
 
 
-
 @pytest.fixture
 def feedback1() -> Feedback:
     return Feedback(
@@ -415,6 +414,34 @@ async def test_annotation_judge_valid(valid_annotations1, source_texts):
         assert ev.is_valid
         assert not any(v for _, v in ev.metrics.items())
         assert ev.artifacts["soup"]
+
+@pytest.mark.asyncio
+async def test_boardschool_example():
+    source_text = textwrap.dedent("""
+        Motion: This house supports BOARDING VS. DAY SCHOOLS.
+
+        From the debate:
+
+        Large families are becoming rare because society has reached higher moral and physical standards. Boarding schools can never replace the natural atmosphere of family life. Parents are more concerned with their responsibilities than formerly.
+        """)
+    annotated_text = textwrap.dedent("""
+        ```xml
+        <proposition id="1" ref_reco="5">This house supports BOARDING VS. DAY SCHOOLS.</proposition>
+        <proposition id="2" supports="1" ref_reco="4">Large families are becoming rare because society has reached higher moral and physical standards.</proposition>
+        <proposition id="3" supports="2" ref_reco="1">Boarding schools can never replace the natural atmosphere of family life.</proposition>
+        <proposition id="4" supports="2" ref_reco="2">Parents are more concerned with their responsibilities than formerly.</proposition>
+        ```
+        """)
+    annotation = Annotation(annotated_source_text=annotated_text)
+    pg = AnnotationProblemGenerator()
+    problem = await pg.arun(source_text)
+
+    judge = AnnotationJudge()
+    evaluations = await judge.arun(problem, [annotation])
+    evaluation = evaluations[0]
+    print(evaluation)
+    assert not evaluation.is_valid
+
 
 
 @pytest.mark.asyncio
