@@ -984,16 +984,26 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         if top_valid_solution is None or top_invalid_solution is None:
             return pairs
 
-        # Check if top_invalid_solution includes any error_types (e.g. HasAnnotationsHandler) 
-        # with a configured ask_for_invalid_probability
-        # if so, get the minimum ask_for_invalid_probability
+        # current accuracy
+        mean_syntactic_validity = mean(int(e.is_valid) for e in evaluations)
+
+        # ask_for_invalid_probability is minimum of
+        # - (1 - accuracy) and
+        # - any configured ask_for_invalid_probability configured for any error_types 
+        #   (e.g. HasAnnotationsHandler) present in top_invalid_solution
+        # In consequence, if the current accuracy is high, the probability that the model
+        # is shown an ask-for-invalid preference pair is low.
         min_ask_for_invalid_probability = min(
             [
-                # select configured error-specific ask_for_invalid probability 
-                afi_prob for error_type, afi_prob in self.ask_for_invalid_probs.items()
+                # select configured error-specific ask_for_invalid probability
+                afi_prob
+                for error_type, afi_prob in self.ask_for_invalid_probs.items()
                 # if error_type has been made in top_invalid_solution
-                if any(error_type in key for key in top_invalid_evaluation.metrics.keys())  # type: ignore
-            ] + [1.0]
+                if any(
+                    error_type in key for key in top_invalid_evaluation.metrics.keys()  # type: ignore
+                )
+            ]
+            + [1.0 - mean_syntactic_validity]
         )
         # randomly determine whether to do ask_for_invalid_pair
         add_ask_for_invalid_pair = random.random() < min_ask_for_invalid_probability
