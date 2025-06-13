@@ -949,7 +949,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
     ) -> tuple[bool, bool]:
         do_virtue_hirp = (
             bool(self.virtue_preference_pair_generators)
-            and random.random() < mean_syntactic_validity
+            and random.random() < mean_syntactic_validity**4
         )
         do_validity_hirp = not do_virtue_hirp
         return do_validity_hirp, do_virtue_hirp
