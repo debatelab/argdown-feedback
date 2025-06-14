@@ -367,7 +367,7 @@ class HasInferenceDataHandler(InfRecoHandler):
                     continue
                     
                 inf_data = c.inference_data
-                if not inf_data:
+                if not inf_data or not isinstance(inf_data, dict):
                     msgs.append(f"In {arg_label}: Inference to conclusion {c.label} lacks properly formatted yaml inference information.")
                 else:
                     from_list = inf_data.get(self.from_key)
@@ -418,7 +418,7 @@ class PropRefsExistHandler(InfRecoHandler):
                 continue
                 
             for enum, c in enumerate(argument.pcs):
-                if isinstance(c, Conclusion):
+                if isinstance(c, Conclusion) and isinstance(c.inference_data, dict):
                     inf_data = c.inference_data
                     from_list = inf_data.get(self.from_key, [])
                     if isinstance(from_list, list):
@@ -464,7 +464,7 @@ class UsesAllPropsHandler(InfRecoHandler):
                 
             used_labels = set()
             for c in argument.pcs:
-                if isinstance(c, Conclusion):
+                if isinstance(c, Conclusion) and isinstance(c.inference_data, dict):
                     used_labels.update(c.inference_data.get(self.from_key, []))
             
             unused_props = [

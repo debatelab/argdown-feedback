@@ -114,7 +114,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         
         • Add XML tags to identify propositions and their argumentative relationships
         • Clearly indicate support and attack relationships between propositions
-        • Maintain the integrity of the original text (though you may abbreviate non-argumentative passages)
+        • Maintain the integrity of the original text (though you may abbreviate non-argumentative passages in very long source texts)
         • Ensure each proposition has a unique identifier
         
         Submission Format:
@@ -146,7 +146,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         2. Preserve the exact wording of the original text
         3. Identify all support and attack relationships between propositions
         4. Assign unique identifiers to each proposition
-        5. You may abbreviate non-argumentative passages if necessary
+        5. You may abbreviate non-argumentative passages in very long texts if necessary
         
         Present your analysis in a machine-readable format by enclosing the annotated text in a code block with ```xml at the beginning and ``` at the end.
 
@@ -167,7 +167,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         - Each proposition needs a unique ID attribute
         - Link related propositions using supports/attacks attributes
         - Maintain the original text content (do not modify wording)
-        - Non-argumentative sections can be abbreviated with [...] notation
+        - Non-argumentative sections can be abbreviated with [...] notation if the text is very long
         
         SOURCE TEXT:
         ::: {{.source_text}}
@@ -204,7 +204,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         - Each proposition needs a unique ID attribute
         - Link related propositions using supports/attacks attributes
         - Maintain the original text content (do not modify wording)
-        - Non-argumentative sections can be abbreviated with [...] notation
+        - Non-argumentative sections in very long texts can be abbreviated with [...] notation
         - Embed the annotated text within a code block (```xml at start, ``` at end)
 
         Please provide the annotated text in the specified format.
@@ -240,7 +240,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         - Record attack relationships using the "attacks" attribute (space-separated IDs)
         
         4.3 Technical Guidelines
-        - Non-argumentative segments may be abbreviated with [...] notation
+        - Non-argumentative segments in very long texsts may be abbreviated with [...] notation
         - Do not modify any text within identified propositions
         - Ensure all XML tags are properly nested and closed
         
@@ -416,73 +416,6 @@ class AnnotationJudge(MPJudge):
         evaluation = Evaluation.from_verification_request(result)
         return evaluation
     
-
-
-# class AnnotationJudge2(Judge):
-#     """Judge for the annotation task."""
-
-#     def parse_xml_snippet(
-#         self, annotated_source_text: str
-#     ) -> tuple[BeautifulSoup, str | None]:
-#         error_msg: str | None = None
-#         ast = annotated_source_text.strip("\n ")
-#         if ast.startswith("```xml") and ast.endswith("```") and len(ast.splitlines()) > 1:
-#             ast = "\n".join(ast.splitlines()[1:-1])
-#         else:  # no fenced code block
-#             error_msg = "Failed to extract single fenced annotation block:"
-#             if ast.count("```xml") == 0:
-#                 error_msg += " No fenced code block starting with '```xml'."
-#             if ast.count("```xml") > 1:
-#                 error_msg += " More than one fenced code block starting with '```xml'."
-#             if not ast.endswith("```"):
-#                 error_msg += " No closing '```'."
-
-#         multi_valued_attributes = {"*": {"supports", "attacks"}}
-#         soup = BeautifulSoup(
-#             ast,
-#             "html.parser",
-#             multi_valued_attributes=multi_valued_attributes,
-#         )
-#         return soup, error_msg
-
-#     def _evaluate_annotation(
-#         self, problem: AnnotationProblem, annotation: Annotation
-#     ) -> Evaluation:
-#         handler = CompositeHandler(
-#             handlers=[
-#                 DefaultProcessingHandler(),
-#                 HasAnnotationsHandler(),
-#                 ArgannoCompositeHandler(),
-#             ]
-#         )
-#         request = VerificationRequest(
-#             inputs=annotation.annotated_source_text, source=problem.sources
-#         )
-#         result = handler.process(request)
-#         evaluation = Evaluation.from_verification_request(result)
-#         return evaluation
-
-#     async def arun(
-#         self,
-#         problem: Problem,
-#         solutions: Sequence[Solution],
-#         original_solution: Solution | None = None,
-#         feedback: Feedback | None = None,
-#     ) -> Sequence[Evaluation]:
-#         assert isinstance(problem, AnnotationProblem), (
-#             "Problem must be an AnnotationProblem"
-#         )
-#         assert isinstance(original_solution, Annotation) or original_solution is None
-#         assert feedback or original_solution is None, (
-#             "Feedback is required for evaluating revised solutions"
-#         )
-
-#         evaluations = []
-#         for solution in solutions:
-#             assert isinstance(solution, Annotation), "All solutions must be Annotations"
-#             evaluations.append(self._evaluate_annotation(problem, solution))
-
-#         return evaluations
 
 
 class AnnotationFeedbackGenerator(FeedbackGenerator):
