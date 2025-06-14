@@ -180,7 +180,7 @@ class ArgannoPlusLogReco(ArgannoPlusInfreco):
         return cls(
             annotated_source_text=solution.annotated_source_text,
             argdown_snippet=solution.argdown_snippet,
-            unparsed_solution=solution.unparsed_solution,
+            _raw_answer=solution._raw_answer,
         )
 
 

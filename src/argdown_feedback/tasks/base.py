@@ -103,6 +103,10 @@ class Solution(ABC):
     def __str__(self) -> str:
         """Cast the solution as a string."""
 
+    @abstractmethod
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+
     @classmethod
     @abstractmethod
     def from_raw_answer(cls, raw_answer: str) -> "Solution":
@@ -249,13 +253,14 @@ class ProblemSolutionChat:
     original_solution: Solution | None = None
     feedback: Feedback | None = None
 
-    def as_chat(self, **problem_kwargs) -> list[ChatMessage]:
+    def as_chat(self, use_raw_answer: bool = False, **problem_kwargs) -> list[ChatMessage]:
+        answer_content = str(self.solution) if not use_raw_answer else self.solution.raw_answer()
         if self.original_solution is None or self.feedback is None:
             return [
                 ChatMessage(
                     role="user", content=self.problem.instruct_prompt(**problem_kwargs)
                 ),
-                ChatMessage(role="assistant", content=str(self.solution)),
+                ChatMessage(role="assistant", content=answer_content),
             ]
         return [
             ChatMessage(role="user", content=self.problem.instruct_prompt()),
@@ -265,7 +270,7 @@ class ProblemSolutionChat:
             ChatMessage(
                 role="user", content=self.problem.revise_prompt(**problem_kwargs)
             ),
-            ChatMessage(role="assistant", content=str(self.solution)),
+            ChatMessage(role="assistant", content=answer_content),
         ]
 
 
@@ -920,6 +925,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         feedback_generator: FeedbackGenerator | None = None,
         failure_type_preference_pair_generator: FailureTypePreferencePairGenerator
         | None = None,
+        ask_for_invalid_probs: dict[str, float] | None = None,
         **kwargs,
     ):
         self.problem_generator = problem_generator
@@ -934,6 +940,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         self.failure_type_preference_pair_generator = (
             failure_type_preference_pair_generator
         )
+        self.ask_for_invalid_probs: dict[str, float] = ask_for_invalid_probs if ask_for_invalid_probs is not None else {}
         for k, v in kwargs.items():
             setattr(self, k, v)
 
@@ -942,7 +949,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
     ) -> tuple[bool, bool]:
         do_virtue_hirp = (
             bool(self.virtue_preference_pair_generators)
-            and random.random() < mean_syntactic_validity
+            and random.random() < mean_syntactic_validity**4
         )
         do_validity_hirp = not do_virtue_hirp
         return do_validity_hirp, do_virtue_hirp
@@ -977,6 +984,30 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         if top_valid_solution is None or top_invalid_solution is None:
             return pairs
 
+        # current accuracy
+        mean_syntactic_validity = mean(int(e.is_valid) for e in evaluations)
+
+        # ask_for_invalid_probability is minimum of
+        # - (1 - accuracy) and
+        # - any configured ask_for_invalid_probability configured for any error_types 
+        #   (e.g. HasAnnotationsHandler) present in top_invalid_solution
+        # In consequence, if the current accuracy is high, the probability that the model
+        # is shown an ask-for-invalid preference pair is low.
+        min_ask_for_invalid_probability = min(
+            [
+                # select configured error-specific ask_for_invalid probability
+                afi_prob
+                for error_type, afi_prob in self.ask_for_invalid_probs.items()
+                # if error_type has been made in top_invalid_solution
+                if any(
+                    error_type in key for key in top_invalid_evaluation.metrics.keys()  # type: ignore
+                )
+            ]
+            + [1.0 - mean_syntactic_validity]
+        )
+        # randomly determine whether to do ask_for_invalid_pair
+        add_ask_for_invalid_pair = random.random() < min_ask_for_invalid_probability
+
         pairs.append(
             ChatPreferencePair(
                 chosen=ProblemSolutionChat(
@@ -984,15 +1015,18 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     solution=top_valid_solution,
                     original_solution=original_solution,
                     feedback=feedback,
-                ).as_chat(),
+                ).as_chat(use_raw_answer=True), # we're including full raw answers here
                 rejected=ProblemSolutionChat(
                     problem=problem,
                     solution=top_invalid_solution,
                     original_solution=original_solution,
                     feedback=feedback,
-                ).as_chat(),
+                ).as_chat(use_raw_answer=True), # we're including full raw answers here
             )
         )
+
+        if not add_ask_for_invalid_pair:
+            return pairs
 
         pairs.append(
             ChatPreferencePair(

@@ -829,14 +829,18 @@ class ArgmapPlusInfreco(Solution):
     Contains unparsed answer iff fenced code blocks couldn't be extracted.
     """
 
-    argdown_map_snippet: str
-    argdown_reconstructions_snippet: str
-    unparsed_solution: str | None = None
+    argdown_map_snippet: str  | None = None
+    argdown_reconstructions_snippet: str | None = None
+    _raw_answer: str | None = None
 
     def __str__(self):
-        if self.unparsed_solution:
-            return self.unparsed_solution
-        return self.argdown_map_snippet + "\n\n" + self.argdown_reconstructions_snippet
+        if self.argdown_map_snippet and self.argdown_reconstructions_snippet:
+            return self.argdown_map_snippet + "\n\n" + self.argdown_reconstructions_snippet
+        return self._raw_answer if self._raw_answer is not None else "None"
+
+    def raw_answer(self) -> str:
+        """Returns the full and raw answer as a string, including any reasoning traces"""
+        return self._raw_answer if self._raw_answer else str(self)
 
     @classmethod
     def from_raw_answer(cls, raw_answer: str) -> "ArgmapPlusInfreco":
@@ -868,23 +872,21 @@ class ArgmapPlusInfreco(Solution):
         )
 
         return cls(
-            argdown_map_snippet=map_snippet if map_snippet else raw_answer,
-            argdown_reconstructions_snippet=reco_snippet
-            if reco_snippet
-            else raw_answer,
-            unparsed_solution=None if map_snippet and reco_snippet else raw_answer,
+            argdown_map_snippet=map_snippet,
+            argdown_reconstructions_snippet=reco_snippet,
+            _raw_answer=raw_answer,
         )
 
     def partial_argmap(self) -> ArgumentMap:
         """Return the argument map subsolution."""
         return ArgumentMap(
-            argdown_snippet=self.argdown_map_snippet,
+            argdown_snippet=self.argdown_map_snippet, _raw_answer=self._raw_answer
         )
 
     def partial_infreco(self) -> InformalReco:
         """Return the informal reconstruction subsolution."""
         return InformalReco(
-            argdown_snippet=self.argdown_reconstructions_snippet,
+            argdown_snippet=self.argdown_reconstructions_snippet, _raw_answer=self._raw_answer,
         )
 
 
