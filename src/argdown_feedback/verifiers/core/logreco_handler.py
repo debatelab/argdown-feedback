@@ -111,6 +111,11 @@ class WellFormedFormulasHandler(BaseLogRecoHandler):
                         f"Proposition ({pr.label}) in argument <{argument.label}> lacks inline yaml data with formalization info."
                     )
                     continue
+                if not isinstance(prop.data, dict):
+                    msgs.append(
+                        f"Proposition ({pr.label}) in argument <{argument.label}> lacks properly format inline yaml data."
+                    )
+                    continue
                 formalization = prop.data.get(self.formalization_key)
                 declarations = prop.data.get(self.declarations_key)
                 if formalization is None:
