@@ -159,7 +159,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
          a) Natural language articulation
          b) First-order logic formalization in NLTK syntax
          c) Variable/predicate/constant declarations with clear natural language referents
-       • Example: (1) All mammals are vertebrates. {{formalization: '(x).(M(x) -> V(x))', declarations: {{'M': 'being a mammal', 'V': 'being a vertebrate'}} }}
+       • Example: (1) All mammals are vertebrates. {{formalization: 'all x.(M(x) -> V(x))', declarations: {{'M': 'being a mammal', 'V': 'being a vertebrate'}} }}
 
     3. INFERENTIAL DOCUMENTATION
        • Document each inference step with explicit notation of premise dependencies
@@ -307,7 +307,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
 
     Example:
     ```
-    (1) All birds have feathers. {{formalization: 'AllX(B(x) -> F(x))', declarations: {{'B': 'being a bird', 'F': 'having feathers'}} }}
+    (1) All birds have feathers. {{formalization: 'all x.(B(x) -> F(x))', declarations: {{'B': 'being a bird', 'F': 'having feathers'}} }}
     ```
 
     ## Step 5: Connect the Inferences
@@ -425,7 +425,7 @@ _LOGRECO_PROMPT_TEMPLATES = [
 
     Example:
     ```
-    (1) All humans are mortal. {{formalization: 'AllX(H(x) -> M(x))', declarations: {{'H': 'being human', 'M': 'being mortal'}} }}
+    (1) All humans are mortal. {{formalization: 'all x.(H(x) -> M(x))', declarations: {{'H': 'being human', 'M': 'being mortal'}} }}
     ```
 
     ### Step 4: Document Inference Steps
