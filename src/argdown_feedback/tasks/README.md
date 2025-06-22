@@ -38,6 +38,7 @@ flowchart LR
     B -.->|ranked by| SCP
 ```
 
+```mermaid
 flowchart LR
     OS[Solution S<sub>i</sub><br/>_–incorrect–_]
     OE[Evaluation E<sub>i</sub>]
@@ -46,18 +47,20 @@ flowchart LR
     F@{ shape: docs, label: "Feedbacks<br/>F<sub>1</sub>...F<sub>k</sub>"}
     R@{ shape: docs, label: "Revisions<br/>R<sub>11</sub>...R<sub>1l</sub><br/>...<br/>R<sub>k1</sub>...R<sub>kl</sub>"}
     ER@{ shape: docs, label: "Evaluations<br/>E<sub>11</sub>...E<sub>1l</sub><br/>...<br/>E<sub>k1</sub>...E<sub>kl</sub>"}
-    FE(Feedback<br/>Effectiveness)
-    HIRPO(HIRPO)
+    RevOri(3️⃣ &nbsp;Revision<br/>vs. Original )
+    FE(2️⃣&nbsp;&nbsp;Feedback<br/>Effectiveness)
+    HIRPO(1️⃣&nbsp;HIRPO)
     PP[Preference<br/>Pairs]
     OS --> A
     OE --> A
     A --> F --> B
     B -->R -->|VR| ER
+    ER --> RevOri --> PP
     ER --> FE --> PP
     ER --> HIRPO --> PP
     R -.->|ranked by| HIRPO
     F -.->|ranked by| FE
-
+```
 
 
 ### Symmetric HIRP (illustration of key idea)
