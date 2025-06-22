@@ -1189,7 +1189,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     )
                 except Exception as exc:
                     logger.warning(
-                        f"Failed to evaluate revisions ({str(exc)}). Skipping revision workflow."
+                        f"Failed to evaluate revisions ({str(exc)}) with judge {str(self.judge.__class__.__name__)}. Skipping revision workflow."
                     )
                     return pairs_rev_wf, [], stats
 
