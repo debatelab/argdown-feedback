@@ -15,7 +15,7 @@ from argdown_feedback.tasks.base import (
     FeedbackGenerator,
 )
 
-from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
+from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler, SourceTextIntegrityHandler
 from argdown_feedback.verifiers.core.content_check_handler import HasAnnotationsHandler
 from argdown_feedback.verifiers.verification_request import (
     VerificationDType,
@@ -43,7 +43,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
                     
         Annotate the following **source text** in order to identify the argumentative function of different parts in the text.
 
-        ::: {{.source_text}}
+        ::: {{.source_text words={word_count}}}
         {sources}
         :::
 
@@ -51,7 +51,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
 
         {annotation_scheme}
 
-        Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts may be shortened).
+        Just add tags and attributes to the source text to mark the argumentative function of each part. Don't modify the text in any other way (exception: non-annotated segments of long texts with more than {word_count_threshold} words may be shortened).
 
         Enclose the annotated text in a single fenced codeblock, starting with '```xml' and ending with '```'.
         """).strip(),
@@ -63,7 +63,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
                     
         Please read this **story** below very carefully:
 
-        ::: {{.source_text}}
+        ::: {{.source_text words={word_count}}}
         {sources}
         :::
 
@@ -71,7 +71,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
 
         {annotation_scheme}
 
-        Remember, dear AI: Just add the tags around the words - don't change any of the words in the story! (If the story is super long, you can shorten parts that don't have arguments.)
+        Remember, dear AI: Just add the tags around the words - don't change any of the words in the story! (If the story is super long and has more than {word_count_threshold} words, you can shorten parts that don't have arguments.)
 
         When you're done, put your marked-up text between these special markers:
         ```xml at the beginning
@@ -84,7 +84,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
                     
         So basically, I need you to go through this text document and mark up the argumentative parts:
 
-        ::: {{.source_text}}
+        ::: {{.source_text words={word_count}}}
         {sources}
         :::
 
@@ -92,7 +92,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
 
         {annotation_scheme}
 
-        Just add those tags where needed but don't change any of the actual wording. If there are long sections with no arguments, you can abbreviate those parts.
+        Just add those tags where needed but don't change any of the actual wording. If there are long sections with no arguments and the word count exceeds {word_count_threshold}, you can abbreviate those parts.
 
         When you're done, could you put the whole thing in one of those code blocks? Start with ```xml and end with ```. Makes it easier to process later. -- Don't forget the final ``` at the end! 
 
@@ -103,7 +103,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
                         
         Analyze the following passage by identifying its argumentative structure. Apply the appropriate XML annotation tags to demarcate propositions and their logical relationships.
 
-        ::: {{.source_text}}
+        ::: {{.source_text words={word_count}}}
         {sources}
         :::
 
@@ -114,7 +114,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         
         • Add XML tags to identify propositions and their argumentative relationships
         • Clearly indicate support and attack relationships between propositions
-        • Maintain the integrity of the original text (though you may abbreviate non-argumentative passages in very long source texts)
+        • Maintain the integrity of the original text (though you may abbreviate non-argumentative passages in source texts with more than {word_count_threshold} words)
         • Ensure each proposition has a unique identifier
         
         Submission Format:
@@ -133,7 +133,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
 
         Here's the passage I'm analyzing:
 
-        ::: {{.source_text}}
+        ::: {{.source_text words={word_count}}}
         {sources}
         :::
 
@@ -146,7 +146,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         2. Preserve the exact wording of the original text
         3. Identify all support and attack relationships between propositions
         4. Assign unique identifiers to each proposition
-        5. You may abbreviate non-argumentative passages in very long texts if necessary
+        5. You may abbreviate non-argumentative passages in very long texts (> {word_count_threshold} words) if necessary
         
         Present your analysis in a machine-readable format by enclosing the annotated text in a code block with ```xml at the beginning and ``` at the end.
 
@@ -167,9 +167,9 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         - Each proposition needs a unique ID attribute
         - Link related propositions using supports/attacks attributes
         - Maintain the original text content (do not modify wording)
-        - Non-argumentative sections can be abbreviated with [...] notation if the text is very long
+        - Non-argumentative sections can be abbreviated with [...] notation if word count exceeds {word_count_threshold}
         
-        SOURCE TEXT:
+        SOURCE TEXT ({word_count} words):
         ::: {{.source_text}}
         {sources}
         :::
@@ -185,7 +185,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
     dedent("""
         Please help me in understanding the following TEXT:
 
-        TEXT:
+        TEXT ({word_count} words):
         :::
         {sources}
         :::
@@ -204,7 +204,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         - Each proposition needs a unique ID attribute
         - Link related propositions using supports/attacks attributes
         - Maintain the original text content (do not modify wording)
-        - Non-argumentative sections in very long texts can be abbreviated with [...] notation
+        - Non-argumentative sections in texts with more than {word_count_threshold} words can be abbreviated with [...] notation
         - Embed the annotated text within a code block (```xml at start, ``` at end)
 
         Please provide the annotated text in the specified format.
@@ -219,7 +219,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         SECTION 2: SOURCE MATERIAL
         Please annotate the following text according to the protocol described below:
         
-        ::: {{.source_text}}
+        ::: {{.source_text words={word_count}}}
         {sources}
         :::
         
@@ -240,7 +240,7 @@ _ANNOTATION_PROMPT_TEMPLATES = [
         - Record attack relationships using the "attacks" attribute (space-separated IDs)
         
         4.3 Technical Guidelines
-        - Non-argumentative segments in very long texsts may be abbreviated with [...] notation
+        - Non-argumentative segments in texts with more than {word_count_threshold} words may be abbreviated with [...] notation
         - Do not modify any text within identified propositions
         - Ensure all XML tags are properly nested and closed
         
@@ -276,7 +276,10 @@ class AnnotationProblem(Problem):
         evaluation: Evaluation | None = None,
     ) -> str:
         prompt = self._prompt_template.format(
-            sources=self.sources, annotation_scheme=ANNOTATION_SCHEME
+            sources=self.sources,
+            annotation_scheme=ANNOTATION_SCHEME,
+            word_count=len(self.sources.split()),
+            word_count_threshold=SourceTextIntegrityHandler._ALLOW_SOURCE_TEXT_SHORTENING_WC_THRESHOLD,
         )
 
         if hints:
