@@ -518,18 +518,25 @@ class LogrecoFromInfrecoProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._infreco_pg = InfRecoProblemGenerator()        
-        self._infreco_sg = GenericSolutionGenerator(solution_class=InformalReco, *args, **kwargs, n_solutions=1)
+        self._infreco_sg = GenericSolutionGenerator(solution_class=InformalReco, *args, **kwargs, n_solutions=10)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
             infreco_problem = await self._infreco_pg.arun(inputs)
-            infreco_solution = await self._infreco_sg.arun(infreco_problem)            
-            infreco_evaluation = InfRecoJudge()._evaluate_solution(infreco_solution[0], infreco_problem)
+            infreco_solutions = await self._infreco_sg.arun(infreco_problem)            
+            infreco_evaluations =[
+                InfRecoJudge()._evaluate_solution(s, infreco_problem)
+                for s in infreco_solutions
+            ]
+            infreco_solution, infreco_evaluation = next(
+                ((s,e) for s, e in zip(infreco_solutions, infreco_evaluations) if e.is_valid),
+                (infreco_solutions[0], infreco_evaluations[0])
+            )
             argdown_infreco = infreco_evaluation.artifacts.get("argdown_reco")
             return LogrecoFromInfrecoProblem(
-                argdown_snippet=str(infreco_solution[0]),
+                argdown_snippet=str(infreco_solution),
                 argdown_infreco=argdown_infreco,
                 infreco_evaluation=infreco_evaluation,
             )

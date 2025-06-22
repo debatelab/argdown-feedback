@@ -468,17 +468,25 @@ class ArgmapFromArgannoProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._arganno_pg = AnnotationProblemGenerator()        
-        self._arganno_sg = GenericSolutionGenerator(solution_class=Annotation, *args, **kwargs, n_solutions=1)
+        self._arganno_sg = GenericSolutionGenerator(solution_class=Annotation, *args, **kwargs, n_solutions=10)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
             arganno_problem = await self._arganno_pg.arun(inputs)
-            arganno_solution = await self._arganno_sg.arun(arganno_problem)
-            soup_anno, _ = AnnotationJudge().parse_xml_snippet(arganno_solution[0].annotated_source_text)  # type: ignore
+            arganno_solutions = await self._arganno_sg.arun(arganno_problem)
+            arganno_evaluations =[
+                AnnotationJudge()._evaluate_solution(s, arganno_problem)
+                for s in arganno_solutions
+            ]
+            arganno_solution = next(
+                (s for s, e in zip(arganno_solutions, arganno_evaluations) if e.is_valid),
+                arganno_solutions[0]
+            )
+            soup_anno, _ = AnnotationJudge().parse_xml_snippet(arganno_solution.annotated_source_text)  # type: ignore
             return ArgmapFromArgannoProblem(
-                annotated_text=str(arganno_solution[0]),
+                annotated_text=str(arganno_solution),
                 soup_anno=soup_anno,
             )
         raise ValueError(
@@ -505,6 +513,7 @@ class AnnotationTextProximityPreferencePairGenerator(ScoringVirtuePreferencePair
     ) -> float:
         assert isinstance(problem, ArgmapFromArgannoProblem)
         assert isinstance(solution, ArgumentMap)
+        assert isinstance(solution.argdown_snippet, str)
 
         soup = problem.soup_anno
         if soup is None:

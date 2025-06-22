@@ -488,15 +488,23 @@ class InfRecoFromArgAnnoProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._arganno_pg = AnnotationProblemGenerator()
-        self._arganno_sg = GenericSolutionGenerator(solution_class=Annotation, *args, **kwargs, n_solutions=1)
+        self._arganno_sg = GenericSolutionGenerator(solution_class=Annotation, *args, **kwargs, n_solutions=10)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
             arganno_problem = await self._arganno_pg.arun(inputs)
-            arganno_solution = await self._arganno_sg.arun(arganno_problem)
-            return InfRecoFromArgAnnoProblem(str(arganno_solution[0]))
+            arganno_solutions = await self._arganno_sg.arun(arganno_problem)
+            arganno_evaluations =[
+                AnnotationJudge()._evaluate_solution(s, arganno_problem)
+                for s in arganno_solutions
+            ]
+            arganno_solution = next(
+                (s for s, e in zip(arganno_solutions, arganno_evaluations) if e.is_valid),
+                arganno_solutions[0]
+            )
+            return InfRecoFromArgAnnoProblem(str(arganno_solution))
         raise ValueError(
             "Inputs to an argument reconstruction problem must be a string or a list of strings"
         )
@@ -520,6 +528,7 @@ class AnnotationProximityPreferencePairGenerator(ScoringVirtuePreferencePairGene
     ) -> float:
         assert isinstance(problem, InfRecoFromArgAnnoProblem)
         assert isinstance(solution, InformalReco)
+        assert isinstance(solution.argdown_snippet, str)
 
         soup, _ = AnnotationJudge().parse_xml_snippet(problem.annotation)
         anno_props = soup.find_all("proposition")

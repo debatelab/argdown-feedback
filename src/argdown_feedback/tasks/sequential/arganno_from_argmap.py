@@ -498,21 +498,28 @@ class ArgannoFromArgmapProblemGenerator(ProblemGeneratorLLM):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self._argmap_pg = ArgMapProblemGenerator()        
-        self._argmap_sg = GenericSolutionGenerator(solution_class=ArgumentMap, *args, **kwargs, n_solutions=1)
+        self._argmap_sg = GenericSolutionGenerator(solution_class=ArgumentMap, *args, **kwargs, n_solutions=10)
 
     async def arun(self, inputs) -> Problem:
         if isinstance(inputs, str) or (
             isinstance(inputs, list) and all(isinstance(i, str) for i in inputs)
         ):
             argmap_problem = await self._argmap_pg.arun(inputs)
-            argmap_solution = await self._argmap_sg.arun(argmap_problem)
+            argmap_solutions = await self._argmap_sg.arun(argmap_problem)
             #print("argmap_problem", argmap_problem)
-            #print("argmap_solution", argmap_solution)
-            argmap_evaluation = ArgMapJudge()._evaluate_solution(argmap_solution[0], argmap_problem)
+            #print("argmap_solutions", argmap_solutions)
+            argmap_evaluations =[
+                ArgMapJudge()._evaluate_solution(s, argmap_problem)
+                for s in argmap_solutions
+            ]
+            argmap_solution, argmap_evaluation = next(
+                ((s,e) for s, e in zip(argmap_solutions, argmap_evaluations) if e.is_valid),
+                (argmap_solutions[0], argmap_evaluations[0])
+            )
             argdown_map = argmap_evaluation.artifacts.get("argdown_map")
             return ArgannoFromArgmapProblem(
                 sources=inputs,
-                argdown_snippet=str(argmap_solution[0]),
+                argdown_snippet=str(argmap_solution),
                 argdown_map=argdown_map,
                 argmap_evaluation=argmap_evaluation,
             )
