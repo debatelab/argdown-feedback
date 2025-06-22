@@ -5,6 +5,7 @@ import asyncio
 from concurrent.futures import ProcessPoolExecutor
 import copy
 import dataclasses
+import enum
 import functools
 import hashlib
 import logging
@@ -38,6 +39,20 @@ class ChatMessage(TypedDict):
 class ChatPreferencePair(TypedDict):
     chosen: list[ChatMessage]
     rejected: list[ChatMessage]
+    metadata: dict[str, Any] | None
+
+
+class PreferencePairType(enum.Enum):
+    """Enum representing the type of preference pair."""
+
+    VALIDITY = "VALIDITY_PREFERENCE_PAIR"
+    VALIDITY_REVISION = "VALIDITY_PREFERENCE_PAIR_REVISION"
+    VIRTUE = "VIRTUE_PREFERENCE_PAIR"
+    VIRTUE_REVISION = "VIRTUE_PREFERENCE_PAIR_REVISION"
+    FAILURE_TYPE = "FAILURE_TYPE_PREFERENCE_PAIR"
+    FAILURE_TYPE_REVISION = "FAILURE_TYPE_PREFERENCE_PAIR_REVISION"
+    FEEDBACK = "FEEDBACK_PREFERENCE_PAIR"
+    ORIGINAL_REVISION = "ORIGINAL_REVISION_PREFERENCE_PAIR"
 
 
 class Problem(ABC):
@@ -714,6 +729,11 @@ class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
             [s for s, e in valid_recos if self._score(problem, s, e) < top_score]
         )
 
+        metadata = {
+            "type": PreferencePairType.VIRTUE.value if original_solution is None else PreferencePairType.VIRTUE_REVISION.value,
+            "ask_for_invalid": False,
+        }
+
         pairs.append(
             ChatPreferencePair(
                 chosen=ProblemSolutionChat(
@@ -728,6 +748,7 @@ class ScoringVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
                     feedback=feedback,
                     original_solution=original_solution,
                 ).as_chat(hints=self.hints),
+                metadata=metadata,
             )
         )
 
@@ -847,6 +868,13 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
             f"- {k}: {v}" for k, v in errors_avoided.items()
         )
 
+        metadata = {
+            "type": PreferencePairType.FAILURE_TYPE.value
+            if original_solution is None
+            else PreferencePairType.FAILURE_TYPE_REVISION.value,
+            "ask_for_invalid": False,
+        }
+
         pairs.append(
             ChatPreferencePair(
                 chosen=ProblemSolutionChat(
@@ -861,6 +889,7 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
                     feedback=feedback,
                     original_solution=original_solution,
                 ).as_chat(hints=[hint]),
+                metadata=metadata,
             )
         )
 
@@ -961,6 +990,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         evaluations: Sequence[Evaluation],
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
+        preference_pair_type: str | None = None,
     ) -> list[ChatPreferencePair]:
         """
         Builds two preference pairs based on syntactic differences
@@ -1008,6 +1038,9 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         # randomly determine whether to do ask_for_invalid_pair
         add_ask_for_invalid_pair = random.random() < min_ask_for_invalid_probability
 
+        if preference_pair_type is None:
+            preference_pair_type = PreferencePairType.VALIDITY.value if original_solution is None else PreferencePairType.VALIDITY_REVISION.value
+
         pairs.append(
             ChatPreferencePair(
                 chosen=ProblemSolutionChat(
@@ -1022,6 +1055,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     original_solution=original_solution,
                     feedback=feedback,
                 ).as_chat(use_raw_answer=True), # we're including full raw answers here
+                metadata={
+                    "type": preference_pair_type,
+                    "ask_for_invalid": False,
+                    "use_raw_answer": True,
+                }
             )
         )
 
@@ -1042,6 +1080,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     original_solution=original_solution,
                     feedback=feedback,
                 ).as_chat(ask_for_invalid=True, evaluation=top_invalid_evaluation),
+                metadata={
+                    "type": preference_pair_type,
+                    "ask_for_invalid": True,
+                    "use_raw_answer": False,
+                }
             )
         )
 
@@ -1054,6 +1097,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         evaluations: Sequence[Evaluation],
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
+        preference_pair_type: str | None = None
     ) -> tuple[list[ChatPreferencePair], HIRPOGenStats]:
         assert len(candidate_solutions) == len(evaluations), (
             "Candidate solutions and evaluations must have the same length."
@@ -1097,6 +1141,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 evaluations,
                 original_solution=original_solution,
                 feedback=feedback,
+                preference_pair_type=preference_pair_type,
             )
             pairs.extend(new_pairs)
             stats.n_total += len(new_pairs)
@@ -1170,6 +1215,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                         problem,
                         candidate_solutions=[cs, candidate_revisions[0]],
                         evaluations=[e, revision_evals[0]],
+                        preference_pair_type=PreferencePairType.ORIGINAL_REVISION.value,
                     )
                     pairs_rev_wf.extend(new_pairs)
                     stats.n_total += len(new_pairs)
@@ -1236,6 +1282,10 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 least_successful_feedback = feedbacks[
                     n_valid_revisions.index(min(n_valid_revisions))
                 ]
+                metadata = {
+                    "type": PreferencePairType.FEEDBACK.value,
+                    "ask_for_invalid": False,
+                }
                 pairs.append(
                     ChatPreferencePair(
                         chosen=[
@@ -1260,6 +1310,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                                 content=least_successful_feedback.feedback,
                             ),
                         ],
+                        metadata=metadata,
                     )
                 )
                 stats.n_total += 1

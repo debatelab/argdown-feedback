@@ -16,6 +16,7 @@ from argdown_feedback.tasks.base import (
     FeedbackGenerator,
     VirtuePreferencePairGenerator,
     HIRPreferencePairGenerator,
+    PreferencePairType,
 )
 
 
@@ -316,6 +317,7 @@ class NumberVirtuePreferencePairGenerator(VirtuePreferencePairGenerator):
                         feedback=feedback,
                         original_solution=original_solution,
                     ).as_chat(hints=["mathematically perfect answer, please"]),
+                    metadata={"type": PreferencePairType.VALIDITY}
                 )
             )
 
@@ -424,6 +426,12 @@ async def test_valid_after_magic():
     hirp_gen_magic_fbk = hirp_factory(ValidAfterMagicGen, MagicFeedbackGenerator)
     pairs, _ = await hirp_gen_magic_fbk.arun(1)
     pprint.pprint(pairs)
+    assert all("metadata" in pair for pair in pairs)
+    assert all(
+        PreferencePairType.VALIDITY_REVISION.value 
+        in pair.get("metadata", {})["type"]
+        for pair in pairs
+    )
     # as the feedback is always the same, we will never get feeback preferences
     assert not any("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs)))
     assert all(len(pair["chosen"]) == 6 for pair in pairs)
@@ -444,6 +452,11 @@ async def test_valid_after_magic2():
     hirp_gen_magic_fbk = hirp_factory(ValidAfterMagicGen, MagicFeedbackGenerator)
     pairs, _ = await hirp_gen_magic_fbk.arun(2)
     pprint.pprint(pairs)
+    assert all(
+        PreferencePairType.VALIDITY_REVISION.value 
+        in pair.get("metadata", {})["type"]
+        for pair in pairs if pair
+    )
     # as the feedback is always the same, we will never get feeback preferences
     assert not any("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs)))
     assert all(len(pair["chosen"]) == 6 for pair in pairs)
@@ -470,6 +483,11 @@ async def test_valid_after_magic3():
     assert pairs
     # as the first feedback is empty and the second is magic, we will get one feedback preference pair for each
     # original solution
+    assert sum(
+        PreferencePairType.FEEDBACK.value
+        in pair["metadata"]["type"]
+        for pair in pairs
+    ) == 3
     assert sum("magic" in pairs[i]["chosen"][-1]["content"] for i in range(len(pairs))) == 3
     assert sum(len(pair["chosen"]) == 4 for pair in pairs) == 3
     # but the "magic" feedback is never rejected
