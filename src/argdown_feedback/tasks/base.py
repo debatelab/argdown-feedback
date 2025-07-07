@@ -900,48 +900,6 @@ class GenericFailureDiffPreferencePairGenerator(FailureTypePreferencePairGenerat
 ######################
 
 
-@dataclasses.dataclass
-class HIRPOGenStats:
-    """
-    Statistics for preference pairs generated with HIRPOGen.
-    """
-
-    n_solutions: int = 0
-    n_solutions_valid: int = 0
-    n_total: int = 0
-    n_validity_preference_pairs: int = 0
-    n_virtue_preference_pairs: int = 0
-    n_validity_preference_pairs_rev: int = 0
-    n_virtue_preference_pairs_rev: int = 0
-    n_feedback_preference_pairs: int = 0
-    n_failure_type_preference_pairs: int = 0
-    n_original_revision_pairs: int = 0
-
-    # define operator overloading for addition
-    def __add__(self, other: "HIRPOGenStats") -> "HIRPOGenStats":
-        if not isinstance(other, HIRPOGenStats):
-            raise TypeError("Can only add HIRPOGenStats objects")
-        return HIRPOGenStats(
-            n_solutions=self.n_solutions + other.n_solutions,
-            n_solutions_valid=self.n_solutions_valid + other.n_solutions_valid,
-            n_total=self.n_total + other.n_total,
-            n_validity_preference_pairs=self.n_validity_preference_pairs
-            + other.n_validity_preference_pairs,
-            n_virtue_preference_pairs=self.n_virtue_preference_pairs
-            + other.n_virtue_preference_pairs,
-            n_validity_preference_pairs_rev=self.n_validity_preference_pairs_rev
-            + other.n_validity_preference_pairs_rev,
-            n_virtue_preference_pairs_rev=self.n_virtue_preference_pairs_rev
-            + other.n_virtue_preference_pairs_rev,
-            n_feedback_preference_pairs=self.n_feedback_preference_pairs
-            + other.n_feedback_preference_pairs,
-            n_failure_type_preference_pairs=self.n_failure_type_preference_pairs
-            + other.n_failure_type_preference_pairs,
-            n_original_revision_pairs=self.n_original_revision_pairs
-            + other.n_original_revision_pairs,
-        )
-
-
 class HIRPreferencePairGenerator(HIRAbstractGenerator):
     def __init__(
         self,
@@ -1098,12 +1056,11 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         original_solution: Solution | None = None,
         feedback: Feedback | None = None,
         preference_pair_type: str | None = None
-    ) -> tuple[list[ChatPreferencePair], HIRPOGenStats]:
+    ) -> list[ChatPreferencePair]:
         assert len(candidate_solutions) == len(evaluations), (
             "Candidate solutions and evaluations must have the same length."
         )
         pairs: list[ChatPreferencePair] = []
-        stats = HIRPOGenStats()
         mean_syntactic_validity = mean(int(e.is_valid) for e in evaluations)
         do_validity_hirp, do_virtue_hirp = self.validity_vs_virtue_router(
             mean_syntactic_validity
@@ -1127,11 +1084,6 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 if virtue_pairs:
                     break
             pairs.extend(virtue_pairs)
-            stats.n_total += len(virtue_pairs)
-            if original_solution is None:
-                stats.n_virtue_preference_pairs += len(virtue_pairs)
-            else:
-                stats.n_virtue_preference_pairs_rev += len(virtue_pairs)
 
         if do_validity_hirp:
             logger.debug("Constructing syntactic validity preference pair")
@@ -1144,13 +1096,8 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 preference_pair_type=preference_pair_type,
             )
             pairs.extend(new_pairs)
-            stats.n_total += len(new_pairs)
-            if original_solution is None:
-                stats.n_validity_preference_pairs += len(new_pairs)
-            else:
-                stats.n_validity_preference_pairs_rev += len(new_pairs)
 
-        return pairs, stats
+        return pairs
 
     async def run_self_critique(
         self,
@@ -1158,20 +1105,19 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         candidate_solutions: Sequence[Solution],
         evaluations: Sequence[Evaluation],
         generate_revision_failure_type_pairs: bool = False,
-    ) -> tuple[list[ChatPreferencePair], HIRPOGenStats]:
+    ) -> list[ChatPreferencePair]:
         """self-critique branch"""
 
         async def run_selfcritique_workflow(
             problem: Problem, cs: Solution, e: Evaluation
-        ) -> tuple[list[ChatPreferencePair], HIRPOGenStats]:
+        ) -> list[ChatPreferencePair]:
             """runs a full selfcritique workflow for a _single_ candidate_solution and its evaluation"""
 
             async def run_revision_workflow(
                 problem: Problem, cs: Solution, e: Evaluation, feedback: Feedback
-            ) -> tuple[list[ChatPreferencePair], Sequence[Evaluation], HIRPOGenStats]:
+            ) -> tuple[list[ChatPreferencePair], Sequence[Evaluation]]:
                 """generates and evaluates revisions, construct pref pairs for single solution, evaluation, and feedback"""
                 pairs_rev_wf: list[ChatPreferencePair] = []
-                stats = HIRPOGenStats()
                 candidate_revisions = await self.solution_generator.arun(
                     problem, original_solution=cs, feedback=feedback
                 )
@@ -1179,7 +1125,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     logger.info(
                         "No candidate revisions generated. Skipping revision workflow."
                     )
-                    return pairs_rev_wf, [], stats
+                    return pairs_rev_wf, []
                 try:
                     revision_evals = await self.judge.arun(
                         problem,
@@ -1191,7 +1137,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     logger.warning(
                         f"Failed to evaluate revisions ({str(exc)}) with judge {str(self.judge.__class__.__name__)}. Skipping revision workflow."
                     )
-                    return pairs_rev_wf, [], stats
+                    return pairs_rev_wf, []
 
                 # run revision-specific HIRP to generate solution preference pairs
 
@@ -1206,22 +1152,18 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                             )
                         )
                         pairs_rev_wf.extend(new_pairs)
-                        stats.n_total += len(new_pairs)
-                        stats.n_failure_type_preference_pairs += len(new_pairs)
-                    return pairs_rev_wf, revision_evals, stats
+                    return pairs_rev_wf, revision_evals
 
                 if all(re.is_valid for re in revision_evals):
-                    new_pairs, _ = await self.build_solution_pref_pair(
+                    new_pairs = await self.build_solution_pref_pair(
                         problem,
                         candidate_solutions=[cs, candidate_revisions[0]],
                         evaluations=[e, revision_evals[0]],
                         preference_pair_type=PreferencePairType.ORIGINAL_REVISION.value,
                     )
                     pairs_rev_wf.extend(new_pairs)
-                    stats.n_total += len(new_pairs)
-                    stats.n_original_revision_pairs += len(new_pairs)
 
-                new_pairs, new_stats = await self.build_solution_pref_pair(
+                new_pairs = await self.build_solution_pref_pair(
                     problem,
                     candidate_revisions,
                     revision_evals,
@@ -1229,37 +1171,24 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                     feedback=feedback,
                 )
                 pairs_rev_wf.extend(new_pairs)
-                stats += new_stats
 
-                return pairs_rev_wf, revision_evals, stats
+                return pairs_rev_wf, revision_evals
 
             pairs: list[ChatPreferencePair] = []
-            stats = HIRPOGenStats()
             revision_evaluations: list[Sequence[Evaluation]] = []
 
             # generate feedbacks
             if self.feedback_generator is None:
-                return pairs, stats
+                return pairs
             feedbacks = await self.feedback_generator.arun(problem, cs, e)
-            # revisions: list[Sequence[Solution]] = []
-
-            # coros = [
-            #     run_revision_workflow(problem, cs, e, feedback)
-            #     for feedback in feedbacks
-            # ]
-            # for pairs_rev_wf, revision_evals in await asyncio.gather(*coros):
-            #     revision_evaluations.append(revision_evals)
-            #     pairs.extend(pairs_rev_wf)
 
             for feedback in feedbacks:
                 (
                     pairs_rev_wf,
                     revision_evals,
-                    stats_rev_wf,
                 ) = await run_revision_workflow(problem, cs, e, feedback)
                 revision_evaluations.append(revision_evals)
                 pairs.extend(pairs_rev_wf)
-                stats += stats_rev_wf
 
                 # stop if we have at least one valid revision
                 if any(ev.is_valid for ev in revision_evals):
@@ -1313,15 +1242,12 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                         metadata=metadata,
                     )
                 )
-                stats.n_total += 1
-                stats.n_feedback_preference_pairs += 1
 
-            return pairs, stats
+            return pairs
 
         pairs_all: list[ChatPreferencePair] = []
-        stats_all = HIRPOGenStats()
         if self.feedback_generator is None:
-            return [], stats_all
+            return []
 
         # coros = [
         #     run_selfcritique_workflow(problem, cs, e)
@@ -1333,9 +1259,8 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
 
         for cs, e in zip(candidate_solutions, evaluations):
             if not e.is_valid:
-                pairs, stats = await run_selfcritique_workflow(problem, cs, e)
+                pairs = await run_selfcritique_workflow(problem, cs, e)
                 pairs_all.extend(pairs)
-                stats_all += stats
 
         # Deduplicate (ignoring differences in rejected conversations)
         random.shuffle(pairs_all)
@@ -1344,12 +1269,8 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             for i, pair in enumerate(pairs_all)
             if not any(p["chosen"] == pair["chosen"] for p in pairs_all[:i])
         ]
-        # NOTE
-        # We're only adjusting total counts
-        # In consequence, pair_type_counts include duplicates and might not add up to total count
-        stats_all.n_total = len(pairs_all)
 
-        return pairs_all, stats_all
+        return pairs_all
 
     def self_critique_router(
         self, evaluations: Sequence[Evaluation]
@@ -1358,23 +1279,19 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
         do_self_critique = not any(e.is_valid for e in evaluations)
         return do_self_critique, not do_self_critique
 
-    async def arun(self, inputs) -> tuple[list[ChatPreferencePair], dict[str, int]]:
+    async def arun(self, inputs) -> list[ChatPreferencePair]:
         """main workflow logic"""
         problem = await self.problem_generator.arun(inputs)
         candidate_solutions = await self.solution_generator.arun(problem)
         evaluations = await self.judge.arun(problem, candidate_solutions)
 
         pairs: list[ChatPreferencePair] = []
-        stats = HIRPOGenStats(
-            n_solutions=len(evaluations),
-            n_solutions_valid=len([e for e in evaluations if e.is_valid])
-        )
 
         do_self_critique, skip_self_critique = self.self_critique_router(evaluations)
 
         if do_self_critique:
             try:
-                pairs, stats = await self.run_self_critique(
+                pairs = await self.run_self_critique(
                     problem, candidate_solutions, evaluations
                 )
             except Exception as e:
@@ -1383,7 +1300,7 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
                 skip_self_critique = True
 
         if skip_self_critique:
-            pairs, stats = await self.build_solution_pref_pair(
+            pairs = await self.build_solution_pref_pair(
                 problem, candidate_solutions, evaluations
             )
 
@@ -1391,12 +1308,8 @@ class HIRPreferencePairGenerator(HIRAbstractGenerator):
             pairs = await self.failure_type_preference_pair_generator.arun(
                 problem, candidate_solutions, evaluations
             )
-            stats = HIRPOGenStats(
-                n_failure_type_preference_pairs=len(pairs),
-                n_total=len(pairs),
-            )
 
-        return pairs, dataclasses.asdict(stats)
+        return pairs
 
 
 class HIREvaluator(HIRAbstractGenerator):
