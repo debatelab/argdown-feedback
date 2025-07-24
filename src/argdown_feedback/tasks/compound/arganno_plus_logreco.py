@@ -95,7 +95,7 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
             {sources}
             :::
 
-            ## Annotation Task Details                   
+            ## Annotation Task Details           
                    
             Annotate the source text above according to the following schema:
 
@@ -114,18 +114,17 @@ class ArgannoPlusLogRecoProblem(LogRecoProblem, AnnotationProblem):
             - For each inference step in the argument(s), provide information about which previously introduced premises or conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.            
             - Provide a succinct label (title) for each argument and summarize its gist in line with Argdown syntax conventions. 
                   
-            Importantly, enclose your Argdown snippet in a fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
+            Importantly, enclose all your formal reconstructions (separated by newlines) in a single fenced Argdown codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
                    
             ## Required Coherence of Annotation and Formal Argument Reconstruction                                                
 
-            The argument reconstruction, on the one hand, and the annotated source text, on the other hand, must cohere with each other. There should be one-to-many correspondence between premises/conclusion(s) and annotated text segments. Moreover, the inferential relations in the reconstructed argument(s) should reflect the annotated support relations.
-                   
-            In particular, you should ensure that: 
+            The argument reconstruction, on the one hand, and the annotated source text, on the other hand, must cohere with each other. Moreover, the inferential relations in the reconstructed argument(s) should reflect the annotated support relations.
+            In particular, you should ensure that:
 
             - Every <proposition> element in the annotation has an `argument_label` attribute, which refers to a label of an argument in the Argdown snippet.
             - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding argument. 
-            - Every premise and conclusion in an Argdown argument has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> elements in the annotation.
+            - Every premise and conclusion in an Argdown argument has yaml inline data. In addition to 'formalization' and 'declarations' keys, that yaml data has an `annotation_ids` attribute which contains a (possibly empty) list of `id` attributes of the corresponding <proposition> elements in the annotation.
             - If, in the annotation, one <proposition> element supports another one (via its `support` attribute), then, in the Argdown argument, the proposition corresponding to the former element is used to infer the conclusion corresponding to the latter element.
 
             Please encapsulate both artifacts in separate fenced codeblocks, for example:

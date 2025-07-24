@@ -94,7 +94,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     Informally analyse and reconstruct the text's arguments with Argdown. In particular, you should
 
-    - reconstruct *at least two arguments* in standard form (including premises, final 
+    - reconstruct the text's arguments in standard form (including premises, final 
       conclusion, and possible intermediate conclusions).
     - provide, for each conclusion in an argument, information about which previously introduced premises or 
       conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','4']}} --`,
@@ -103,19 +103,40 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
           
     Importantly, enclose your Argdown reconstructions in a fenced codeblock:
     ```argdown {{filename="reconstructions.ad"}}
-    // your Argdown reconstructions here
+    // your Argdown argument reconstructions here
     ```
     If you provide multiple argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
            
     ## Required Coherence of Annotation and Argument Reconstructions                                            
 
     The argument map (first artifact) and your argument reconstructions (second artifact) must neatly correspond to each other. Meaning that:
-           
-    1. Every argument in the argument map is reconstructed in standard form.
-    2. Every reconstructed argument is present in the argument map.
-    3. Whenever a claim in the argument map supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the reconstructed argument – and vice versa.
-    4. Whenever an argument in the argument map supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument – and vice versa.
-    5. Whenever an argument A in the argument map supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B – and vice versa.
+
+    1. Every argument contained in the first argdown snippet ("map.ad") is reconstructed in standard form in the second argdown snippet ("reconstructions.ad"). So, for example, if your "map.ad" contains `<Argument A>`, `<Argument B>`, and `<Argument C>`, then these three arguments need to be informally reconstructed as premise conclusion structures in your "reconstructions.ad" snippet.
+    2. Every argument reconstructed in the second argdown snippet ("reconstructions.ad") is present in the argument map. So, for example, if your "reconstructions.ad" also contains a reconstruction of `<Argument D>`, then `<Argument D>`, too, must figure in your "map.ad" code block.
+    3. Whenever a claim in the argument map supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the reconstructed argument – and vice versa. So, for example, if your map contains the lines
+    ```argdown {{filename="map.ad"}}
+    // ...
+    [Claim C]: Claim C.
+        +> <Argument A>: ...
+    // ...
+    ```
+    then the reconstruction of `<Argument A>` in your "reconstructions.ad" snippet must contain `[Claim C]` as premise.
+    4. Whenever an argument in the argument map supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument – and vice versa. So, for example, if your map contains the lines
+    ```argdown {{filename="map.ad"}}
+    // ...
+    <Argument A>: Argument A.
+        -> [Claim C]: Claim C.
+    // ...
+    ```
+    then the reconstruction of `<Argument A>` in your "reconstructions.ad" snippet must feature "NOT: Claim C" as final conclusion.
+    5. Whenever an argument A in the argument map supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B – and vice versa. So, for example, if your map contains the lines
+    ```argdown {{filename="map.ad"}}
+    // ...
+    <Argument A>: Argument A.
+        +> <Argument B>: Argument B.
+    // ...
+    ```
+    then the reconstruction of `<Argument B>` in your "reconstructions.ad" snippet must contain A's conclusion as premise (or, if A attacks B, the negation of A's conclusion as premise).
     
     Here are the specific notation instructions which help you to ensure that your argument map and your argument reconstructions fully cohere with each other in the above sense: 
 
@@ -142,14 +163,14 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ## Part 1: Create an Argument Map! 🗺️
 
-    First, let's make a map that shows all the main arguments and claims in the text and how they connect to each other.
+    First, let's make a map that shows all the main arguments (at least two) and claims in the text and how they connect to each other.
 
     Here's how to make your map:
     1. Find all the main ideas (claims) and mark them with [square brackets]
     2. Find all the arguments and mark them with <angle brackets>
     3. Show which ideas support others with +> arrows (or <+ arrows)
     4. Show which ideas attack others with -> arrows (or <- arrows)
-    5. Give every idea a clear label name
+    5. Give every idea a clear label name           
 
     Put your finished map in a special box like this:
     ```argdown {{filename="map.ad"}}
@@ -160,7 +181,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     Now, let's take each argument from our map and show exactly how it works with premises (reasons) and conclusions:
 
-    1. Take at least TWO arguments from your map
+    1. Take all the arguments from your map
     2. For each one, show:
        - All the reasons (premises) that support the conclusion
        - The main conclusion
@@ -180,7 +201,8 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     1. Arguments must match:
        - Every argument in your map needs to be broken down in Part 2
-       - Every broken-down argument needs to be in your map
+       - Every broken-down argument from Part 2 needs to be in your map
+       - Keep map and breakdowns separate - don't break down any arguments in your map
     2. Support relationships must match:
        - If a claim supports an argument in your map, that same claim must be a reason in your breakdown
        - If an argument supports a claim in your map, that claim must be the conclusion in your breakdown
@@ -191,6 +213,35 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
        - If one argument attacks another in your map, the negation of the conclusion of the first must be a premise in the second
 
     Uff, that's a lot to keep track of! To help with this, use the SAME LABELS in both parts!
+
+    To give you an idea of how it should look, here's a rough example of what your answer might look like:
+
+    ```argdown {{filename="map.ad"}}
+    [Main idea]: This is the main idea.
+        <+ <Argument A>: This argument supports the main idea.
+           <+ <Argument B>: This argument supports argument A.
+    // add more arguments and claims as needed ...
+    ```
+
+    ```argdown {{filename="reconstructions.ad"}}
+    <Argument A>
+           
+    (1) Reason 1 for Argument A.
+    (2) Reason 2 for Argument A.
+    -- {{'from': ['1', '2']}} --
+    (3) [Main idea]: This is the main idea. // Argument A supports the main idea, that's why we put it here.
+
+    // Now we add Argument B. 
+    // Argument B supports Argument A, which means that one of A's premises is the conclusion of B.
+    // But which premise? That can be tricky to decide! Let's assume Argument B backs Argument A's first premise:
+
+    <Argument B>
+           
+    (1) Reason 1 for Argument B.
+    (2) Reason 2 for Argument B.
+    -- {{'from': ['1', '2']}} --
+    (3) Reason 2 for Argument A. // Argument B supports Argument A, that's why we negate it here.
+    ```
 
     I can't wait to see what great arguments you find! 🌟
     """).strip(),
@@ -208,7 +259,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ## First task: Create an argument map
 
-    I need you to create an Argdown argument map that shows the "big picture" of how all the arguments and claims in this text relate to each other. Include at least two arguments in your map Think of it as drawing a network of ideas. For this map:
+    I need you to create an Argdown argument map that shows the "big picture" of how all the arguments and claims in this text relate to each other. Include at least two arguments in your map. Think of it as drawing a network of ideas. For this map:
 
     - Label each claim with [square_brackets]
     - Label each argument with <angle_brackets>
@@ -223,6 +274,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     ## Second task: Break down each argument
 
     Now I need you to "zoom in" on those arguments and show exactly how they work internally. For each argument:
+    - Start every breakdown with the argument label in angle brackets (followed by an empty line)
     - Identify all the premises (the supporting reasons)
     - Show the main conclusion 
     - Include any intermediate conclusions
@@ -230,7 +282,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     - Make sure every premise actually gets used!
     - Prepend "NOT: " to indicate negations
 
-    Put these breakdowns in another code block:
+    Put these breakdowns, separated by newlines, in another code block:
     ```argdown {{filename="reconstructions.ad"}}
     // your argument breakdowns go here
     ```
@@ -250,7 +302,45 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ## Putting it all together
     
-    Finally, make sure to format your answer with the two code blocks as described above.
+    Finally, make sure to format your answer with the two code blocks as described above. Roughly like so:
+           
+    ```argdown {{filename="map.ad"}}
+    // your map goes here, for example:
+    [Central claim]: First central claim.
+        <+ <Supporting argument A>: Supporting argument for the first claim.
+        <- <Counter argument B>: Counter argument against the first claim.
+           <- <Another argument C>: Another argument against the counter argument.
+    // more arguments and claims as needed ...
+    ```
+
+    ```argdown {{filename="reconstructions.ad"}}
+    // your argument breakdowns go here, for example:
+    <Supporting argument A>
+           
+    (1) Premise 1 of supporting argument.
+    (2) Premise 2 supporting argument.
+    // ... more premises as needed ...
+    -- {{'from': ['1', '2']}} --
+    (3) [Central claim]: First central claim. // Argument A supports the central claim, that's why we put it here.
+           
+    <Counter argument B>
+
+    (1) Premise 1 of counter argument.
+    (2) Premise 2 of counter argument.
+    // ... more premises as needed ...
+    -- {{'from': ['1', '2']}} --
+    (3) NOT: First central claim. // Argument B attacks the central claim, that's why we negate it here.
+
+    // We finally need to add argument C, which attacks argument B:
+           
+    <Another argument C>
+           
+    (1) Premise 1 of another argument.
+    (2) Premise 2 of another argument.
+    // ... more premises as needed ...
+    -- {{'from': ['1', '2']}} --
+    (3) NOT: Premise 1 of counter argument. // Here we assume that Argument C attacks premise (1) of argument B.
+    ```
 
     Thanks so much for helping with this! Looking forward to seeing how you map out these arguments.
     """).strip(),
@@ -258,7 +348,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     dedent("""
     # COMPREHENSIVE ARGUMENT ANALYSIS ASSIGNMENT
 
-    OBJECTIVE: Conduct a systematic analysis of argumentative structure using two complementary methodologies: macro-level argument mapping and micro-level argument reconstruction.
+    OBJECTIVE: Conduct a systematic analysis of argumentative structure using two complementary methodologies: macro-level argument mapping and micro-level informal argument reconstruction.
 
     SOURCE MATERIAL:
     Analyze the following text:
@@ -279,7 +369,8 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     3. Systematic documentation of dialectical relationships:
        • Support relations
        • Attack relations
-    4. Adherence to standard Argdown syntactical conventions
+    4. Minimum coverage of two (2) distinct arguments
+    5. Adherence to standard Argdown syntactical conventions
 
     SUBMISSION FORMAT:
     Present your argument map within a delimited code block with filename specification:
@@ -292,7 +383,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     TASK: Produce informal reconstructions of multiple arguments in standard (premise-conclusion) form.
 
     METHODOLOGICAL REQUIREMENTS:
-    1. Reconstruct a minimum of two (2) distinct arguments
+    1. Informally reconstruct distinct arguments as premise-conclusion structures
     2. For each argument:
        • Identify all premises
        • Articulate intermediary conclusions as necessary
@@ -303,7 +394,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     5. Use "NOT: " prefix for negated propositions
 
     SUBMISSION FORMAT:
-    Present your argument reconstructions within a delimited code block with filename specification:
+    Present all your argument reconstructions, separated by newlines, within a single fenced code block with filename specification:
     ```argdown {{filename="reconstructions.ad"}}
     // Argument reconstructions
     ```
@@ -317,7 +408,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
        • Every reconstruction must have a corresponding map component
     
     2. Dialectical Consistency:
-       • Support/attack relations in the map must be reflected in reconstruction premises/conclusions
+       • Support/attack relations in the map must be reflected in the reconstructions' premise-conclusion breakdowns
        • When claim C supports (attacks) argument A in the map, C (C's negation) must appear as a premise in A's reconstruction
        • When argument A supports (attacks) claim C in the map, C (C's negation) must appear as A's conclusion in the reconstruction
        • When argument A supports argument B in the map, A's conclusion (the negation of A's conclusion) must appear as a premise in B's reconstruction
@@ -326,6 +417,47 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
        • Maintain identical labeling conventions across both analytical components
        • Use identical claim labels between map and reconstruction
        • Represent negations consistently using "NOT: " prefixing
+
+    ## ABSTRACT EXAMPLE
+
+    ```argdown {{filename="map.ad"}}
+    // your map goes here, for example:
+    [Central claim]: First central claim.
+        <+ <Supporting argument A>: Supporting argument for the first claim.
+        <- <Counter argument B>: Counter argument against the first claim.
+           <+ <Another argument C>: Another argument against the counter argument.
+    // more arguments and claims as needed ...
+    ```
+
+    ```argdown {{filename="reconstructions.ad"}}
+    // your argument breakdowns go here, for example:
+    <Supporting argument A>
+           
+    (1) Premise 1 of supporting argument.
+    (2) Premise 2 supporting argument.
+    // ... more premises as needed ...
+    -- {{'from': ['1', '2']}} --
+    (3) [Central claim]: First central claim. // Argument A supports the central claim, that's why we put it here.
+           
+    <Counter argument B>
+
+    (1) [Key premise]: Premise 1 of counter argument.
+    (2) Premise 2 of counter argument.
+    // ... more premises as needed ...
+    -- {{'from': ['1', '2']}} --
+    (3) NOT: First central claim. // Argument B attacks the central claim, that's why we negate it here.
+
+    // We finally need to add argument C, which supports argument B:
+           
+    <Another argument C>
+           
+    (1) Premise 1 of another argument.
+    (2) Premise 2 of another argument.
+    // ... more premises as needed ...
+    -- {{'from': ['1', '2']}} --
+    (3) [Key premise]: Premise 1 of counter argument. // Here we assume that Argument C backs premise (1) of argument B.
+    ```
+           
 
     EVALUATION CRITERIA:
     Your analysis will be assessed based on comprehensiveness, structural coherence, analytical precision, and adherence to formatting requirements.
@@ -370,7 +502,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     OUTPUT FORMAT:
     Structured Argdown code enclosed in fenced block with metadata:
     ```argdown {{filename="map.ad"}}
-    // Argdown argument map
+    // Argdown argument map, no premise-conclusion structures
     ```
 
     ## METHODOLOGY PHASE II: MICROSTRUCTURAL RECONSTRUCTION
@@ -392,7 +524,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     OUTPUT FORMAT:
     Structured Argdown code enclosed in fenced block with metadata:
     ```argdown {{filename="reconstructions.ad"}}
-    // Standard-form argument reconstructions
+    // Standard-form argument reconstructions, starting with argument labels in angle brackets and separated by newlines
     ```
 
     ## CROSS-METHODOLOGICAL COHERENCE REQUIREMENTS
@@ -420,7 +552,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     This protocol ensures methodological triangulation and analytical robustness in the examination of argumentative discourse.
            
-    Please submit your completed analysis with both required Argdown code blocks as specified above.
+    Please submit your completed analysis of the SUBJECT TEXT with both required Argdown code blocks as specified above.
     """).strip(),
     # Developer-focused style
     dedent("""
@@ -441,39 +573,42 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ### 1. Argument Map Generation
     ```
-    Type: Argdown syntax map
+    Type: Argdown map
     Node formats:
       - Claims: [square_bracket_labels]
       - Arguments: <angle_bracket_labels>
     Relations:
       - Support: +> or <+ 
       - Attack: -> or <-
-    Output format: Fenced code block with filename metadata
+    Output format: Fenced code block with {{filename="map.ad"}} metadata
     ```
 
     ### 2. Argument Reconstruction Implementation
     ```
     Type: Argdown premise-conclusion structures
-    Format: Standard form argument
+    Format: Standard form arguments, starting with argument labels in angle brackets
     Required elements:
       - Premises (all must be used)
       - Conclusions (intermediate and final)
-      - Inference paths with from metadata
+      - Inference paths via yaml inline data with `from` key
     Minimum coverage: 2+ distinct arguments
-    Output format: Fenced code block with filename metadata
+    Output format: Single fenced code block with {{filename="reconstructions.ad"}} metadata, containing multiple argument reconstructions separated by newlines
     ```
 
     ### 3. Cross-Format Coherence Module
     // Label consistency:
-    - Map labels must match reconstruction labels           
+    - Map labels must match reconstruction labels        
            
     // Structural alignment
-    - Argument A supports argument B in map iff A's conclusion is a premise in B
-    - Argument A attacks argument B in map iff A's conclusion negates a premise in B
-    - Likewise for claims and arguments
-
+    - Argument <A> supports argument <B> in map iff, in the reconstruction, <A>'s conclusion is a premise in <B>
+    - Argument <A> attacks argument <B> in map iff, in the reconstruction, <A>'s conclusion negates a premise in <B>
+    - Claim [C] supports argument <A> in map iff, in the reconstruction, [C] is a premise in <A>
+    - Claim [C] attacks argument <A> in map iff, in the reconstruction, [C] contradicts a premise of <A>
+    - Argument <A> supports claim [C] in map iff, in the reconstruction, [C] is the conclusion of <A>
+    - Argument <A> attacks claim [C] in map iff, in the reconstruction, the negation of [C] is the conclusion of <A>
+           
     // Negation handling
-    - Proposition "NOT: $P" is the negation of proposition "$P"
+    - Claim with string text "NOT: $P" is the negation of claim "$P"
 
     ## Output Format Specifications
 
@@ -497,7 +632,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     dedent("""
     # Creating Argument Maps and Reconstructions: Step-by-Step Guide
 
-    In this assignment, you'll analyze arguments in a text using two complementary methods. Let's break this down into manageable steps.
+    In this assignment, you'll analyze arguments in a text using two complementary methods you're already familiar with. Let's break this down into manageable steps.
 
     ## The Text to Analyze
 
@@ -514,7 +649,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
     - The arguments supporting or attacking those claims
     - How different arguments relate to each other
 
-    ## Step 2: Create the Argument Map
+    ## Step 2: Create the Argdown Argument Map
 
     This map shows the "big picture" of how arguments and claims relate. It must contain at least 2 arguments.
 
@@ -534,8 +669,10 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
        - Are all major claims represented?
        - Are all significant arguments included?
        - Are all important relationships shown?
+    
+    5. Remove any informal argument reconstructions from the map – this is just for the macro structure!
 
-    5. Format your map in a code block:
+    6. Format your map in a code block:
        ```argdown {{filename="map.ad"}}
        (your argument map here)
        ```
@@ -550,6 +687,7 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
        - Determine if there are any intermediate conclusions
 
     2. Format each argument:
+       - Start with the argument label in <angle_brackets>, followed by an empty line
        - Number each premise and conclusion
        - For conclusions, show which premises they follow from using:
          `-- {{'from': ['1','2']}} --`
@@ -594,83 +732,11 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     Your final submission should contain both code blocks with their appropriate filename metadata.
     """).strip(),
-    # Visualization-focused style
-    dedent("""
-    # Dual-Layer Argumentative Structure Visualization
-
-    VISUALIZATION OBJECTIVE: Create complementary representations of argumentative structure at both macro and micro analytical levels.
-
-    SOURCE CONTENT:
-    ::: {{.source_text}}
-    {sources}
-    :::
-
-    ## PRIMARY VISUALIZATION: ARGDOWN ARGUMENT MAP
-
-    VISUALIZATION TYPE: Dialectical relationship network showing argument-claim interaction patterns.
-
-    ELEMENTS:
-    • NODE REPRESENTATIONS:
-      - Primary claims: [square_bracket_notation] with descriptive labels
-      - Argumentative clusters: <angle_bracket_notation> with descriptive labels
-    
-    • EDGE REPRESENTATIONS:
-      - Support relationships: Directional connectors with positive valence (+>/<+)
-      - Attack relationships: Directional connectors with negative valence (->/<-)
-    
-    RENDERING FORMAT:
-    ```argdown {{filename="map.ad"}}
-    // Network visualization code
-    ```
-
-    ## SECONDARY VISUALIZATION: ARGUMENT STRUCTURE BREAKDOWNS
-
-    VISUALIZATION TYPE: Sequential premise-conclusion Argdown code for individual arguments.
-
-    ELEMENTS:
-    • COMPONENT REPRESENTATION:
-      - Premises: Sequential numbered propositions
-      - Conclusions: Terminal or intermediate inferential points
-      - Inferential pathways: Explicit documentation of reasoning flow
-    
-    • FLOW INDICATORS:
-      - Inference markers: `-- {{'from': ['source_prem']}} --` notation
-      - Proposition numbering: Sequential identifiers for reference
-      - Logical progression: Top-to-bottom inferential structure
-    
-    RENDERING FORMAT:
-    ```argdown {{filename="reconstructions.ad"}}
-    // Structure breakdown visualizations
-    ```
-
-    ## CROSS-VISUALIZATION COHERENCE REQUIREMENTS
-
-    INTEGRATION MECHANISMS:
-    • COMPONENT ALIGNMENT:
-      - Each argument node in network map has corresponding structure breakdown
-      - All reconstructed arguments appear as nodes in network map
-    
-    • RELATIONSHIP CONSISTENCY:
-      - Support edges in network → Premise-conclusion relationships in breakdowns according to Argdown conventions
-      - Attack edges in network → Negation relationships in breakdowns according to Argdown conventions
-
-    • NAMING CONSISTENCY:
-      - Identical labeling system across both visualizations
-    
-    • PROPOSITIONAL CORRESPONDENCE:
-      - Map claims correspond to reconstruction propositions
-      - Map arguments correspond to reconstruction argument structures
-      - Support/attack relationships have consistent directionality
-
-    These visualization specifications ensure comprehensive representation of argumentative structure with consistent cross-referencing between macro and micro levels of analysis.
-           
-    Please submit your visualizations in the specified formats, ensuring both fenced code blocks are included in your response.
-    """).strip(),
     # Tutorial style
     dedent("""
-    # Tutorial: Creating Argument Maps and Reconstructions
+    # Tutorial: Creating Argument Maps and Informal Reconstructions
 
-    In this tutorial, you'll learn how to analyze arguments in two complementary ways: by creating an argument map to show the overall structure, and by reconstructing individual arguments to show their internal logic.
+    In this tutorial, you'll practice how to analyze arguments in two complementary ways: by creating an argument map to show the overall structure, and by reconstructing individual arguments to show their internal logic.
 
     ## The Source Text
 
@@ -704,9 +770,9 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ### Stylized example:
     ```argdown
-    [Climate Change]: Climate change is a serious threat
-        <+ <Scientific Consensus>: Scientific consensus supports climate change
-        <- <Economic Argument>: The economy can adapt
+    [Climate Change]: Climate change is a serious threat.
+        <+ <Scientific Consensus>: Scientific consensus supports climate change.
+        <- <Economic Argument>: The economy can adapt.
     ```
 
     ### Format Your Map:
@@ -734,12 +800,14 @@ _ARGMAP_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ### Example:
     ```argdown
-    <Scientific Consensus>: Scientific Consensus Argument
+    <Scientific Consensus>: Scientific consensus supports climate change.
 
-    (1) 97% of climate scientists agree that climate change is a threat
-    (2) Scientific consensus is a reliable indicator of truth
+    (1) 97% of climate scientists agree that climate change is a threat.
+    (2) Scientific consensus is a reliable indicator of truth.
     -- {{'from': ['1','2']}} --
-    (3) Climate change is happening
+    (3) Climate change is a serious threat.
+
+    <Economic Argument>: The economy can adapt.
 
     // ...
     ```

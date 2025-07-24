@@ -118,8 +118,8 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
             Enclose the annotated text in a fenced codeblock, starting with '```xml {{filename="annotation.txt"}}' and ending with '```'. If you provide multiple xml-codeblocks (e.g., improved versions or revisions), we will use and evaluate the last one only.
                                       
             ## Argument Mapping Task Details
-                   
-            Create a syntactically correct Argdown argument map that captures the argumentation in the text. In particular, you should
+
+            Create a syntactically correct Argdown argument map that captures the argumentation in the text (with at least two arguments). In particular, you should
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
@@ -131,11 +131,13 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
 
             Logically analyse and formally reconstruct the text's arguments with Argdown, ensuring the inferences are deductively valid.
 
-            - Reconstruct *at least two arguments* in standard form (including premises, final conclusion, and possible intermediate conclusions).                   
+            - Reconstruct all arguments in standard form (including premises, final conclusion, and possible intermediate conclusions).                   
             - For each proposition in your reconstruction (premises and conclusions), provide an adequate propositional logic / FOL formalization in NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Only declare variables that are used in the corresponding formalization and that have not been declared in the corresponding argument before. Ensure that your formalizations are consistent across different arguments.
             - For each inference step in the argument, provide information about which previously introduced premises or conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.
+            - Use `<-` / `<+` / `><` syntax to declare that any premises and/or conclusions from different arguments logically entail or contradict each other, providing explicit labels for these claims in square brackets.
+            - Start each logical reconstruction with the <argument title> and an optional short description of the argument's gist. 
                   
-            Importantly, enclose your Argdown reconstructions in a fenced codeblock, starting with '```argdown {{filename="reconstructions.ad"}}' and ending with '```'. If you provide multiple argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
+            Importantly, enclose your all your logical reconstructions in a single fenced Argdown codeblock (separated by empty lines), starting with '```argdown {{filename="reconstructions.ad"}}' and ending with '```'. If you provide multiple argdown reconstructions codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
             ## Required Coherence of Annotation, Argument Map, and Argument Reconstructions
 
@@ -143,25 +145,25 @@ class ArgmapPlusArgannoPlusLogrecoProblem(ArgmapPlusLogrecoProblem, AnnotationPr
 
             The argument reconstructions and the annotated source text must cohere with each other. Moreover, the inferential relations in the logically reconstructed arguments must reflect the annotated support relations. That is:
             
-            1. Every argument in the argument map is reconstructed in standard form.
-            2. Every reconstructed argument is present in the argument map.
-            3. Every annotated text segment corresponds to a premise or conclusion in a reconstructed argument.
-            4. Whenever a claim in the _argument map_ supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the reconstructed argument -- and vice versa.
-            5. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the reconstructed argument -- and vice versa.
-            6. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) is a premise of B -- and vice versa.
-            7. Whenever a claim A, in the _argdown reconstructions_, is declared to support, attack, or contradict another claim B, then the formalizations of A and B must logically ground this relation.
-            8. Whenever a text segment A in the _annotation_ supports another text segment B, then, in the _argdown reconstructions_, B's corresponding proposition is inferred from the proposition corresponding to A, or A refers to an argument that supports the argument referenced by B.
-            9. Whenever a text segment A in the _annotation_ attacks another text segment B, then, in the _argdown reconstructions_, A's corresponding argument attacks the argument referenced by B.
+            1. Every argument in the _argument map_ is logically reconstructed in the _Argdown reconstructions_.
+            2. Every reconstructed argument in the _Argdown reconstructions_ is present in the _argument map_.
+            3. Every annotated text segment in the _annotation_ corresponds to a premise or conclusion in a reconstructed argument in the _Argdown reconstructions_.
+            4. Whenever a claim in the _argument map_ supports (attacks) an argument, the corresponding claim (or, respectively, its negation) is a premise in the corresponding reconstructed argument -- and vice versa -- in the _Argdown reconstructions_.
+            5. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) is the conclusion in the corresponding reconstructed argument -- and vice versa -- in the _Argdown reconstructions_.
+            6. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then, in the _Argdown reconstructions_, A's conclusion (or, respectively, its negation) is a premise of B -- and vice versa -- in the _Argdown reconstructions_.
+            7. Whenever a claim A, in the _Argdown reconstructions_, is declared to support, attack, or contradict another claim B, then the formalizations of A and B must logically ground this relation.
+            8. Whenever a text segment A in the _annotation_ supports another text segment B, then, in the _Argdown reconstructions_, B's corresponding proposition is inferred from the proposition corresponding to A, or A refers to an argument that supports the argument referenced by B.
+            9. Whenever a text segment A in the _annotation_ attacks another text segment B, then, in the _Argdown reconstructions_, A's corresponding argument attacks the argument referenced by B.
             
-            Here are the specific notation instructions which help you to ensure that annotation (first artifact), argument map (second artifact) and argument reconstructions (third artifact) fully cohere with each other in the above sense: 
+            Here are the specific notation instructions which help you to ensure that annotation (filename="annotation.txt"), argument map (filename="map.ad") and argument reconstructions (filename="reconstructions.ad") fully cohere with each other in the above sense: 
 
             - Every <proposition> element in the annotation has an `argument_label` attribute, which refers to a label of an argument in the Argdown snippets.
-            - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding logically reconstructed argument.
-            - Every premise and conclusion in the Argdown argument reconstructions has yaml inline data with an `annotation_ids` attribute that contains a (possibly empty) list of `id` attributes of the corresponding <proposition> elements in the annotation.
+            - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding logically reconstructed argument (_Argdown reconstructions_).
+            - Every premise and conclusion in the Argdown argument reconstructions has yaml inline data. Besides 'formalization' and 'declarations' keys, that yaml data has an `annotation_ids` attribute which contains a (possibly empty) list of `id` attributes of the corresponding <proposition> elements in the annotation.
             - The argument labels in the argument map match (1-to-1) the argument labels in the argument reconstruction.
-            - Re-use the labels of claims in the argument map for the corresponding premises and conclusions (if any) in the argument reconstruction. 
-            - In the argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label.
-            - In the argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if a corresponding logical relation between them is defined in the argdown snippet (e.g., with "><" or "->" syntax).
+            - The labels of claims in the argument map are re-used for the corresponding premises and conclusions (if any) in the argument reconstruction. 
+            - In the Argdown argument reconstructions, two propositions (premise or conclusion) count as the same if they have the same label.
+            - In the Argdown argument reconstructions, one proposition (premise or conclusion) counts as the negation of another proposition (premise or conclusion) if a corresponding logical relation between them is defined in the argdown snippet (e.g., with "><" or "->" syntax).
             
             ## Formatting Recommendations
             

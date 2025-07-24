@@ -4,10 +4,6 @@ from typing import Sequence
 import dataclasses
 from textwrap import dedent
 from bs4 import BeautifulSoup
-from pyargdown import (
-    Conclusion,
-    Argument,
-)
 import textdistance
 
 from argdown_feedback.tasks.base import (
@@ -95,10 +91,10 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     Informally analyse and reconstruct the text's main argumentation with Argdown. In particular, you should
 
-    - reconstruct *at least one argument* in standard form (including premises, final conclusion, and possible intermediate conclusions).
+    - reconstruct *at least one argument* in standard form (including the argument label, premises, final conclusion, and possible intermediate conclusions).
     - provide, for each conclusion in every argument reconstructed, information about which previously introduced premises or conclusions it is inferred *from*, using yaml inline data in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.
-          
-    Importantly, enclose your Argdown snippet in a fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
+
+    Importantly, enclose all your reconstructions, separated by newlines, in a single fenced codeblock, starting with '```argdown' and ending with '```'. If you provide multiple argdown codeblocks (e.g., improved versions or revisions), we will use and evaluate the last of these only.
 
     ## Required Coherence of Annotation and Argument Reconstruction                                                
 
@@ -108,7 +104,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     - Every <proposition> element in the annotation has an `argument_label` attribute, which refers to a label of an argument in the Argdown snippet.
     - Every <proposition> element in the annotation has a `ref_reco_label` attribute, which refers to a label of a premise or conclusion in the corresponding argument. 
-    - Every premise and conclusion in the Argdown argument has yaml inline data with an `annotation_ids` attribute that contains a list of `id` attributes of the corresponding <proposition> elements in the annotation.
+    - Every premise and conclusion in the Argdown argument has yaml inline data with an `annotation_ids` attribute that contains a (possibly empty) list of `id` attributes of the corresponding <proposition> elements in the annotation.
     - If, in the annotation, one <proposition> element supports another one (via its `supports` attribute), then, in the Argdown argument, the proposition corresponding to the former element is used to infer the conclusion corresponding to the latter element.
 
     Please submit your answer below, containing both appropriately formatted artifacts enclosed in separate code blocks, e.g.:
@@ -175,13 +171,30 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     3. Each premise and conclusion needs `annotation_ids` showing which text parts it came from
     4. If parts support each other in the text, they should also connect in the argument
 
+    ## EXAMPLE
+
+    Let us flesh this out with an example, shall we?
+           
+    ```xml
+    <proposition id="i1" argument_label="Fun Course" ref_reco_label="1" supports="i2">This course is fun!</proposition> We are having a great time. <proposition id="i2" argument_label="Fun Course" ref_reco_label="3">I'll recommend it to my friends.</proposition>
+    ```
+
+    ```argdown
+    <Fun Course>
+
+    (1) This course is fun. {{annotation_ids: ['i1']}}
+    (2) My friends love fun courses. {{annotation_ids: []}}
+    -- {{'from': ['1', '2']}} --
+    (3) I will recommend this course to my friends. {{annotation_ids: ['i2']}} 
+    ```
+
     I know you'll be an AMAZING argument detective! Let's solve this case! 🕵️‍♀️🕵️‍♂️
     """).strip(),
     # Casual/friendly style
     dedent("""
     # Hey there! Let's break down an argument together
 
-    I've got this text that I need analyzed in two complementary ways - first by marking up the argumentative parts directly in the text, and then by reconstructing the main argument in a clear, structured format. Could you help me out with this?
+    I've got this text that I need analyzed in two complementary ways - first by marking up the argumentative parts directly in the text, and then by reconstructing the main argument(s) in a clear, structured format. Could you help me out with this?
 
     ## Here's the text we're working with:
 
@@ -191,7 +204,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ## First task: Annotate the text
 
-    I need you to mark up the text to show which parts function as arguments. You'll use these XML tags:
+    I need you to mark up the text to show which parts function as reasons. You'll use these XML tags:
 
     {annotation_scheme}
 
@@ -199,22 +212,23 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     When you're done, put your annotated text in a code block that starts with ```xml and ends with ```.
 
-    ## Second task: Reconstruct the argument
+    ## Second task: Reconstruct the argument(s)
 
-    Next, take the argument you identified and reconstruct it in standard form using Argdown. I need you to:
+    Next, take the arguments you identified and reconstruct them in standard form using Argdown. I need you to:
+    - Start each argument with a label (e.g., `<My Argument>`), followed by an empty line
     - Include all the premises (supporting reasons)
     - Show the main conclusion
     - Add any intermediate conclusions if needed
     - For each conclusion, note which premises it follows from using this format: `-- {{'from': ['1','2','3']}} --`
 
-    Put this reconstruction in another code block starting with ```argdown and ending with ```.
+    Put all these reconstructions (separated by new lines) in another single code block starting with ```argdown and ending with ```.
 
-    ## Important: Connect your annotation to your reconstruction
+    ## Important: Connect your annotation with your reconstruction
 
     The key part is making sure your annotation and reconstruction work together:
     - Each proposition in your annotation should have an `argument_label` pointing to the argument it belongs to
     - Each proposition should also have a `ref_reco_label` pointing to its corresponding premise/conclusion
-    - Each premise and conclusion in your reconstruction should have `annotation_ids` showing which text parts it came from
+    - Each premise and conclusion in your reconstruction should have `annotation_ids` showing which text parts it came from (may be an empty list)
     - If something supports something else in your annotation, it should also support it in your reconstruction
 
     Thanks for your help with this! Looking forward to seeing how you break down the argument.
@@ -223,7 +237,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     dedent("""
     # INTEGRATED ARGUMENTATIVE ANALYSIS ASSIGNMENT
 
-    OBJECTIVE: Conduct a comprehensive analysis of argumentative structure through complementary methods: textual annotation and standardized argument reconstruction.
+    OBJECTIVE: Conduct a comprehensive analysis of argumentative structure through complementary methods: textual annotation and standardized informal argument reconstruction.
 
     SOURCE MATERIAL:
     Analyze the following text:
@@ -254,22 +268,24 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ## PART II: ARGUMENT RECONSTRUCTION PROTOCOL
 
-    TASK: Produce a formal reconstruction of the primary argument(s) identified in the source text.
+    TASK: Produce an informal reconstruction of the primary argument(s) identified in the source text.
 
     METHODOLOGICAL REQUIREMENTS:
     1. Reconstruct a minimum of one (1) distinct argument in standard form
     2. For each argument:
+       • Clearly label the argument
        • Identify all premises
        • Articulate intermediary conclusions as necessary
        • Formulate the final conclusion
     3. Document inferential pathways using standardized notation:
        • Format: `-- {{'from': ['premise_number', 'premise_number']}} --`
-    4. Include reference attributes connecting to the text annotation
+    4. Reference the corresponding text annotation via inline yaml data
+       • Format: `(1) ... {{annotation_ids: ['proposition_id1', 'proposition_id2']}}`
 
     SUBMISSION FORMAT:
-    Present your argument reconstruction within a delimited code block with Argdown specification:
+    Present your argument reconstructions within a delimited code block with Argdown specification:
     ```argdown
-    // Standard-form argument reconstruction
+    // Standard-form argument reconstructions, separated by empty lines
     ```
 
     ## CROSS-METHODOLOGICAL COHERENCE REQUIREMENTS
@@ -279,7 +295,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     1. Propositional Correspondence:
        • Each annotated proposition must reference its corresponding argument via `argument_label`
        • Each annotated proposition must reference its corresponding premise/conclusion via `ref_reco_label`
-       • Each premise/conclusion must reference its textual sources via `annotation_ids`
+       • Each premise/conclusion must reference its textual sources via `annotation_ids` (possibly an empty list)
     
     2. Inferential Consistency:
        • Support relationships documented in the annotation must correspond to inferential relationships in the reconstruction
@@ -291,7 +307,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     """).strip(),
     # Research-oriented style
     dedent("""
-    # Multimodal Argument Analysis Protocol (ver. 3.2)
+    # Dual Argument Analysis Protocol (ver. 3.2)
 
     RESEARCH CONTEXT:
     This protocol implements a bimodal analytical framework for argumentation, integrating textual annotation with standard-form reconstruction to enable comprehensive understanding of argumentative discourse.
@@ -322,22 +338,26 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ## METHODOLOGY PHASE II: STANDARD-FORM RECONSTRUCTION
 
-    OBJECTIVE: Develop Argdown representation of the argument's inferential structure.
+    OBJECTIVE: Develop Argdown representation of the arguments' internal inferential structure.
 
     IMPLEMENTATION REQUIREMENTS:
     
     I. Structural Components
-       A. Premises: All supporting reasons
-       B. Intermediate Conclusions: As necessary for complex arguments
-       C. Final Conclusion: Ultimate proposition being established
+       A. Argument Labeling: Clearly label each argument
+       B. Premises: All supporting reasons
+       C. Intermediate Conclusions: As necessary for complex arguments
+       D. Final Conclusion: Ultimate proposition being established
     
     II. Inferential Documentation
        A. Format: `-- {{'from': ['premise_identifier', 'premise_identifier', ...]}} --`
        B. Comprehensiveness: Document all inferential pathways
-       C. Cross-Reference Implementation: Include reference attributes connecting to annotation
+    
+    III. Cross-Reference Implementation
+       A. Include reference attributes connecting to annotation
+       B. Format: `(1) Premise text {{annotation_ids: ['proposition_id1', 'proposition_id2']}}`
     
     OUTPUT FORMAT:
-    Argdown code enclosed in fenced code block (```argdown ... ```)
+    Argdown code enclosed in fenced code block (```argdown ... ```), with multiple arguments separated by newlines.
 
     ## CROSS-METHODOLOGICAL INTEGRATION REQUIREMENTS
 
@@ -348,7 +368,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
           1. Each proposition must include argument_label attribute
           2. Each proposition must include ref_reco_label attribute
        B. Reconstruction → Annotation:
-          Each premise/conclusion must include annotation_ids metadata
+          1. Each premise/conclusion must include annotation_ids inline yaml data (possibly empty list)
     
     II. Structural Isomorphism
        Support relationships in annotation must correspond to inferential relationships in reconstruction
@@ -370,12 +390,12 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     ## Task Description
     Generate two linked representations of the source text's argumentative structure:
     1. XML annotation of source text
-    2. Argdown premise-conclusion reconstruction
+    2. Argdown premise-conclusion reconstruction(s)
 
     ## Implementation Requirements
 
     ### 1. Text Annotation Module
-    ```
+    
     Format: XML with custom schema
     Primary elements: <proposition> tags
     Required attributes:
@@ -384,7 +404,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
       - attacks (optional, space-separated IDs)
       - argument_label (reference to Argdown argument)
       - ref_reco_label (reference to premise/conclusion in Argdown)
-    ```
+    
 
     Schema definition:
     ```
@@ -392,16 +412,19 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     ```
 
     ### 2. Argument Reconstruction Module
-    ```
+    
     Format: Argdown argument in standard form
     Required elements:
+      - Argument label (e.g., `<Argument Name>`)
       - Premises (numbered)
       - Conclusions (intermediate and final)
       - Inference paths with 'from' metadata
+      - Inline yaml data for cross-referencing with annotation
     Minimum coverage: 1+ distinct arguments
-    ```
+    
 
     ### 3. Cross-Reference Implementation
+    
     ```
     // Annotation → Reconstruction reference
     <proposition 
@@ -409,13 +432,13 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
       argument_label="argument_name"
       ref_reco_label="1">
       Text content
-    </proposition>
+    </proposition>    
     ```
-    
+
     ```
     // Reconstruction → Annotation reference
     (1) Premise text {{annotation_ids: ['p1']}}
-    ```
+    ```    
 
     ### 4. Consistency Validation
     
@@ -508,81 +531,11 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     - Every premise and conclusion has `annotation_ids` metadata
     - Support relationships in the annotation match inferential relationships in the reconstruction
 
-    Double-check all IDs and labels to make sure they match correctly!
-    """).strip(),
-    # Visualization-focused style
-    dedent("""
-    # Dual-Mode Argumentative Structure Visualization
-
-    VISUALIZATION OBJECTIVE: Create complementary representations of argumentative structure in both textual context and standard form.
-
-    SOURCE CONTENT:
-    ::: {{.source_text}}
-    {sources}
-    :::
-
-    ## PRIMARY VISUALIZATION: TEXT-EMBEDDED ANNOTATION
-
-    MODE: XML markup with proposition tagging
-
-    ANNOTATION SCHEMA:
-    {annotation_scheme}
-
-    VISUAL ELEMENTS:
-    • Explicit boundary demarcation of argumentative units
-    • Unique identifier assignment for each unit
-    • Directional relationship indicators (support/attack)
-    • Cross-reference linking to structural visualization
-
-    IMPLEMENTATION PARAMETERS:
-    - Preserve original textual content within proposition boundaries
-    - Include argument_label attribute for cross-visualization reference
-    - Include ref_reco_label attribute for precise component mapping
-    - Abbreviate non-argumentative content as needed for visual clarity
-
-    OUTPUT FORMAT:
-    ```xml
-    <!-- Text-embedded argumentative structure visualization -->
-    ```
-
-    ## SECONDARY VISUALIZATION: STANDARD-FORM RECONSTRUCTION
-
-    MODE: Premise-conclusion structure with explicit inferential pathways
-
-    VISUAL ELEMENTS:
-    • Sequential premise presentation
-    • Intermediate and final conclusions
-    • Explicit inference pathway documentation
-    • Cross-reference metadata to primary visualization
-
-    IMPLEMENTATION PARAMETERS:
-    - Implement premise-conclusion numbering system
-    - Document inference pathways using from attribute (`-- {{'from': ['label1', 'label2']}} --`)
-    - Include annotation_ids metadata for each component
-    - Maintain inferential consistency with primary visualization
-
-    OUTPUT FORMAT:
-    ```argdown
-    // Standard-form argument visualization
-    ```
-
-    ## CROSS-VISUALIZATION COHERENCE SPECIFICATIONS
-
-    REFERENCE INTEGRITY:
-    1. Bidirectional component mapping:
-       • Text annotation → Reconstruction: argument_label and ref_reco_label attributes
-       • Reconstruction → Text annotation: annotation_ids metadata
-       
-    2. Structural consistency:
-       • Support relationships in annotation correspond to inferential pathways in reconstruction
-
-    This dual-mode visualization approach enables both contextual understanding and structural clarity in argumentative analysis.
-           
-    Submit your comprehensive analysis below.
+    Double-check all IDs and labels to make sure they match correctly, and revise if necessary.
     """).strip(),
     # Tutorial style
     dedent("""
-    # Tutorial: Creating Linked Annotations and Argument Reconstructions
+    # Tutorial: Creating Linked Annotations and Informal Argument Reconstructions
 
     In this tutorial, you'll learn how to analyze an argument through two complementary methods and link them together.
 
@@ -615,7 +568,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     2. **Add tags** - Wrap each proposition in `<proposition>` tags
     3. **Assign IDs** - Give each proposition a unique identifier (e.g., "x1", "x2")
     4. **Mark relationships** - Show which propositions support or attack others
-    5. **Add cross-references** - Include attributes that link to your reconstruction:
+    5. **Add cross-references** - Include attributes that link to your reconstruction (may need to be adjusted later):
        - `argument_label` - Which argument this belongs to
        - `ref_reco_label` - Which premise or conclusion this corresponds to
 
@@ -631,6 +584,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     ### What is a Standard Form Reconstruction?
 
     A standard form reconstruction shows the inferential structure of an argument by presenting:
+    - Argument title (label)
     - Numbered premises (reasons)
     - Intermediate conclusions (if applicable)
     - The conclusion (what's being argued for)
@@ -638,13 +592,15 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     ### How to Create Your Reconstruction:
 
-    1. **List the premises** - Start with the supporting reasons
-    2. **Add intermediate conclusions** - If needed for complex arguments
-    3. **End with the main conclusion** - The ultimate point being argued for
-    4. **Document inference paths** - Show which premises support each conclusion using:
+    1. **Create the argument title** - Give it a clear label (e.g., `<Main Argument>`)
+    2. **List the premises** - Start with the supporting reasons
+    3. **Add intermediate conclusions** - If needed for complex arguments
+    4. **End with the main conclusion** - The ultimate point being argued for
+    5. **Document inference paths** - Show which premises support each conclusion using:
        `-- {{'from': ['1','4']}} --`
-    5. **Add cross-references** - Link back to your annotation using:
+    6. **Add cross-references** - Link back to your annotation using:
        `(1) First premise {{annotation_ids: ['x1', 'x2']}}`
+
 
     Put your completed reconstruction in a code block:
     ```argdown
@@ -656,7 +612,7 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
     The power of this approach comes from connecting both representations:
 
     - Every proposition in your annotation includes references to your reconstruction
-    - Every premise and conclusion in your reconstruction references the corresponding text
+    - Every premise and conclusion in your reconstruction references the corresponding text (possibly an empty list)
     - Support relationships in the annotation match inferential relationships in the reconstruction
 
     ### Example of Linked Components:
@@ -668,6 +624,8 @@ ARGANNO_PLUS_INFRECO_PROMPT_TEMPLATES = [
 
     In reconstruction:
     ```argdown
+    <Socrates>
+
     (1) All humans are mortal {{annotation_ids: ['y1']}}
     // ...
     ```

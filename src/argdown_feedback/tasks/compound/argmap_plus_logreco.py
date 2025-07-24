@@ -1,5 +1,4 @@
 import dataclasses
-import random
 from typing import Sequence
 
 from textwrap import dedent
@@ -102,7 +101,8 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
 
             - explicitly label all nodes in the argument map;
             - use square/angled brackets for labels to distinguish arguments/claims;
-            - indicate support and attack relations between nodes in accordance with Argdown syntax conventions.
+            - indicate support and attack relations between nodes in accordance with Argdown syntax conventions;
+            - cover *at least two* arguments in the argument map;
 
             Importantly, enclose your Argdown argument map in a fenced codeblock:
             ```argdown {{filename="map.ad"}}
@@ -113,11 +113,12 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
             ## Argument Reconstruction Task Details                   
 
             Logically analyse and reconstruct the text's arguments with Argdown, ensuring the inferences are deductively valid.
-            - Reconstruct *at least two arguments* in standard form (including premises, final conclusion, and possible intermediate conclusions).      
-            - For each proposition in your reconstruction (premises and conclusions), provide an adequate propositional logic / FOL formalization in NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Only declare variables that are used in the corresponding formalization and that have not been declared in the corresponding argument before. Ensure that your formalizations are consistent across different arguments.
+            - Reconstruct all arguments presented in the map in standard form (including argument title, premises, final conclusion, and possible intermediate conclusions).      
+            - For each premise and conclusion in your reconstructions, provide an adequate propositional logic / FOL formalization in NLTK syntax. Use yaml inline data with keys 'formalization' and 'declarations' to record your logical analyses. Only declare variables that are used in the corresponding formalization and that have not been declared in the corresponding argument before. Ensure that your formalizations are consistent across different arguments.
             - For each inference step in the argument, provide information about which previously introduced premises or conclusions it uses. Indicate this via yaml inline data with key 'from' in the inference line, e.g. `-- {{'from': ['1','3']}} --`, where the list items refer to the respective premise or conclusion labels.
-                  
-            Importantly, enclose your Argdown reconstructions in a fenced codeblock:
+            - Use `<-` / `<+` / `><` syntax to declare that any premises and/or conclusions from different arguments logically entail or contradict each other, providing explicit labels for these claims in square brackets.
+
+            Importantly, enclose your Argdown reconstructions in a single fenced codeblock, separating different arguments with newlines:
             ```argdown {{filename="reconstructions.ad"}}'
             // your formal Argdown reconstructions here
             ```
@@ -127,8 +128,8 @@ class ArgmapPlusLogrecoProblem(ArgmapPlusInfrecoProblem):
 
             The argument map and your argument reconstructions must neatly correspond to each other. Meaning that:
 
-            1. Every argument in the argument map is reconstructed in standard form.
-            2. Every reconstructed argument is present in the argument map.
+            1. Every argument in the _argument map_ is reconstructed in standard form.
+            2. Every reconstructed argument is present in the _argument map_.
             3. Whenever a claim in the _argument map_ supports (attacks) an argument, the corresponding claim (or, respectively, its negation) figures as premise in the reconstructed argument -- and vice versa.
             4. Whenever an argument in the _argument map_ supports (attacks) a claim, the corresponding claim (or, respectively,  its negation) figures as conclusion in the reconstructed argument -- and vice versa.
             5. Whenever an argument A in the _argument map_ supports (attacks) another argument B, then A's conclusion (or, respectively, its negation) figures as premise of B -- and vice versa.
