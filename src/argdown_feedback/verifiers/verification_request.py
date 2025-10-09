@@ -32,7 +32,7 @@ VDFilter: TypeAlias = Callable[[PrimaryVerificationData], bool]
 class VerificationResult:
     """Results of a verification check."""
     verifier_id: str
-    verification_data_references: List[str]
+    verification_data_references: List[str]  # Coherence requests assess the alignment between multiple data items
     is_valid: bool
     message: Optional[str] = None
     details: Dict[str, Any] = field(default_factory=dict)
