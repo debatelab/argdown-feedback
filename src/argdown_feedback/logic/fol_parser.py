@@ -1,5 +1,6 @@
 """Parser for first-order logic formulae using NLTK"""
 
+from functools import lru_cache
 from nltk.sem.logic import (  # type: ignore
     Expression,
     LogicalExpressionException,
@@ -11,6 +12,7 @@ class FOLParser:
     based on NLTK parser"""
 
     @staticmethod
+    @lru_cache(maxsize=1024)
     def parse(form: str) -> Expression:
         """parses string formalizationsas NLTK first-order-logic formula"""
         try:
