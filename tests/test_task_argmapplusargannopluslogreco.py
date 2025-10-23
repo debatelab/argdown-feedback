@@ -302,7 +302,7 @@ def invalid_recos(solution_class) -> list[Solution]:
             """)
         ),
         solution_class.from_raw_answer(
-            textwrap.dedent("""                            
+            textwrap.dedent("""            
                             
             MISSING axiomatic relation in logreco
 
