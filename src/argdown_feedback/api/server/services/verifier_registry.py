@@ -6,11 +6,44 @@ from abc import ABC, abstractmethod
 
 from typing import Dict, List, Any
 
-from ....verifiers.base import BaseHandler
+from ....verifiers.verification_request import VerificationRequest
 
-from ...shared.models import VerifierInfo, VerifiersList, VerifierConfigOption
+from ....verifiers.base import CompositeHandler
+
+from ...shared.models import ScoringResult, VerifierInfo, VerifiersList, VerifierConfigOption
 from ...shared.exceptions import VerifierNotFoundError
 #from ..services import verifier_registry
+
+
+class BaseScorer(ABC):
+    """Abstract base class for virtue scorers."""
+
+    scorer_id: str
+
+    def __init__(self, parent_name: str):
+        self.name = parent_name + "." + self.scorer_id
+
+    @abstractmethod
+    def score(self, result: VerificationRequest) -> ScoringResult:
+        """Score the given verification data and return scoring results."""
+        pass
+
+
+class ScorerCompositeHandler(CompositeHandler):
+    """Composite handler with extra virtue scoring method."""
+
+    def __init__(self, **kwargs):
+        scorers = kwargs.pop("scorers", [])
+        super().__init__(**kwargs)
+        self.scorers: List[BaseScorer] = scorers
+
+    def score(self, result: VerificationRequest) -> List[ScoringResult]:
+        """Run all virtue scorers on the given evaluation and collect results."""
+        all_scores: List[ScoringResult] = []
+        for scorer in self.scorers:
+            score = scorer.score(result)
+            all_scores.append(score)
+        return all_scores
 
 
 class AbstractVerifierBuilder(ABC):
@@ -24,7 +57,7 @@ class AbstractVerifierBuilder(ABC):
     is_coherence_verifier: bool = False
 
     @abstractmethod
-    def build(self, filters_spec: dict, **kwargs) -> BaseHandler:
+    def build(self, filters_spec: dict, **kwargs) -> ScorerCompositeHandler:
         """Build complete verifier handler with validation."""        
     
     @abstractmethod
@@ -58,7 +91,7 @@ class VerifierRegistry:
             raise VerifierNotFoundError(name, list(self._builders.keys()))
         return self._builders[name]
     
-    def create_handler(self, name: str, **kwargs) -> BaseHandler:
+    def create_handler(self, name: str, **kwargs) -> ScorerCompositeHandler:
         """Create a handler instance for a verifier with full preprocessing pipeline."""
         filters_spec = kwargs.pop("filters", None)
         filters_spec = filters_spec if filters_spec is not None else {}

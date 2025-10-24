@@ -85,6 +85,7 @@ class TestVerificationResponse:
             is_valid=True,
             verification_data=[],
             results=[],
+            scores=[],
             executed_handlers=[],
             processing_time_ms=42.5
         )
@@ -119,6 +120,7 @@ class TestVerificationResponse:
             is_valid=True,
             verification_data=verification_data,
             results=results,
+            scores=[],
             executed_handlers=["TestHandler"],
             processing_time_ms=123.45
         )
@@ -207,6 +209,7 @@ class TestModelIntegration:
             is_valid=True,
             verification_data=[],
             results=[],
+            scores=[],
             executed_handlers=["TestHandler"],
             processing_time_ms=42.5
         )

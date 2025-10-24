@@ -3,9 +3,10 @@ from typing import List
 
 from argdown_feedback.verifiers.verification_request import PrimaryVerificationData, VDFilter, VerificationDType
 
-from .....verifiers.base import BaseHandler, CompositeHandler
-from ..verifier_registry import AbstractVerifierBuilder
+from .....verifiers.base import BaseHandler
+from ..verifier_registry import AbstractVerifierBuilder, BaseScorer, ScorerCompositeHandler
 from ....shared.models import VerifierInfo
+
 
 
 class VerifierBuilder(AbstractVerifierBuilder):
@@ -15,13 +16,19 @@ class VerifierBuilder(AbstractVerifierBuilder):
     def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
         """Build the complete pipeline including preprocessing and main handler."""
         pass
+
+    def build_scorers(self, filters_spec: dict, **kwargs) -> List[BaseScorer]:
+        """Build the list of virtue scorers to be used."""
+        return []
         
-    def build(self, filters_spec: dict, **kwargs) -> BaseHandler:
+    def build(self, filters_spec: dict, **kwargs) -> ScorerCompositeHandler:
         """Build complete verifier handler with validation."""        
         handlers = self.build_handlers_pipeline(filters_spec, **kwargs)
-        return CompositeHandler(
+        scorers = self.build_scorers(filters_spec, **kwargs)
+        return ScorerCompositeHandler(
             name=f"{self.name}_pipeline",
-            handlers=handlers
+            handlers=handlers,
+            scorers=scorers
         )
     
     def validate_filters(self, filter_roles: List[str]) -> List[str]:

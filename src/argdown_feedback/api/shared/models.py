@@ -56,6 +56,14 @@ class VerificationResult(BaseModel):
     message: Optional[str] = Field(None, description="Human-readable message about the result")
     details: Dict[str, Any] = Field(default_factory=dict, description="Additional details about the verification")
 
+class ScoringResult(BaseModel):
+    """Result from a single virtue scoring."""
+    scorer_id: str = Field(..., description="ID of the scorer that produced this result")
+    scorer_description: str = Field(..., description="Human-readable description of normative dimension or virtue that is being scored")
+    scoring_data_references: List[str] = Field(..., description="IDs of verification data this result references, if any")
+    score: float = Field(..., description="Numerical score achieved")
+    message: Optional[str] = Field(None, description="Human-readable message about the result")
+    details: Dict[str, Any] = Field(default_factory=dict, description="Additional details about the scoring")
 
 class VerificationResponse(BaseModel):
     """Response model for verification endpoints."""
@@ -63,6 +71,7 @@ class VerificationResponse(BaseModel):
     is_valid: bool = Field(..., description="Whether all verification checks passed")
     verification_data: List[VerificationData] = Field(..., description="Data extracted and processed")
     results: List[VerificationResult] = Field(..., description="Individual verification results")
+    scores: List[ScoringResult] = Field(..., description="Individual scoring results")
     executed_handlers: List[str] = Field(..., description="List of handlers that were executed")
     processing_time_ms: float = Field(..., description="Time taken to process the request in milliseconds")
 
@@ -86,6 +95,16 @@ class VerificationResponse(BaseModel):
                         "is_valid": True,
                         "message": None,
                         "details": {}
+                    }
+                ],
+                "scores": [
+                    {
+                        "scorer_id": "VirtueScorer.Faithfulness",
+                        "scorer_description": "Evaluates the faithfulness of arguments to the source text",
+                        "scoring_data_references": ["argdown_block_1"],
+                        "score": 0.85,
+                        "message": "The argument is highly faithful to the text.",
+                        "details": {"criterion": "semantic_similarity", "weight": 0.9}
                     }
                 ],
                 "executed_handlers": ["InfReco.HasArgumentsHandler"],

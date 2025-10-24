@@ -115,15 +115,12 @@ class VerificationService:
         
         # Execute verification
         result = handler.process(internal_request)
-        
-        # Remove `details` from results if present, as these might not be serializable`
-        if hasattr(result, 'results'):
-            for r in result.results:
-                if hasattr(r, 'details'):
-                    r.details = {}
+
+        # Score the results
+        scores = handler.score(result)
 
         # Transform result to API format
-        return self._build_response(verifier_name, result, request)
+        return self._build_response(verifier_name, result, scores, request)
     
     def _build_internal_request(
         self, 
@@ -223,6 +220,7 @@ class VerificationService:
         self, 
         verifier_name: str, 
         result: Any, 
+        scores: Any,
         original_request: VerificationRequest
     ) -> VerificationResponse:
         """
@@ -239,6 +237,12 @@ class VerificationService:
         # Extract result data
         is_valid = result.is_valid() if hasattr(result, 'is_valid') else True
         
+        # Remove `details` from results if present, as these might not be serializable`
+        if hasattr(result, 'results'):
+            for r in result.results:
+                if hasattr(r, 'details'):
+                    r.details = {}
+
         # Convert verification data to API format
         verification_data_objects = []
         if hasattr(result, 'verification_data'):
@@ -260,6 +264,10 @@ class VerificationService:
                     results_dicts.append(r.__dict__)
                 else:
                     results_dicts.append(str(r))
+
+        # Convert scores to API format
+        scores_dicts: list = []
+        # TODO
         
         # Get executed handlers
         executed_handlers = []
@@ -271,6 +279,7 @@ class VerificationService:
             is_valid=is_valid,
             verification_data=verification_data_objects,
             results=results_dicts,
+            scores=scores_dicts,
             executed_handlers=executed_handlers,
             processing_time_ms=0.0  # Will be set by caller
         )
