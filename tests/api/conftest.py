@@ -79,7 +79,7 @@ from tests.test_verifiers_argmap_logreco_handler import (
 
 
 import pytest
-import nltk
+import nltk  # type: ignore
 
 @pytest.fixture(scope="session", autouse=True)
 def download_nltk_punkt_tab():
