@@ -1,5 +1,10 @@
 from typing import List
 
+from pyargdown import ArgdownMultiDiGraph, Conclusion
+import textdistance
+
+from argdown_feedback.api.server.services.verifier_registry import BaseScorer
+from argdown_feedback.tasks.base import Evaluation
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
     InfRecoCompositeHandler,
@@ -12,9 +17,10 @@ from argdown_feedback.verifiers.processing_handler import (
     ArgdownParser,
     FencedCodeBlockExtractor,
 )
+from argdown_feedback.verifiers.verification_request import VerificationDType, VerificationRequest
 
 from ..base import VerifierBuilder
-from .....shared.models import VerifierConfigOption
+from .....shared.models import ScoringResult, VerifierConfigOption
 
 
 class InfrecoBuilder(VerifierBuilder):
@@ -30,6 +36,27 @@ class InfrecoBuilder(VerifierBuilder):
             type="string",
             default="from",
             description="Key used for inference information in arguments",
+            required=False
+        ),
+        VerifierConfigOption(
+            name="enable_infreco_subarguments_scorer",
+            type="bool",
+            default=False,
+            description="Enable scoring of sub-arguments in the informal reconstruction",
+            required=False
+        ),
+        VerifierConfigOption(
+            name="enable_infreco_premises_scorer",
+            type="bool",
+            default=False,
+            description="Enable scoring of premises in the informal reconstruction",
+            required=False
+        ),
+        VerifierConfigOption(
+            name="enable_infreco_faithfulness_scorer",
+            type="bool",
+            default=False,
+            description="Enable scoring of faithfulness of the informal reconstruction to the input text",
             required=False
         )
     ]
@@ -51,4 +78,129 @@ class InfrecoBuilder(VerifierBuilder):
             HasArgdownHandler(filter=vd_filters.get("infreco")),
             infreco_handler
         ]
+
+
+### Scorers ###
+
+
+class InfrecoSubargumentsScorer(BaseScorer):
+    """Scorer that evaluates the number of sub-arguments in the informal reconstruction."""
+
+    scorer_id = "infreco_subarguments_scorer"
+    scorer_description = "Scores the number of sub-arguments in the informal reconstruction."
+
+    def score(self, result: VerificationRequest) -> ScoringResult:
+        evaluation = Evaluation.from_verification_request(result)
+        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown")
+
+        if not argdown or not argdown.arguments:
+            return ScoringResult(
+                scorer_id=self.name,
+                scorer_description=self.scorer_description,
+                scoring_data_references=[],
+                message="No argument reconstruction found; cannot compute sub-arguments score.",
+                score=0.0,
+                details={},
+            )
+        
+        argument = argdown.arguments[0]
+        conclusion_count = sum(
+            1 for prop in argument.pcs if isinstance(prop, Conclusion)
+        )
+        score = 1 - 0.5 ** conclusion_count
+
+        scoring = ScoringResult(
+            scorer_id=self.name,
+            scorer_description=self.scorer_description,
+            scoring_data_references=[],
+            message=f"Number of sub-arguments (intermediate conclusions) found: {conclusion_count-1}.",
+            score=score,
+            details={"intermediate_conclusion_count": conclusion_count - 1},
+        )
+
+        return scoring
+
+
+class InfrecoPremisesScorer(BaseScorer):
+    """Scorer that evaluates the number of premises in the informal reconstruction."""
+
+    scorer_id = "infreco_premises_scorer"
+    scorer_description = "Scores the number of premises in the informal reconstruction."
+
+    def score(self, result: VerificationRequest) -> ScoringResult:
+        evaluation = Evaluation.from_verification_request(result)
+        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown")
+
+        if not argdown or not argdown.arguments:
+            return ScoringResult(
+                scorer_id=self.name,
+                scorer_description=self.scorer_description,
+                scoring_data_references=[],
+                message="No argument reconstruction found; cannot compute premises score.",
+                score=0.0,
+                details={},
+            )
+        
+        argument = argdown.arguments[0]
+        premises_count = sum(
+            1 for prop in argument.pcs if not isinstance(prop, Conclusion)
+        )
+        score = 1 - 0.7 ** max(premises_count-1, 0)
+
+        scoring = ScoringResult(
+            scorer_id=self.name,
+            scorer_description=self.scorer_description,
+            scoring_data_references=[],
+            message=f"Number of premises found: {premises_count}.",
+            score=score,
+            details={"premises_count": premises_count - 1},
+        )
+
+        return scoring
+
+
+class InfrecoFaithfulnessScorer(BaseScorer):
+    """Scorer that evaluates the faithfulness of the informal argument reconstruction to the input."""
+
+    scorer_id = "infreco_faithfulness_scorer"
+    scorer_description = "Scores the faithfulness of the informal argument reconstruction, i.e. the text similarity between argdown snippet and source text."
+
+    def score(self, result: VerificationRequest) -> ScoringResult:
+
+        source_text = result.source
+        argdown_snippet = next(
+            (
+                vr.code_snippet for vr in reversed(result.verification_data)
+                if vr.dtype == VerificationDType.argdown and vr.code_snippet
+            ),
+            None,
+        )
+
+        if not source_text or not argdown_snippet:
+            return ScoringResult(
+                scorer_id=self.name,
+                scorer_description=self.scorer_description,
+                scoring_data_references=[],
+                message="No source text / argdown provided; cannot compute faithfulness score.",
+                score=0.0,
+                details={},
+            )
+
+        text_similarity = round(
+            textdistance.damerau_levenshtein.normalized_similarity(
+                source_text, argdown_snippet
+            ),
+            1,
+        )
+
+        scoring = ScoringResult(
+            scorer_id=self.name,
+            scorer_description=self.scorer_description,
+            scoring_data_references=[],
+            message=f"Text similarity between argdown snippet and source text: {text_similarity}.",
+            score=text_similarity,
+            details={},
+        )
+        return scoring
+
 

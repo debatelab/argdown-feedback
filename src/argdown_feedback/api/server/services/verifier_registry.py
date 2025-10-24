@@ -39,6 +39,8 @@ class ScorerCompositeHandler(CompositeHandler):
 
     def score(self, result: VerificationRequest) -> List[ScoringResult]:
         """Run all virtue scorers on the given evaluation and collect results."""
+        if not result.is_valid():
+            return []
         all_scores: List[ScoringResult] = []
         for scorer in self.scorers:
             score = scorer.score(result)
