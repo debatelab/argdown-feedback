@@ -5,6 +5,9 @@ This module creates the main FastAPI application with all necessary middleware,
 exception handlers, and route configurations.
 """
 
+
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -21,9 +24,17 @@ from ..shared.exceptions import (
 from .routes.verification import router as verification_router
 from .routes.discovery import router as discovery_router
 
+import nltk  # type: ignore
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Download NLTK punkt tokenizer data at startup
+@asynccontextmanager
+async def lifespan(app):
+    nltk.download('punkt')
+    yield
 
 # Create FastAPI application
 app = FastAPI(
@@ -31,7 +42,8 @@ app = FastAPI(
     description="API for verifying argdown documents and annotations",
     version="1.0.0",
     docs_url="/docs",
-    redoc_url="/redoc"
+    redoc_url="/redoc",
+    lifespan=lifespan
 )
 
 # Configure CORS
@@ -145,3 +157,4 @@ async def root() -> Dict[str, str]:
 # Include routers
 app.include_router(verification_router, prefix="/api/v1")
 app.include_router(discovery_router, prefix="/api/v1")
+
