@@ -21,51 +21,6 @@ from argdown_feedback.verifiers.verification_request import VerificationDType, V
 from ..base import VerifierBuilder
 
 
-class ArgmapBuilder(VerifierBuilder):
-    """Builder for argument map verifier."""
-
-    name = "argmap"
-    description = "Validates argument maps in Argdown format"
-    input_types = ["argdown"]
-    allowed_filter_roles = ["argmap"]
-    config_options = [
-        VerifierConfigOption(
-            name="enable_argmap_size_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of argument map size",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_argmap_density_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of argument map density",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_argmap_faithfulness_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of argument map faithfulness to input text",
-            required=False
-        ),
-    ]
-
-    def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
-    ) -> List[BaseHandler]:
-        """Build argmap verification pipeline."""
-        vd_filters = self._create_vd_filters(filters_spec)
-
-        return [
-            FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
-            ArgdownParser(name="ArgdownParser"),
-            HasArgdownHandler(filter=vd_filters.get("argmap")),
-            ArgMapCompositeHandler(filter=vd_filters.get("argmap")),
-        ]
-
-
 ### Scorers ###
 
 class ArgmapSizeScorer(BaseScorer):
@@ -187,4 +142,35 @@ class ArgmapFaithfulnessScorer(BaseScorer):
             details={},
         )
         return scoring
+
+
+
+### Verifier Builder ###
+
+class ArgmapBuilder(VerifierBuilder):
+    """Builder for argument map verifier."""
+
+    name = "argmap"
+    description = "Validates argument maps in Argdown format"
+    input_types = ["argdown"]
+    allowed_filter_roles = ["argmap"]
+    scorer_classes = [
+        ArgmapSizeScorer,
+        ArgmapDensityScorer,
+        ArgmapFaithfulnessScorer,
+    ]
+    config_options = []
+
+    def build_handlers_pipeline(
+        self, filters_spec: dict, **kwargs
+    ) -> List[BaseHandler]:
+        """Build argmap verification pipeline."""
+        vd_filters = self._create_vd_filters(filters_spec)
+
+        return [
+            FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+            ArgdownParser(name="ArgdownParser"),
+            HasArgdownHandler(filter=vd_filters.get("argmap")),
+            ArgMapCompositeHandler(filter=vd_filters.get("argmap")),
+        ]
 

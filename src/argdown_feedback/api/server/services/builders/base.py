@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import List
+from typing import List, Type
 
 from argdown_feedback.verifiers.verification_request import PrimaryVerificationData, VDFilter, VerificationDType
 
@@ -11,7 +11,7 @@ from ....shared.models import VerifierInfo
 
 class VerifierBuilder(AbstractVerifierBuilder):
     """Abstract base class for verifier builders."""
-        
+
     @abstractmethod
     def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
         """Build the complete pipeline including preprocessing and main handler."""
@@ -19,7 +19,12 @@ class VerifierBuilder(AbstractVerifierBuilder):
 
     def build_scorers(self, filters_spec: dict, **kwargs) -> List[BaseScorer]:
         """Build the list of virtue scorers to be used."""
-        return []
+        scorers = [
+            scorer_class(parent_name=self.name) 
+            for scorer_class in self.scorer_classes
+            if kwargs.get("enable_" + scorer_class.scorer_id, True)
+        ]
+        return scorers
         
     def build(self, filters_spec: dict, **kwargs) -> ScorerCompositeHandler:
         """Build complete verifier handler with validation."""        

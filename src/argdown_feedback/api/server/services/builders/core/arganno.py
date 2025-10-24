@@ -18,63 +18,6 @@ from ..base import BaseScorer, VerifierBuilder
 from nltk.tokenize import sent_tokenize  # type: ignore
 
 
-### Verifier builder ###
-
-class ArgannoBuilder(VerifierBuilder):
-    """Builder for argumentative annotation verifier."""
-
-    name = "arganno"
-    description = "Validates argumentative annotations in XML format"
-    input_types = ["xml"]
-    allowed_filter_roles = ["arganno"]
-    config_options = [
-        VerifierConfigOption(
-            name="enable_annotation_coverage_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of annotation coverage",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_annotation_scope_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of annotation scope",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_annotation_density_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of annotation density",
-            required=False
-        ),
-    ]  
-    
-    def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
-    ) -> List[BaseHandler]:
-        """Build arganno verification pipeline."""
-        vd_filters = self._create_vd_filters(filters_spec)
-
-        return [
-            FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
-            XMLParser(name="XMLAnnotationParser"),
-            HasAnnotationsHandler(filter=vd_filters.get("arganno")),
-            ArgannoCompositeHandler(filter=vd_filters.get("arganno")),
-        ]
-    
-    def build_scorers(self, filters_spec: dict, **kwargs) -> List[BaseScorer]:
-        """Build the list of virtue scorers to be used."""
-        scorer_classes: List[Type[BaseScorer]] = [AnnotationCoverageScorer]
-        scorers = [
-            scorer_class(parent_name=self.name) 
-            for scorer_class in scorer_classes
-            if kwargs.get("enable_" + scorer_class.scorer_id, True)
-        ]
-        return scorers
-
-
 ### Scorers ###
 
 class AnnotationCoverageScorer(BaseScorer):
@@ -187,3 +130,33 @@ class AnnotationDensityScorer(BaseScorer):
             details={"support_count": supports_count, "attack_count": attacks_count, "proposition_count": propositions_count},
         )
 
+
+### Verifier builder ###
+
+class ArgannoBuilder(VerifierBuilder):
+    """Builder for argumentative annotation verifier."""
+
+    name = "arganno"
+    description = "Validates argumentative annotations in XML format"
+    input_types = ["xml"]
+    allowed_filter_roles = ["arganno"]
+    scorer_classes: List[Type[BaseScorer]] = [
+        AnnotationCoverageScorer,
+        AnnotationScopeScorer,
+        AnnotationDensityScorer,
+    ]
+    config_options = []  
+    
+    def build_handlers_pipeline(
+        self, filters_spec: dict, **kwargs
+    ) -> List[BaseHandler]:
+        """Build arganno verification pipeline."""
+        vd_filters = self._create_vd_filters(filters_spec)
+
+        return [
+            FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+            XMLParser(name="XMLAnnotationParser"),
+            HasAnnotationsHandler(filter=vd_filters.get("arganno")),
+            ArgannoCompositeHandler(filter=vd_filters.get("arganno")),
+        ]
+    

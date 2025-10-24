@@ -29,125 +29,33 @@ from .....shared.models import ScoringResult, VerifierConfigOption
 from .infreco import InfrecoPremisesScorer, InfrecoSubargumentsScorer, InfrecoFaithfulnessScorer
 
 
-class LogrecoBuilder(VerifierBuilder):
-    """Builder for logical argument reconstruction verifier."""
-    
-    name = "logreco"
-    description = "Validates logical argument reconstruction in Argdown format"
-    input_types = ["argdown"]
-    allowed_filter_roles = ["logreco"]
-    config_options = [
-        VerifierConfigOption(
-            name="from_key",
-            type="string",
-            default="from",
-            description="Key used for inference information in arguments",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="formalization_key",
-            type="string",
-            default="formalization",
-            description="Key used for formalization information",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="declarations_key",
-            type="string",
-            default="declarations",
-            description="Key used for declarations information",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_logreco_subarguments_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of sub-arguments in the informal reconstruction",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_logreco_premises_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of premises in the informal reconstruction",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_logreco_faithfulness_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of faithfulness of the informal reconstruction to the input text",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_logreco_predicate_logic_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of the use of predicate logic in the logical reconstruction",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_logreco_formalizations_faithfulness_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of faithfulness of formalizations in the logical reconstruction to the input text",
-            required=False
-        ),
-        VerifierConfigOption(
-            name="enable_logreco_triviality_scorer",
-            type="bool",
-            default=False,
-            description="Enable scoring of non-triviality of the logical inference",
-            required=False
-        )
-    ]
-    
-    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
-        """Build logreco verification pipeline."""
-        vd_filters = self._create_vd_filters(filters_spec)
-        
-        # Create InfRecoCompositeHandler and remove NoPropInlineDataHandler
-        infreco_handler = InfRecoCompositeHandler(filter=vd_filters.get("logreco"), **{k:v for k,v in kwargs.items() if k == "from_key"})
-        infreco_handler.handlers = [
-            h for h in infreco_handler.handlers
-            if not isinstance(h, NoPropInlineDataHandler)
-        ]
-        
-        return [
-            FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
-            ArgdownParser(name="ArgdownParser"),
-            HasArgdownHandler(filter=vd_filters.get("logreco")),
-            infreco_handler,
-            LogRecoCompositeHandler(filter=vd_filters.get("logreco"), **kwargs)
-        ]
-
 ### Scorers ###
 
 class LogrecoPremisesScorer(InfrecoPremisesScorer):
     """Scorer for premises in logical argument reconstruction."""
     
-    name = "logreco_premises_scorer"
+    scorer_id = "logreco_premises_scorer"
     scorer_description = "Scores the number of premises in the logical argument reconstruction."
 
 
 class LogrecoSubargumentsScorer(InfrecoSubargumentsScorer):
     """Scorer for sub-arguments in logical argument reconstruction."""
     
-    name = "logreco_subarguments_scorer"
+    scorer_id = "logreco_subarguments_scorer"
     scorer_description = "Scores the number of sub-arguments in the logical argument reconstruction."
 
 
 class LogrecoFaithfulnessScorer(InfrecoFaithfulnessScorer):
     """Scorer for faithfulness of logical argument reconstruction to the input text."""
     
-    name = "logreco_faithfulness_scorer"
+    scorer_id = "logreco_faithfulness_scorer"
     scorer_description = "Scores the faithfulness of the logical argument reconstruction to the input text."
 
 
 class LogrecoPredicateLogicScorer(BaseScorer):
     """Scorer that evaluates the use of predicate logic in the logical argument reconstruction."""
 
-    name = "logreco_predicate_logic_scorer"
+    scorer_id = "logreco_predicate_logic_scorer"
     scorer_description = "Scores the use of predicate logic in the logical argument reconstruction."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
@@ -183,7 +91,7 @@ class LogrecoFormalizationsFaithfulnessScorer(BaseScorer):
     """Scores faithfulness of ofmalizations argument reco, rewarding valid reconstructions
     with formalizations that are similiar to the sentences being formalized."""
 
-    name = "logreco_formalizations_faithfulness_scorer"
+    scorer_id = "logreco_formalizations_faithfulness_scorer"
     scorer_description = "Scores the faithfulness of formalizations in the logical argument reconstruction to the input text."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
@@ -239,7 +147,7 @@ class LogrecoTrivialityScorer(BaseScorer):
     """Scores that the FOL inference from premises to final conclusion is not trivial, i.e.
     does in particular not just consists in joining the premises via conjunction as conclusion."""
 
-    name = "logreco_triviality_scorer"
+    scorer_id = "logreco_triviality_scorer"
     scorer_description = "Scores the degree to which the reconstructed inference is not trivial."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
@@ -283,3 +191,65 @@ class LogrecoTrivialityScorer(BaseScorer):
             details={},
         )
         return scoring
+
+
+### Verifier Builder ###
+
+class LogrecoBuilder(VerifierBuilder):
+    """Builder for logical argument reconstruction verifier."""
+    
+    name = "logreco"
+    description = "Validates logical argument reconstruction in Argdown format"
+    input_types = ["argdown"]
+    allowed_filter_roles = ["logreco"]
+    scorer_classes = [
+        LogrecoPremisesScorer,
+        LogrecoSubargumentsScorer,
+        LogrecoFaithfulnessScorer,
+        LogrecoPredicateLogicScorer,
+        LogrecoFormalizationsFaithfulnessScorer,
+        LogrecoTrivialityScorer
+    ]
+    config_options = [
+        VerifierConfigOption(
+            name="from_key",
+            type="string",
+            default="from",
+            description="Key used for inference information in arguments",
+            required=False
+        ),
+        VerifierConfigOption(
+            name="formalization_key",
+            type="string",
+            default="formalization",
+            description="Key used for formalization information",
+            required=False
+        ),
+        VerifierConfigOption(
+            name="declarations_key",
+            type="string",
+            default="declarations",
+            description="Key used for declarations information",
+            required=False
+        ),
+    ]
+    
+    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
+        """Build logreco verification pipeline."""
+        vd_filters = self._create_vd_filters(filters_spec)
+        
+        # Create InfRecoCompositeHandler and remove NoPropInlineDataHandler
+        infreco_handler = InfRecoCompositeHandler(filter=vd_filters.get("logreco"), **{k:v for k,v in kwargs.items() if k == "from_key"})
+        infreco_handler.handlers = [
+            h for h in infreco_handler.handlers
+            if not isinstance(h, NoPropInlineDataHandler)
+        ]
+        
+        return [
+            FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
+            ArgdownParser(name="ArgdownParser"),
+            HasArgdownHandler(filter=vd_filters.get("logreco")),
+            infreco_handler,
+            LogRecoCompositeHandler(filter=vd_filters.get("logreco"), **kwargs)
+        ]
+

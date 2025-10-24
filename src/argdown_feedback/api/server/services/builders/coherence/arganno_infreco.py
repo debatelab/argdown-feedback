@@ -1,5 +1,8 @@
 from typing import List
 
+import textdistance
+
+from argdown_feedback.tasks.base import Evaluation
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
@@ -24,9 +27,98 @@ from argdown_feedback.verifiers.coherence.arganno_infreco_handler import (
 from argdown_feedback.verifiers.processing_handler import (
     DefaultProcessingHandler,
 )
+from argdown_feedback.verifiers.verification_request import VerificationRequest
 
-from ..base import VerifierBuilder
-from .....shared.models import VerifierConfigOption
+from ..base import VerifierBuilder, BaseScorer
+from .....shared.models import ScoringResult, VerifierConfigOption
+
+from ..core.arganno import (
+    AnnotationCoverageScorer,
+    AnnotationDensityScorer,
+    AnnotationScopeScorer,
+)
+
+
+### Scorers ###
+
+# NOTE
+# Scorers subclassed from core.arganno module
+# works out of the box with verifier `arganno_infreco`,
+# because there is just one `soup` artifact in the
+# verification request produced by the handler pipeline.
+
+
+class AnnotationInfrecoScopeScorer(AnnotationScopeScorer):
+    """Scorer that evaluates the number of text elements annotated."""
+
+    scorer_id = "annotation_infreco_scope_scorer"
+
+
+class AnnotationInfrecoDensityScorer(AnnotationDensityScorer):
+    """Scorer that evaluates the density of dialectical relations identified in the annotation."""
+
+    scorer_id = "annotation_infreco_density_scorer"
+
+
+class AnnotationInfrecoCoverageScorer(AnnotationCoverageScorer):
+    """Scorer that evaluates the coverage of argumentative annotations in the input."""
+
+    scorer_id = "annotation_infreco_coverage_scorer"
+
+
+class AnnotationInfrecoSemanticCoherenceScorer(BaseScorer):
+    """Scorer that evaluates the semantic coherence between argumentative annotations and informal reconstructions."""
+
+    scorer_id = "annotation_infreco_semantic_coherence_scorer"
+    scorer_description = "Scores the semantic coherence between argumentative annotations and informal reconstructions."
+
+    def score(self, result: VerificationRequest) -> ScoringResult:
+        evaluation = Evaluation.from_verification_request(result)
+
+        soup = evaluation.artifacts.get("soup")
+        anno_props = soup.find_all("proposition") if soup else None
+        argdown = evaluation.artifacts.get("argdown_reco")
+
+        if anno_props is None or argdown is None:
+            return ScoringResult(
+                scorer_id=self.name,
+                scorer_description=self.scorer_description,
+                scoring_data_references=[],
+                message="Insufficient data for semantic coherence scoring.",
+                score=0.0,
+                details={},
+            )
+
+        matches: list[tuple[str, str]] = []
+        for proposition in argdown.propositions:
+            for annotation_id in proposition.data.get("annotation_ids", []):
+                anno_prop = next(
+                    (ap for ap in anno_props if ap.get("id") == annotation_id), None
+                )
+                if anno_prop is None:
+                    continue
+                for text in proposition.texts:
+                    matches.append((anno_prop.get_text(), text))
+
+        dlss = [
+            textdistance.damerau_levenshtein.normalized_similarity(s, t)
+            for s, t in matches
+        ]
+        score = round(sum(dlss) / len(dlss), 1) if dlss else 0.0
+
+        scoring = ScoringResult(
+            scorer_id=self.name,
+            scorer_description=self.scorer_description,
+            scoring_data_references=[],
+            message=f"Semantic coherence score based on {len(dlss)} matched propositions.",
+            score=score,
+            details={"matched_propositions": len(dlss)},
+        )
+
+        return scoring
+
+
+#### Verifier Builder ###
 
 
 class ArgannoInfrecoBuilder(VerifierBuilder):
@@ -36,14 +128,20 @@ class ArgannoInfrecoBuilder(VerifierBuilder):
     description = "Checks coherence between argumentative annotations and informal argument reconstructions"
     input_types = ["xml", "argdown"]
     allowed_filter_roles = ["arganno", "infreco"]
+    scorer_classes = [
+        AnnotationInfrecoScopeScorer,
+        AnnotationInfrecoDensityScorer,
+        AnnotationInfrecoCoverageScorer,
+        AnnotationInfrecoSemanticCoherenceScorer,
+    ]
     config_options = [
         VerifierConfigOption(
             name="from_key",
             type="string",
             default="from",
             description="Key used for inference information in arguments",
-            required=False
-        )
+            required=False,
+        ),
     ]
     is_coherence_verifier = True
 
@@ -79,12 +177,14 @@ class ArgannoInfrecoBuilder(VerifierBuilder):
                 # Label and gist handlers
                 HasLabelHandler(name="InfReco.HasLabelHandler"),
                 # Inference data handlers
-                HasInferenceDataHandler(name="InfReco.HasInferenceDataHandler", **kwargs),
+                HasInferenceDataHandler(
+                    name="InfReco.HasInferenceDataHandler", **kwargs
+                ),
                 PropRefsExistHandler(name="InfReco.PropRefsExistHandler", **kwargs),
                 UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler", **kwargs),
             ],
             filter=infreco_filter,
-            **kwargs
+            **kwargs,
         )
 
         return [

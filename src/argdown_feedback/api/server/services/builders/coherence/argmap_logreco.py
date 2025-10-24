@@ -31,7 +31,37 @@ from argdown_feedback.verifiers.processing_handler import (
 )
 
 from ..base import VerifierBuilder
+from ..core.argmap import (
+    ArgmapSizeScorer,
+    ArgmapDensityScorer,
+    ArgmapFaithfulnessScorer,
+)
+
 from .....shared.models import VerifierConfigOption
+
+
+### Scorers ###
+
+# NOTE
+# Scorers subclassed from core.argmap module will work,
+# assuming that the argument map can be identified
+# with our default filters, using filename patterns.
+
+class ArgmapLogrecoSizeScorer(ArgmapSizeScorer):
+    """Scorer that evaluates the size of the argument map ."""
+
+    scorer_id = "argmap_logreco_size_scorer"
+
+class ArgmapLogrecoDensityScorer(ArgmapDensityScorer):
+    """Scorer that evaluates the density of the argument map ."""
+
+    scorer_id = "argmap_logreco_density_scorer"
+
+class ArgmapLogrecoFaithfulnessScorer(ArgmapFaithfulnessScorer):
+    """Scorer that evaluates the faithfulness of the argument map ."""
+
+    scorer_id = "argmap_logreco_faithfulness_scorer"
+
 
 
 class ArgmapLogrecoBuilder(VerifierBuilder):
@@ -41,6 +71,11 @@ class ArgmapLogrecoBuilder(VerifierBuilder):
     description = "Checks coherence between argument maps and logical argument reconstructions"
     input_types = ["argdown"]
     allowed_filter_roles = ["argmap", "logreco"]
+    scorer_classes = [
+        ArgmapLogrecoSizeScorer,
+        ArgmapLogrecoDensityScorer,
+        ArgmapLogrecoFaithfulnessScorer
+    ]
     config_options = [
         VerifierConfigOption(
             name="from_key",

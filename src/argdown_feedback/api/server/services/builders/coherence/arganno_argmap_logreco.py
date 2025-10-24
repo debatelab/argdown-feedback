@@ -34,9 +34,47 @@ from argdown_feedback.verifiers.processing_handler import (
     DefaultProcessingHandler,
 )
 
-from ..base import VerifierBuilder
 from .....shared.models import VerifierConfigOption
 
+from ..base import VerifierBuilder
+from ..core.arganno import (
+    AnnotationScopeScorer,
+    AnnotationDensityScorer,
+    AnnotationCoverageScorer,
+)
+
+
+### Scorers ###
+
+
+# NOTE
+# Scorers subclassed from core.arganno module
+# works out of the box with verifier `arganno_infreco`,
+# because there is just one `soup` artifact in the
+# verification request produced by the handler pipeline.
+
+
+class AnnotationArgmapLogrecoScopeScorer(AnnotationScopeScorer):
+    """Scorer that evaluates the number of text elements annotated."""
+
+    scorer_id = "annotation_argmap_logreco_scope_scorer"
+
+
+class AnnotationArgmapLogrecoDensityScorer(AnnotationDensityScorer):
+    """Scorer that evaluates the density of dialectical relations identified in the annotation."""
+
+    scorer_id = "annotation_argmap_logreco_density_scorer"
+
+
+class AnnotationArgmapLogrecoCoverageScorer(AnnotationCoverageScorer):
+    """Scorer that evaluates the coverage of argumentative annotations in the input."""
+
+    scorer_id = "annotation_argmap_logreco_coverage_scorer"
+
+
+
+
+### Verifier Builder ###
 
 class ArgannoArgmapLogrecoBuilder(VerifierBuilder):
     """Builder for argumentative annotation, argument map, and logical reconstruction coherence verifier."""
@@ -45,6 +83,11 @@ class ArgannoArgmapLogrecoBuilder(VerifierBuilder):
     description = "Checks coherence between argumentative annotations, argument maps, and logical argument reconstructions"
     input_types = ["xml", "argdown"]
     allowed_filter_roles = ["arganno", "argmap", "logreco"]
+    scorer_classes = [
+        AnnotationArgmapLogrecoScopeScorer,
+        AnnotationArgmapLogrecoDensityScorer,
+        AnnotationArgmapLogrecoCoverageScorer,
+    ]
     config_options = [
         VerifierConfigOption(
             name="from_key",

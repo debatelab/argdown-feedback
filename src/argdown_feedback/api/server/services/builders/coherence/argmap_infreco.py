@@ -26,8 +26,39 @@ from argdown_feedback.verifiers.processing_handler import (
 )
 
 from ..base import VerifierBuilder
+from ..core.argmap import (
+    ArgmapSizeScorer,
+    ArgmapDensityScorer,
+    ArgmapFaithfulnessScorer,
+)
+
 from .....shared.models import VerifierConfigOption
 
+
+### Scorers ###
+
+# NOTE
+# Scorers subclassed from core.argmap module will work,
+# assuming that the argument map can be identified
+# with our default filters, using filename patterns.
+
+class ArgmapInfrecoSizeScorer(ArgmapSizeScorer):
+    """Scorer that evaluates the size of the argument map ."""
+
+    scorer_id = "argmap_infreco_size_scorer"
+
+class ArgmapInfrecoDensityScorer(ArgmapDensityScorer):
+    """Scorer that evaluates the density of the argument map ."""
+
+    scorer_id = "argmap_infreco_density_scorer"
+
+class ArgmapInfrecoFaithfulnessScorer(ArgmapFaithfulnessScorer):
+    """Scorer that evaluates the faithfulness of the argument map ."""
+
+    scorer_id = "argmap_infreco_faithfulness_scorer"
+
+
+### Verifier Builder ###
 
 class ArgmapInfrecoBuilder(VerifierBuilder):
     """Builder for argument map and informal reconstruction coherence verifier."""
@@ -36,6 +67,11 @@ class ArgmapInfrecoBuilder(VerifierBuilder):
     description = "Checks coherence between argument maps and informal argument reconstructions"
     input_types = ["argdown"]
     allowed_filter_roles = ["argmap", "infreco"]
+    scorer_classes = [
+        ArgmapInfrecoSizeScorer,
+        ArgmapInfrecoDensityScorer,
+        ArgmapInfrecoFaithfulnessScorer
+    ]
     config_options = [
         VerifierConfigOption(
             name="from_key",

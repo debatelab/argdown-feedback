@@ -29,6 +29,78 @@ from argdown_feedback.verifiers.processing_handler import (
 from ..base import VerifierBuilder
 from .....shared.models import VerifierConfigOption
 
+from ..core.arganno import (
+    AnnotationCoverageScorer,
+    AnnotationDensityScorer,
+    AnnotationScopeScorer,
+)
+from ..core.logreco import (
+    LogrecoFormalizationsFaithfulnessScorer,
+    LogrecoPredicateLogicScorer,
+    LogrecoTrivialityScorer,
+)
+from .arganno_infreco import (
+    AnnotationInfrecoSemanticCoherenceScorer,
+)
+
+
+### Scorers ###
+
+# NOTE
+# Scorers subclassed from other modules
+# work out of the box with verifier `arganno_infreco`,
+# because there is just one `soup` artifact in the
+# verification request produced by the handler pipeline.
+
+
+class AnnotationLogrecoScopeScorer(AnnotationScopeScorer):
+    """Scorer that evaluates the number of text elements annotated."""
+
+    scorer_id = "annotation_logreco_scope_scorer"
+
+
+class AnnotationLogrecoDensityScorer(AnnotationDensityScorer):
+    """Scorer that evaluates the density of dialectical relations identified in the annotation."""
+
+    scorer_id = "annotation_logreco_density_scorer"
+
+
+class AnnotationLogrecoCoverageScorer(AnnotationCoverageScorer):
+    """Scorer that evaluates the coverage of argumentative annotations in the input."""
+
+    scorer_id = "annotation_logreco_coverage_scorer"
+
+
+class AnnotationLogrecoFormalizationsFaithfulnessScorer(
+    LogrecoFormalizationsFaithfulnessScorer
+):
+    """Scorer that evaluates the faithfulness of logical formalizations to the foamlized propositions."""
+
+    scorer_id = "annotation_logreco_formalizations_faithfulness_scorer"
+
+
+class AnnotationLogrecoPredicateLogicScorer(LogrecoPredicateLogicScorer):
+    """Scorer that evaluates the use of predicate logic formalizations."""
+
+    scorer_id = "annotation_logreco_predicate_logic_scorer"
+
+
+class AnnotationLogrecoTrivialityScorer(LogrecoTrivialityScorer):
+    """Scorer that evaluates the triviality of logical formalizations."""
+
+    scorer_id = "annotation_logreco_triviality_scorer"
+
+
+class AnnotationLogrecoSemanticCoherenceScorer(
+    AnnotationInfrecoSemanticCoherenceScorer
+):
+    """Scorer that evaluates the semantic coherence between argumentative annotations and informal reconstructions."""
+
+    scorer_id = "annotation_logreco_semantic_coherence_scorer"
+
+
+
+### Verifier Builder  ###
 
 class ArgannoLogrecoBuilder(VerifierBuilder):
     """Builder for argumentative annotation and logical reconstruction coherence verifier."""
@@ -37,6 +109,15 @@ class ArgannoLogrecoBuilder(VerifierBuilder):
     description = "Checks coherence between argumentative annotations and logical argument reconstructions"
     input_types = ["xml", "argdown"]
     allowed_filter_roles = ["arganno", "logreco"]
+    scorer_classes = [
+        AnnotationLogrecoScopeScorer,
+        AnnotationLogrecoDensityScorer,
+        AnnotationLogrecoCoverageScorer,
+        AnnotationLogrecoFormalizationsFaithfulnessScorer,
+        AnnotationLogrecoPredicateLogicScorer,
+        AnnotationLogrecoTrivialityScorer,
+        AnnotationLogrecoSemanticCoherenceScorer,
+    ]
     config_options = [
         VerifierConfigOption(
             name="from_key",
@@ -98,7 +179,7 @@ class ArgannoLogrecoBuilder(VerifierBuilder):
                 UsesAllPropsHandler(name="InfReco.UsesAllPropsHandler"),
             ],
             filter=logreco_filter,
-            **{k: v for k,v in kwargs.items() if k in ["from_key"]},
+            **{k: v for k, v in kwargs.items() if k in ["from_key"]},
         )
 
         return [
@@ -108,5 +189,9 @@ class ArgannoLogrecoBuilder(VerifierBuilder):
             ArgannoCompositeHandler(filter=arganno_filter),
             infreco_handler,
             LogRecoCompositeHandler(filter=logreco_filter, **kwargs),
-            ArgannoLogrecoCoherenceHandler(filters=filters, **{k: v for k,v in kwargs.items() if k in ["from_key"]}),
+            ArgannoLogrecoCoherenceHandler(
+                filters=filters,
+                **{k: v for k, v in kwargs.items() if k in ["from_key"]},
+            ),
         ]
+

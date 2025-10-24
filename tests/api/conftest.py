@@ -78,6 +78,13 @@ from tests.test_verifiers_argmap_logreco_handler import (
 )
 
 
+import pytest
+import nltk
+
+@pytest.fixture(scope="session", autouse=True)
+def download_nltk_punkt_tab():
+    nltk.download('punkt_tab')
+
 # Fixtures for arganno_argmap coherence verifier tests
 @pytest.fixture
 def arganno_argmap_source_text():

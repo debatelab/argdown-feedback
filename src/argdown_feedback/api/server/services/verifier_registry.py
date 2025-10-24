@@ -4,7 +4,7 @@ Verifier registry using builder pattern.
 
 from abc import ABC, abstractmethod
 
-from typing import Dict, List, Any
+from typing import Dict, List, Any, Type
 
 from ....verifiers.verification_request import VerificationRequest
 
@@ -55,8 +55,25 @@ class AbstractVerifierBuilder(ABC):
     description: str
     input_types: List[str]
     allowed_filter_roles: List[str]
+    scorer_classes: List[Type[BaseScorer]] = []
     config_options: List[VerifierConfigOption] = []
     is_coherence_verifier: bool = False
+
+    def __init__(self) -> None:
+        super().__init__()
+        # for each scorer class, add a config option to enable/disable it
+        for scorer_class in self.scorer_classes:
+            option_name = f"enable_{scorer_class.scorer_id}"
+            if not any(opt.name == option_name for opt in self.config_options):
+                self.config_options.append(
+                    VerifierConfigOption(
+                        name=option_name,
+                        type="bool",
+                        default=False,
+                        description=f"Enable scoring of {scorer_class.scorer_id}",
+                        required=False
+                    )
+                )
 
     @abstractmethod
     def build(self, filters_spec: dict, **kwargs) -> ScorerCompositeHandler:
