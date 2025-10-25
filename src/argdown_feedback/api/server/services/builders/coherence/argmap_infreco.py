@@ -1,5 +1,6 @@
-from typing import List
+from typing import Any, List
 
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
@@ -83,7 +84,7 @@ class ArgmapInfrecoBuilder(VerifierBuilder):
     ]
     is_coherence_verifier = True
     
-    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
+    def build_handlers_pipeline(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> List[BaseHandler]:
         """Build argmap_infreco coherence verification pipeline."""
 
         # default filters

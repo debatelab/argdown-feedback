@@ -1,5 +1,6 @@
-from typing import List
+from typing import Any, List
 
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
@@ -63,6 +64,7 @@ class ArgmapLogrecoFaithfulnessScorer(ArgmapFaithfulnessScorer):
     scorer_id = "argmap_logreco_faithfulness_scorer"
 
 
+### Verifier Builder ###
 
 class ArgmapLogrecoBuilder(VerifierBuilder):
     """Builder for argument map and logical reconstruction coherence verifier."""
@@ -108,7 +110,7 @@ class ArgmapLogrecoBuilder(VerifierBuilder):
     ]
     is_coherence_verifier = True
     
-    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
+    def build_handlers_pipeline(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> List[BaseHandler]:
         """Build argmap_logreco coherence verification pipeline."""
         # default filters
         if "argmap" not in filters_spec:

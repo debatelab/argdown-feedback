@@ -1,12 +1,12 @@
-from typing import List
+from typing import Any, List
 
 from bs4 import BeautifulSoup
 from pyargdown import ArgdownMultiDiGraph
 import textdistance
 
 from argdown_feedback.api.server.services.verifier_registry import BaseScorer
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.api.shared.models import ScoringResult
-from argdown_feedback.tasks.base import Evaluation
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandler
@@ -64,9 +64,8 @@ class AnnotationArgmapSemanticCoherenceScorer(BaseScorer):
     scorer_description = "Scores the semantic coherence between argumentative annotations and argument maps."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        soup = evaluation.artifacts.get("soup")
-        argdown = evaluation.artifacts.get("argdown_map")
+        argdown, _ = self.get_argdown(result, roles=["argmap"])
+        soup, _ = self.get_xml_soup(result)
         if not isinstance(soup, BeautifulSoup) or not isinstance(argdown, ArgdownMultiDiGraph):
             return ScoringResult(
                 scorer_id=self.name,
@@ -132,7 +131,7 @@ class ArgannoArgmapBuilder(VerifierBuilder):
     is_coherence_verifier = True
 
     def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
     ) -> List[BaseHandler]:
         """Build arganno_argmap coherence verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)

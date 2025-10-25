@@ -1,6 +1,6 @@
-from typing import List, Type
+from typing import Any, List, Type
 
-from argdown_feedback.tasks.base import Evaluation
+from argdown_feedback.api.shared.filtering import FilterRoleType
 
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
@@ -13,7 +13,7 @@ from argdown_feedback.verifiers.processing_handler import (
 )
 from argdown_feedback.verifiers.verification_request import VerificationRequest
 
-from .....shared.models import ScoringResult, VerifierConfigOption
+from .....shared.models import ScoringResult
 from ..base import BaseScorer, VerifierBuilder
 from nltk.tokenize import sent_tokenize  # type: ignore
 
@@ -28,8 +28,7 @@ class AnnotationCoverageScorer(BaseScorer):
 
     def score(self, result: VerificationRequest) -> ScoringResult:
 
-        evaluation = Evaluation.from_verification_request(result)
-        soup = evaluation.artifacts.get("soup")
+        soup, _ = self.get_xml_soup(result)
         if not soup:
             return ScoringResult(
                 scorer_id=self.name,
@@ -38,10 +37,10 @@ class AnnotationCoverageScorer(BaseScorer):
                 message="No XML content found for annotation coverage scoring.",
                 score=0.0,
                 details={},
-            )
-        propositions = evaluation.artifacts["soup"].find_all("proposition")
+            )        
+        propositions = soup.find_all("proposition")
         coverage = sum(len(proposition.get_text()) for proposition in propositions)
-        text_length = len(evaluation.artifacts["soup"].get_text())
+        text_length = len(soup.get_text())
         coverage_ratio = (
             coverage / text_length
             if text_length > 0
@@ -65,8 +64,7 @@ class AnnotationScopeScorer(BaseScorer):
     scorer_description = "Number of annotated proposition elements."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        soup = evaluation.artifacts.get("soup")
+        soup, _ = self.get_xml_soup(result)
 
         if not soup:
             return ScoringResult(
@@ -101,10 +99,10 @@ class AnnotationDensityScorer(BaseScorer):
     scorer_description = "Scores based on the number of dialectic relations between propositions."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        soup = evaluation.artifacts.get("soup")
+        soup, _ = self.get_xml_soup(result)
+        propositions = soup.find_all("proposition") if soup is not None else None
 
-        if not soup:
+        if not soup or not propositions:
             return ScoringResult(
                 scorer_id=self.name,
                 scorer_description=self.scorer_description,
@@ -114,10 +112,9 @@ class AnnotationDensityScorer(BaseScorer):
                 details={},
             )
 
-        propositions = soup.find_all("proposition")
         propositions_count = len(propositions)
-        supports_count = sum(len(proposition.get("supports", [])) for proposition in propositions)
-        attacks_count = sum(len(proposition.get("attacks", [])) for proposition in propositions)
+        supports_count = sum(len(proposition.get("supports", [])) for proposition in propositions) # type: ignore
+        attacks_count = sum(len(proposition.get("attacks", [])) for proposition in propositions) # type: ignore
         score = (supports_count + attacks_count) / (2 * propositions_count) if propositions_count > 0 else 0
         score = min(score, 1.0)  # Cap the score at 1.0
 
@@ -148,7 +145,7 @@ class ArgannoBuilder(VerifierBuilder):
     config_options = []  
     
     def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
     ) -> List[BaseHandler]:
         """Build arganno verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)

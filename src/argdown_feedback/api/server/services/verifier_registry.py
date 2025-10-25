@@ -6,11 +6,15 @@ from abc import ABC, abstractmethod
 
 from typing import Dict, List, Any, Type
 
-from ....verifiers.verification_request import VerificationRequest
+from bs4 import BeautifulSoup
+from pyargdown import Argdown
+
+from ....verifiers.verification_request import PrimaryVerificationData, VDFilter, VerificationDType, VerificationRequest
 
 from ....verifiers.base import CompositeHandler
 
 from ...shared.models import ScoringResult, VerifierInfo, VerifiersList, VerifierConfigOption
+from ...shared.filtering import FilterRoleType
 from ...shared.exceptions import VerifierNotFoundError
 #from ..services import verifier_registry
 
@@ -20,13 +24,109 @@ class BaseScorer(ABC):
 
     scorer_id: str
 
-    def __init__(self, parent_name: str):
+    def __init__(self, parent_name: str, vd_filters: Dict[FilterRoleType, VDFilter]) -> None:
         self.name = parent_name + "." + self.scorer_id
+        self.vd_filters = vd_filters
 
     @abstractmethod
     def score(self, result: VerificationRequest) -> ScoringResult:
         """Score the given verification data and return scoring results."""
         pass
+
+    def get_argdown(self, request: VerificationRequest, roles: List[FilterRoleType] = ["argmap", "infreco", "logreco"]) -> tuple[Argdown | None, str | None]:
+        """Extract Argdown content from the verification request, if available.
+        Applies scorer's filters for any of the roles (default=argmap, infreco, logreco), 
+        and ensures the primary data type is Argdown."""
+
+        def combined_filter(data: PrimaryVerificationData) -> bool:
+            for role, vd_filter in self.vd_filters.items():
+                if role in roles:
+                    if not vd_filter(data):
+                        return False
+            return True
+
+        filtered_verification_data = [
+            (data.data, data.code_snippet)
+            for data in request.verification_data
+            if data.dtype == VerificationDType.argdown
+            and data.data is not None
+            and isinstance(data.data, Argdown)
+            and combined_filter(data)
+        ]
+
+        if not filtered_verification_data:
+            return None, None
+
+        argdown_data, argdown_snippet = next(reversed(filtered_verification_data))
+
+        return argdown_data, argdown_snippet
+
+
+    def get_xml_soup(self, request: VerificationRequest) -> tuple[BeautifulSoup | None, str | None]:
+        """Extract XML Annotation content (BeautifulSoup) from the verification request, if available.
+        Applies scorer's filters for role=arganno, 
+        and ensures the primary data type is Argdown."""
+
+        filtered_verification_data = [
+            (data.data, data.code_snippet)
+            for data in request.verification_data
+            if data.dtype == VerificationDType.xml
+            and data.data is not None
+            and isinstance(data.data, BeautifulSoup)
+            and (self.vd_filters["arganno"](data) if "arganno" in self.vd_filters else True)
+        ]
+
+        if not filtered_verification_data:
+            return None, None
+
+        soup, xml_snippet = next(reversed(filtered_verification_data))
+
+        return soup, xml_snippet
+
+    def get_formalizations(self, request: VerificationRequest, roles: List[FilterRoleType] = ["logreco"]) -> tuple[Any,Any]:
+        """Extract formalization expressions from the verification request, if available.
+        Applies scorer's filters for any of the roles (default=logreco), 
+        and ensures the primary data type is Argdown."""
+
+        def combined_filter(data: PrimaryVerificationData) -> bool:
+            for role, vd_filter in self.vd_filters.items():
+                if role in roles:
+                    if not vd_filter(data):
+                        return False
+            return True
+
+        filtered_verification_data = [
+            data
+            for data in request.verification_data
+            if data.dtype == VerificationDType.argdown
+            and data.data is not None
+            and isinstance(data.data, Argdown)
+            and combined_filter(data)
+        ]
+
+        if not filtered_verification_data:
+            return None, None
+
+        argdown_vd_id = filtered_verification_data[-1].id
+
+        # NOTE: formalizations are stored as details in result of WellFormedFormulasHandler
+        wff_result = next(
+            (
+                result
+                for result in request.results
+                if "WellFormedFormulasHandler" in result.verifier_id  # NOTE: hacky way to get right VerificationResult
+                and result.verification_data_references == [argdown_vd_id]
+            ),
+            None,
+        )
+
+        if wff_result is None:
+            return None, None
+
+        all_expressions = wff_result.details.get("all_expressions")
+        all_declarations = wff_result.details.get("all_declarations")
+
+        return all_expressions, all_declarations
 
 
 class ScorerCompositeHandler(CompositeHandler):
@@ -46,6 +146,7 @@ class ScorerCompositeHandler(CompositeHandler):
             score = scorer.score(result)
             all_scores.append(score)
         return all_scores
+    
 
 
 class AbstractVerifierBuilder(ABC):
@@ -76,11 +177,11 @@ class AbstractVerifierBuilder(ABC):
                 )
 
     @abstractmethod
-    def build(self, filters_spec: dict, **kwargs) -> ScorerCompositeHandler:
+    def build(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> ScorerCompositeHandler:
         """Build complete verifier handler with validation."""        
     
     @abstractmethod
-    def validate_filters(self, filter_roles: List[str]) -> List[str]:
+    def validate_filters(self, filter_roles: List[FilterRoleType]) -> List[str]:
         """Validate filter roles against allowed roles. Returns list of invalid roles."""
     
     @abstractmethod
@@ -123,7 +224,7 @@ class VerifierRegistry:
         invalid_options = builder.validate_config(config)
         return invalid_options
     
-    def validate_filter_roles(self, name: str, filter_roles: List[str]) -> List[str]:
+    def validate_filter_roles(self, name: str, filter_roles: List[FilterRoleType]) -> List[str]:
         """Validate filter roles for a verifier. Returns list of invalid roles."""
         builder = self.get_builder(name)
         invalid_roles = builder.validate_filters(filter_roles)

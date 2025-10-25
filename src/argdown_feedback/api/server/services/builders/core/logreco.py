@@ -1,13 +1,12 @@
-from typing import List
+from typing import Any, List
 
-from nltk.sem.logic import Expression  # type: ignore
 from pyargdown import ArgdownMultiDiGraph, Conclusion
 import textdistance
 
 from argdown_feedback.api.server.services.verifier_registry import BaseScorer
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.logic.fol_to_nl import FOL2NLTranslator
 from argdown_feedback.logic.logic import get_propositional_variables
-from argdown_feedback.tasks.base import Evaluation
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
     InfRecoCompositeHandler,
@@ -26,41 +25,55 @@ from argdown_feedback.verifiers.verification_request import VerificationRequest
 from ..base import VerifierBuilder
 from .....shared.models import ScoringResult, VerifierConfigOption
 
-from .infreco import InfrecoPremisesScorer, InfrecoSubargumentsScorer, InfrecoFaithfulnessScorer
+from .infreco import (
+    InfrecoPremisesScorer,
+    InfrecoSubargumentsScorer,
+    InfrecoFaithfulnessScorer,
+)
 
 
 ### Scorers ###
 
+
 class LogrecoPremisesScorer(InfrecoPremisesScorer):
     """Scorer for premises in logical argument reconstruction."""
-    
+
     scorer_id = "logreco_premises_scorer"
-    scorer_description = "Scores the number of premises in the logical argument reconstruction."
+    scorer_description = (
+        "Scores the number of premises in the logical argument reconstruction."
+    )
+    _filter_roles: list[FilterRoleType] = ["logreco"]
 
 
 class LogrecoSubargumentsScorer(InfrecoSubargumentsScorer):
     """Scorer for sub-arguments in logical argument reconstruction."""
-    
+
     scorer_id = "logreco_subarguments_scorer"
-    scorer_description = "Scores the number of sub-arguments in the logical argument reconstruction."
+    scorer_description = (
+        "Scores the number of sub-arguments in the logical argument reconstruction."
+    )
+    _filter_roles: list[FilterRoleType] = ["logreco"]
 
 
 class LogrecoFaithfulnessScorer(InfrecoFaithfulnessScorer):
     """Scorer for faithfulness of logical argument reconstruction to the input text."""
-    
+
     scorer_id = "logreco_faithfulness_scorer"
     scorer_description = "Scores the faithfulness of the logical argument reconstruction to the input text."
+    _filter_roles: list[FilterRoleType] = ["logreco"]
 
 
 class LogrecoPredicateLogicScorer(BaseScorer):
     """Scorer that evaluates the use of predicate logic in the logical argument reconstruction."""
 
     scorer_id = "logreco_predicate_logic_scorer"
-    scorer_description = "Scores the use of predicate logic in the logical argument reconstruction."
+    scorer_description = (
+        "Scores the use of predicate logic in the logical argument reconstruction."
+    )
+    _filter_roles: list[FilterRoleType] = ["logreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        all_expressions = evaluation.artifacts.get("all_expressions")
+        all_expressions, _ = self.get_formalizations(result, roles=self._filter_roles)
         if not all_expressions:
             return ScoringResult(
                 scorer_id=self.name,
@@ -70,8 +83,10 @@ class LogrecoPredicateLogicScorer(BaseScorer):
                 score=0.0,
                 details={},
             )
-        
-        n_has_prop_vars = sum(bool(get_propositional_variables(expr)) for expr in all_expressions.values())
+
+        n_has_prop_vars = sum(
+            bool(get_propositional_variables(expr)) for expr in all_expressions.values()
+        )
         score = 1 - (n_has_prop_vars / len(all_expressions))
         scoring = ScoringResult(
             scorer_id=self.name,
@@ -93,14 +108,21 @@ class LogrecoFormalizationsFaithfulnessScorer(BaseScorer):
 
     scorer_id = "logreco_formalizations_faithfulness_scorer"
     scorer_description = "Scores the faithfulness of formalizations in the logical argument reconstruction to the input text."
+    _filter_roles: list[FilterRoleType] = ["logreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown")
-        all_expressions = evaluation.artifacts.get("all_expressions")
-        all_declarations = evaluation.artifacts.get("all_declarations")
+        argdown, _ = self.get_argdown(result, roles=self._filter_roles)
+        all_expressions, all_declarations = self.get_formalizations(
+            result, roles=self._filter_roles
+        )
 
-        if not argdown or not all_declarations or not all_expressions or not argdown.arguments:
+        if (
+            not argdown
+            or not isinstance(argdown, ArgdownMultiDiGraph)
+            or not all_declarations
+            or not all_expressions
+            or not argdown.arguments
+        ):
             return ScoringResult(
                 scorer_id=self.name,
                 scorer_description=self.scorer_description,
@@ -118,7 +140,7 @@ class LogrecoFormalizationsFaithfulnessScorer(BaseScorer):
             proposition = argdown.get_proposition(pr.proposition_label)
 
             if expression is None or proposition is None:
-                continue 
+                continue
 
             text_1 = FOL2NLTranslator.translate_to_nl_sentence(
                 expression, all_declarations
@@ -143,18 +165,29 @@ class LogrecoFormalizationsFaithfulnessScorer(BaseScorer):
         )
         return scoring
 
+
 class LogrecoTrivialityScorer(BaseScorer):
     """Scores that the FOL inference from premises to final conclusion is not trivial, i.e.
     does in particular not just consists in joining the premises via conjunction as conclusion."""
 
     scorer_id = "logreco_triviality_scorer"
-    scorer_description = "Scores the degree to which the reconstructed inference is not trivial."
+    scorer_description = (
+        "Scores the degree to which the reconstructed inference is not trivial."
+    )
+    _filter_roles: list[FilterRoleType] = ["logreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown")
-        all_expressions: dict[str,Expression] | None = evaluation.artifacts.get("all_expressions")
-        if not all_expressions or not argdown or not argdown.arguments:
+        argdown, _ = self.get_argdown(result, roles=self._filter_roles)
+        all_expressions, _ = self.get_formalizations(
+            result, roles=self._filter_roles
+        )
+
+        if (
+            not argdown
+            or not isinstance(argdown, ArgdownMultiDiGraph)
+            or not all_expressions
+            or not argdown.arguments
+        ):
             return ScoringResult(
                 scorer_id=self.name,
                 scorer_description=self.scorer_description,
@@ -168,7 +201,8 @@ class LogrecoTrivialityScorer(BaseScorer):
         premises_formalized = [
             all_expressions[pr.proposition_label]
             for pr in argument.pcs
-            if pr.proposition_label in all_expressions and not isinstance(pr, Conclusion)
+            if pr.proposition_label in all_expressions
+            and not isinstance(pr, Conclusion)
         ]
         conclusion = next(
             all_expressions[pr.proposition_label]
@@ -177,10 +211,12 @@ class LogrecoTrivialityScorer(BaseScorer):
         )
 
         # Hacky string-based check for triviality
-        conclusion_conjuncts = str(conclusion).split('&')
+        conclusion_conjuncts = str(conclusion).split("&")
         conclusion_conjuncts = [c.strip() for c in conclusion_conjuncts]
         premises_stripped = [str(p).strip() for p in premises_formalized]
-        trivial = all(conjunct in premises_stripped for conjunct in conclusion_conjuncts)
+        trivial = all(
+            conjunct in premises_stripped for conjunct in conclusion_conjuncts
+        )
 
         scoring = ScoringResult(
             scorer_id=self.name,
@@ -195,9 +231,10 @@ class LogrecoTrivialityScorer(BaseScorer):
 
 ### Verifier Builder ###
 
+
 class LogrecoBuilder(VerifierBuilder):
     """Builder for logical argument reconstruction verifier."""
-    
+
     name = "logreco"
     description = "Validates logical argument reconstruction in Argdown format"
     input_types = ["argdown"]
@@ -208,7 +245,7 @@ class LogrecoBuilder(VerifierBuilder):
         LogrecoFaithfulnessScorer,
         LogrecoPredicateLogicScorer,
         LogrecoFormalizationsFaithfulnessScorer,
-        LogrecoTrivialityScorer
+        LogrecoTrivialityScorer,
     ]
     config_options = [
         VerifierConfigOption(
@@ -216,40 +253,45 @@ class LogrecoBuilder(VerifierBuilder):
             type="string",
             default="from",
             description="Key used for inference information in arguments",
-            required=False
+            required=False,
         ),
         VerifierConfigOption(
             name="formalization_key",
             type="string",
             default="formalization",
             description="Key used for formalization information",
-            required=False
+            required=False,
         ),
         VerifierConfigOption(
             name="declarations_key",
             type="string",
             default="declarations",
             description="Key used for declarations information",
-            required=False
+            required=False,
         ),
     ]
-    
-    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
+
+    def build_handlers_pipeline(
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
+    ) -> List[BaseHandler]:
         """Build logreco verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)
-        
+
         # Create InfRecoCompositeHandler and remove NoPropInlineDataHandler
-        infreco_handler = InfRecoCompositeHandler(filter=vd_filters.get("logreco"), **{k:v for k,v in kwargs.items() if k == "from_key"})
+        infreco_handler = InfRecoCompositeHandler(
+            filter=vd_filters.get("logreco"),
+            **{k: v for k, v in kwargs.items() if k == "from_key"},
+        )
         infreco_handler.handlers = [
-            h for h in infreco_handler.handlers
+            h
+            for h in infreco_handler.handlers
             if not isinstance(h, NoPropInlineDataHandler)
         ]
-        
+
         return [
             FencedCodeBlockExtractor(name="FencedCodeBlockExtractor"),
             ArgdownParser(name="ArgdownParser"),
             HasArgdownHandler(filter=vd_filters.get("logreco")),
             infreco_handler,
-            LogRecoCompositeHandler(filter=vd_filters.get("logreco"), **kwargs)
+            LogRecoCompositeHandler(filter=vd_filters.get("logreco"), **kwargs),
         ]
-

@@ -1,5 +1,6 @@
-from typing import List
+from typing import Any, List
 
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
@@ -97,6 +98,7 @@ class AnnotationLogrecoSemanticCoherenceScorer(
     """Scorer that evaluates the semantic coherence between argumentative annotations and informal reconstructions."""
 
     scorer_id = "annotation_logreco_semantic_coherence_scorer"
+    _reco_filter_roles: list[FilterRoleType] = ["logreco"]
 
 
 
@@ -144,7 +146,7 @@ class ArgannoLogrecoBuilder(VerifierBuilder):
     is_coherence_verifier = True
 
     def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
     ) -> List[BaseHandler]:
         """Build arganno_logreco coherence verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)

@@ -1,5 +1,6 @@
-from typing import List
+from typing import Any, List
 
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandler
@@ -121,7 +122,7 @@ class ArgannoArgmapLogrecoBuilder(VerifierBuilder):
     is_coherence_verifier = True
 
     def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
     ) -> List[BaseHandler]:
         """Build arganno_argmap_logreco coherence verification pipeline."""
 

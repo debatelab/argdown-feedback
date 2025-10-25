@@ -8,6 +8,8 @@ and runtime validation.
 from typing import Dict, List, Any, Literal
 from dataclasses import dataclass
 
+FilterRoleType = Literal["arganno", "argmap", "infreco", "logreco"]
+
 # Define allowed filter roles for each verifier using Literal types
 InfrecoRoles = Literal["infreco"]
 ArgannoRoles = Literal["arganno"] 

@@ -1,10 +1,10 @@
-from typing import List
+from typing import Any, List
 
-from pyargdown import ArgdownMultiDiGraph, Conclusion
+from pyargdown import Conclusion
 import textdistance
 
 from argdown_feedback.api.server.services.verifier_registry import BaseScorer
-from argdown_feedback.tasks.base import Evaluation
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
     InfRecoCompositeHandler,
@@ -31,10 +31,10 @@ class InfrecoSubargumentsScorer(BaseScorer):
 
     scorer_id = "infreco_subarguments_scorer"
     scorer_description = "Scores the number of sub-arguments in the informal reconstruction."
+    _filter_roles: list[FilterRoleType] = ["infreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown")
+        argdown, _ = self.get_argdown(result, roles=self._filter_roles)
 
         if not argdown or not argdown.arguments:
             return ScoringResult(
@@ -69,10 +69,10 @@ class InfrecoPremisesScorer(BaseScorer):
 
     scorer_id = "infreco_premises_scorer"
     scorer_description = "Scores the number of premises in the informal reconstruction."
+    _filter_roles: list[FilterRoleType] = ["infreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown")
+        argdown, _ = self.get_argdown(result, roles=self._filter_roles)
 
         if not argdown or not argdown.arguments:
             return ScoringResult(
@@ -107,17 +107,12 @@ class InfrecoFaithfulnessScorer(BaseScorer):
 
     scorer_id = "infreco_faithfulness_scorer"
     scorer_description = "Scores the faithfulness of the informal argument reconstruction, i.e. the text similarity between argdown snippet and source text."
+    _filter_roles: list[FilterRoleType] = ["infreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
 
         source_text = result.source
-        argdown_snippet = next(
-            (
-                vr.code_snippet for vr in reversed(result.verification_data)
-                if vr.dtype == VerificationDType.argdown and vr.code_snippet
-            ),
-            None,
-        )
+        _, argdown_snippet = self.get_argdown(result, roles=self._filter_roles)
 
         if not source_text or not argdown_snippet:
             return ScoringResult(
@@ -171,7 +166,7 @@ class InfrecoBuilder(VerifierBuilder):
         ),
     ]
     
-    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
+    def build_handlers_pipeline(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> List[BaseHandler]:
         """Build infreco verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)
         

@@ -1,11 +1,12 @@
 from abc import abstractmethod
-from typing import List, Type
+from typing import Any, List
 
 from argdown_feedback.verifiers.verification_request import PrimaryVerificationData, VDFilter, VerificationDType
 
 from .....verifiers.base import BaseHandler
 from ..verifier_registry import AbstractVerifierBuilder, BaseScorer, ScorerCompositeHandler
 from ....shared.models import VerifierInfo
+from ....shared.filtering import FilterRoleType
 
 
 
@@ -13,20 +14,21 @@ class VerifierBuilder(AbstractVerifierBuilder):
     """Abstract base class for verifier builders."""
 
     @abstractmethod
-    def build_handlers_pipeline(self, filters_spec: dict, **kwargs) -> List[BaseHandler]:
+    def build_handlers_pipeline(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> List[BaseHandler]:
         """Build the complete pipeline including preprocessing and main handler."""
         pass
 
-    def build_scorers(self, filters_spec: dict, **kwargs) -> List[BaseScorer]:
+    def build_scorers(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> List[BaseScorer]:
         """Build the list of virtue scorers to be used."""
+        vd_filters = self._create_vd_filters(filters_spec)
         scorers = [
-            scorer_class(parent_name=self.name) 
+            scorer_class(parent_name=self.name, vd_filters=vd_filters) 
             for scorer_class in self.scorer_classes
             if kwargs.get("enable_" + scorer_class.scorer_id, True)
         ]
         return scorers
         
-    def build(self, filters_spec: dict, **kwargs) -> ScorerCompositeHandler:
+    def build(self, filters_spec: dict[FilterRoleType, Any], **kwargs) -> ScorerCompositeHandler:
         """Build complete verifier handler with validation."""        
         handlers = self.build_handlers_pipeline(filters_spec, **kwargs)
         scorers = self.build_scorers(filters_spec, **kwargs)
@@ -36,9 +38,9 @@ class VerifierBuilder(AbstractVerifierBuilder):
             scorers=scorers
         )
     
-    def validate_filters(self, filter_roles: List[str]) -> List[str]:
+    def validate_filters(self, filter_roles: List[FilterRoleType]) -> List[str]:
         """Validate filter roles against allowed roles. Returns list of invalid roles."""
-        invalid_roles = [role for role in filter_roles 
+        invalid_roles = [str(role) for role in filter_roles 
                         if role not in self.allowed_filter_roles]
         return invalid_roles
     
@@ -50,10 +52,10 @@ class VerifierBuilder(AbstractVerifierBuilder):
                           if key not in valid_options]
         return invalid_options
     
-    def _create_vd_filters(self, filters_spec: dict) -> dict[str, VDFilter]:
+    def _create_vd_filters(self, filters_spec: dict[FilterRoleType, Any]) -> dict[FilterRoleType, VDFilter]:
         """Create VDFilter functions for given filter roles and criteria."""
         # TODO: Move this from existing registry - complex filter creation logic
-        vd_filters: dict[str, VDFilter] = {}
+        vd_filters: dict[FilterRoleType, VDFilter] = {}
 
         def make_filter(role: str, criteria_list: list[dict[str,str]]) -> VDFilter:
             def vd_filter(vdata: PrimaryVerificationData) -> bool:

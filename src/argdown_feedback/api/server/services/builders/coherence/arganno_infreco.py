@@ -1,8 +1,8 @@
-from typing import List
+from typing import Any, List
 
 import textdistance
 
-from argdown_feedback.tasks.base import Evaluation
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.arganno_handler import ArgannoCompositeHandler
 from argdown_feedback.verifiers.core.infreco_handler import (
@@ -71,13 +71,12 @@ class AnnotationInfrecoSemanticCoherenceScorer(BaseScorer):
 
     scorer_id = "annotation_infreco_semantic_coherence_scorer"
     scorer_description = "Scores the semantic coherence between argumentative annotations and informal reconstructions."
+    _reco_filter_roles: list[FilterRoleType] = ["infreco"]
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-
-        soup = evaluation.artifacts.get("soup")
+        argdown, _ = self.get_argdown(result, roles=self._reco_filter_roles)
+        soup, _ = self.get_xml_soup(result)
         anno_props = soup.find_all("proposition") if soup else None
-        argdown = evaluation.artifacts.get("argdown_reco")
 
         if anno_props is None or argdown is None:
             return ScoringResult(
@@ -93,7 +92,7 @@ class AnnotationInfrecoSemanticCoherenceScorer(BaseScorer):
         for proposition in argdown.propositions:
             for annotation_id in proposition.data.get("annotation_ids", []):
                 anno_prop = next(
-                    (ap for ap in anno_props if ap.get("id") == annotation_id), None
+                    (ap for ap in anno_props if ap.get("id") == annotation_id), None  # type: ignore
                 )
                 if anno_prop is None:
                     continue
@@ -146,7 +145,7 @@ class ArgannoInfrecoBuilder(VerifierBuilder):
     is_coherence_verifier = True
 
     def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
     ) -> List[BaseHandler]:
         """Build arganno_infreco coherence verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)

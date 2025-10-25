@@ -1,12 +1,12 @@
-from typing import List
+from typing import Any, List
 
 import networkx as nx  # type: ignore
-from pyargdown import Argdown, ArgdownMultiDiGraph
+from pyargdown import ArgdownMultiDiGraph
 import textdistance
 
 from argdown_feedback.api.server.services.verifier_registry import BaseScorer
+from argdown_feedback.api.shared.filtering import FilterRoleType
 from argdown_feedback.api.shared.models import ScoringResult, VerifierConfigOption
-from argdown_feedback.tasks.base import Evaluation
 from argdown_feedback.verifiers.base import BaseHandler
 from argdown_feedback.verifiers.core.argmap_handler import ArgMapCompositeHandler
 from argdown_feedback.verifiers.core.content_check_handler import (
@@ -30,10 +30,9 @@ class ArgmapSizeScorer(BaseScorer):
     scorer_description = "Scores the size of the argument map, i.e. the number of arguments and theses reconstructed."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown_map")
+        argdown, _ = self.get_argdown(result, roles=["argmap"])
 
-        if not argdown:
+        if not argdown or not isinstance(argdown, ArgdownMultiDiGraph):
             return ScoringResult(
                 scorer_id=self.name,
                 scorer_description=self.scorer_description,
@@ -68,10 +67,9 @@ class ArgmapDensityScorer(BaseScorer):
     scorer_description = "Scores the desnity of the argument map, i.e. the number of interconnections between arguments and theses."
 
     def score(self, result: VerificationRequest) -> ScoringResult:
-        evaluation = Evaluation.from_verification_request(result)
-        argdown: ArgdownMultiDiGraph | None = evaluation.artifacts.get("argdown_map")
+        argdown, _ = self.get_argdown(result, roles=["argmap"])
 
-        if not argdown:
+        if not argdown or not isinstance(argdown, ArgdownMultiDiGraph):
             return ScoringResult(
                 scorer_id=self.name,
                 scorer_description=self.scorer_description,
@@ -107,14 +105,8 @@ class ArgmapFaithfulnessScorer(BaseScorer):
 
         # NOTE
         # This scorer assumes that the last argdown snippet is the target snippet (no filters applied)
-        source_text = result.source
-        argdown_snippet = next(
-            (
-                vr.code_snippet for vr in reversed(result.verification_data)
-                if vr.dtype == VerificationDType.argdown and vr.code_snippet
-            ),
-            None,
-        )
+        source_text = result.source        
+        _, argdown_snippet = self.get_argdown(result, roles=["argmap"])
 
         if not source_text or not argdown_snippet:
             return ScoringResult(
@@ -162,7 +154,7 @@ class ArgmapBuilder(VerifierBuilder):
     config_options = []
 
     def build_handlers_pipeline(
-        self, filters_spec: dict, **kwargs
+        self, filters_spec: dict[FilterRoleType, Any], **kwargs
     ) -> List[BaseHandler]:
         """Build argmap verification pipeline."""
         vd_filters = self._create_vd_filters(filters_spec)
