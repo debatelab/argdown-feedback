@@ -9,6 +9,17 @@ Argdown Verifiers & Data Generators for Hindsight Instruction Relabeling Prefere
 !pip install "git+https://github.com/debatelab/argdown-feedback"
 ```
 
+### NLTK Requirements
+
+The package requires NLTK's `punkt` tokenizer. Download it before using:
+
+```python
+import nltk
+nltk.download('punkt')
+```
+
+**Note for API Server Users**: The server automatically downloads this resource at startup via the lifespan handler, so no manual download is needed when running the FastAPI server.
+
 ### Usage
 
 ```python

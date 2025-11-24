@@ -1,142 +1,204 @@
+# Argdown Feedback API
 
+## Overview
+
+The Argdown Feedback API provides a FastAPI-based REST service for verifying argdown documents, XML annotations, and checking coherence between different types of argument analysis artifacts. The API uses a handler-based architecture with configurable filtering and virtue scoring capabilities.
+
+## Running the Server
+
+### Quick Start
+
+The FastAPI server automatically downloads required NLTK resources (`punkt`) at startup via the lifespan handler. No manual setup is required.
+
+To start the server:
+
+```bash
+uvicorn argdown_feedback.api.server.app:app --reload
+```
+
+The API will be available at `http://localhost:8000` with:
+- Interactive docs at `http://localhost:8000/docs`
+- ReDoc documentation at `http://localhost:8000/redoc`
+- Health check at `http://localhost:8000/health`
+
+### Production Deployment
+
+For production use with multiple workers:
+
+```bash
+uvicorn argdown_feedback.api.server.app:app --workers 4 --host 0.0.0.0 --port 8000
+```
+
+**Note for Testing/Direct Usage**: If you're running tests or using the verifiers directly (not through the FastAPI server), you'll need to download NLTK resources manually:
+
+```python
+import nltk
+nltk.download('punkt')
+```
+
+## API Endpoints
+
+All endpoints use the `/api/v1` prefix.
 
 ### Core Structure
 
-```python
-# Individual verifier endpoints - the main pattern
-POST /verify/{verifier_name}
+```
+POST /api/v1/verify/{verifier_name}
+GET  /api/v1/verifiers
+GET  /api/v1/verifiers/{verifier_name}
+GET  /api/v1/verify/{verifier_name}/info
+GET  /health
+```
+
+### Verification Request Format
+
+```json
 {
-    "inputs": "string",           # Required: the code snippet  
-    "source": "string",           # Optional: source text for some verifiers
-    "config": {                   # Verifier-specific configuration
-        "levenshtein_tolerance": 0.01,
+    "inputs": "string",           // Required: text containing code blocks  
+    "source": "string",           // Optional: source text for some verifiers
+    "config": {                   // Optional: verifier-specific configuration
         "from_key": "from",
-        "N": 1,
-        // ... other verifier-specific options
-    }
-}
-
-# Discovery endpoints
-GET /verifiers                    # List all available verifiers
-GET /verifiers/{verifier_name}    # Get verifier details & config schema
-```
-
-### Available Verifier Endpoints
-
-Core Verifiers:
-
-```python
-POST /verify/arganno              # ArgannoCompositeHandler
-POST /verify/argmap               # ArgMapCompositeHandler  
-POST /verify/infreco              # InfRecoCompositeHandler
-POST /verify/logreco              # LogRecoCompositeHandler
-POST /verify/has_annotations      # HasAnnotationsHandler
-POST /verify/has_argdown          # HasArgdownHandler
-```
-
-Coherence Verifiers:
-
-```python
-POST /verify/arganno_argmap       # ArgAnnotArgmapCoherenceHandler
-POST /verify/arganno_infreco      # ArgannoInfrecoCoherenceHandler
-POST /verify/arganno_logreco      # ArgannoLogrecoCoherenceHandler
-POST /verify/argmap_infreco       # ArgmapInfrecoCoherenceHandler
-POST /verify/argmap_logreco       # ArgmapLogrecoCoherenceHandler
-POST /verify/arganno_argmap_logreco # ArgannoArgmapLogrecoCoherenceHandler
-```
-
-
-Custom metadata filtering:
-
-```python
-@dataclass
-class MetadataFilterRule:
-    """Single metadata filter rule."""
-    key: str
-    value: Any
-    regex: bool = False
-    
-    def matches(self, metadata_value: Any) -> bool:
-        """Check if metadata value matches this rule."""
-        if metadata_value is None:
-            return False
-            
-        if self.regex:
-            import re
-            # Convert both to strings for regex matching
-            pattern = str(self.value)
-            text = str(metadata_value)
-            return bool(re.search(pattern, text))
-        else:
-            # Exact match
-            return metadata_value == self.value
-
-@dataclass
-class MetadataFilter:
-    """Collection of metadata filter rules."""
-    rules: List[MetadataFilterRule]
-    
-    def matches(self, vdata: PrimaryVerificationData) -> bool:
-        """Check if verification data matches ALL filter rules (AND logic)."""
-        if not vdata.metadata:
-            return len(self.rules) == 0
-        
-        for rule in self.rules:
-            metadata_value = vdata.metadata.get(rule.key)
-            if not rule.matches(metadata_value):
-                return False
-        return True
-```
-
-```python
-# Simple exact matching (core)
-{
-    "config": {
-        filters:{
-            "arganno": {
-                "version": "v3",
-                "task": "annotation"
-            }
-        }
-    }
-}
-
-# Simple exact matching (coherence)
-{
-    "config": {
-        filters:{
-            "arganno": {
-                "version": "v3",
-                "task": "annotation"
+        "filters": {
+            "role_name": {
+                "key": "value"    // Simple exact match
             },
-            "argmap": {
-                "version": "v3",
-                "task": "reconstruction"
-            }
-        }
+            "another_role": [     // Advanced with multiple rules/regex
+                {
+                    "key": "version",
+                    "value": "v[3-4]",
+                    "regex": true
+                }
+            ]
+        },
+        "enable_scorer_name": true   // Enable specific virtue scorers
     }
 }
+```
 
+### Verification Response Format
 
-# Advanced with regex (core)
+```json
+{
+    "verifier": "string",
+    "is_valid": true,
+    "verification_data": [
+        {
+            "id": "string",
+            "dtype": "argdown|xml",
+            "code_snippet": "string",
+            "metadata": {}
+        }
+    ],
+    "results": [
+        {
+            "verifier_id": "string",
+            "verification_data_references": ["string"],
+            "is_valid": true,
+            "message": "string",
+            "details": {}
+        }
+    ],
+    "scores": [
+        {
+            "scorer_id": "string",
+            "scorer_description": "string",
+            "scoring_data_references": ["string"],
+            "score": 0.85,
+            "message": "string",
+            "details": {}
+        }
+    ],
+    "executed_handlers": ["string"],
+    "processing_time_ms": 42.5
+}
+```
+
+## Available Verifiers
+
+### Core Verifiers
+
+Core verifiers validate individual types of argument analysis artifacts:
+
+| Endpoint | Description | Input Types | Filter Roles | Config Options |
+|----------|-------------|-------------|--------------|----------------|
+| `POST /api/v1/verify/arganno` | Validates XML annotations | xml | arganno | - |
+| `POST /api/v1/verify/argmap` | Validates argument maps | argdown | argmap | - |
+| `POST /api/v1/verify/infreco` | Validates informal reconstructions | argdown | infreco | from_key |
+| `POST /api/v1/verify/logreco` | Validates logical reconstructions | argdown | logreco | from_key, formalization_key, declarations_key |
+| `POST /api/v1/verify/has_annotations` | Checks for XML annotations | xml | - | - |
+| `POST /api/v1/verify/has_argdown` | Checks for argdown content | argdown | - | - |
+
+### Coherence Verifiers
+
+Coherence verifiers check consistency between different types of artifacts:
+
+| Endpoint | Description | Filter Roles | Config Options |
+|----------|-------------|--------------|----------------|
+| `POST /api/v1/verify/arganno_argmap` | Checks arganno ↔ argmap coherence | arganno, argmap | - |
+| `POST /api/v1/verify/arganno_infreco` | Checks arganno ↔ infreco coherence | arganno, infreco | from_key |
+| `POST /api/v1/verify/arganno_logreco` | Checks arganno ↔ logreco coherence | arganno, logreco | from_key |
+| `POST /api/v1/verify/argmap_infreco` | Checks argmap ↔ infreco coherence | argmap, infreco | from_key |
+| `POST /api/v1/verify/argmap_logreco` | Checks argmap ↔ logreco coherence | argmap, logreco | from_key |
+| `POST /api/v1/verify/arganno_argmap_logreco` | Checks arganno ↔ argmap ↔ logreco coherence | arganno, argmap, logreco | from_key |
+
+### Discovery Endpoints
+
+```bash
+# List all available verifiers with details
+GET /api/v1/verifiers
+
+# Get detailed information about a specific verifier
+GET /api/v1/verifiers/{verifier_name}
+```
+
+## Metadata Filtering System
+
+### Overview
+
+The filtering system allows you to work with multiple code blocks in a single request by using metadata to distinguish between different semantic roles (e.g., argmap vs. infreco).
+
+### Filter Roles
+
+Filter roles represent semantic purposes, not just data types:
+- `arganno`: XML annotation blocks
+- `argmap`: Argument map argdown blocks
+- `infreco`: Informal reconstruction argdown blocks  
+- `logreco`: Logical reconstruction argdown blocks
+
+### Filter Format
+
+The API supports two filter formats, automatically chosen based on complexity:
+
+#### Simple Format (Single Exact Match)
+
+```json
 {
     "config": {
         "filters": {
-            "arganno": [
+            "infreco": {
+                "filename": "reconstruction.ad"
+            }
+        }
+    }
+}
+```
+
+#### Advanced Format (Multiple Rules or Regex)
+
+```json
+{
+    "config": {
+        "filters": {
+            "infreco": [
                 {
-                    "key": "version", 
+                    "key": "version",
                     "value": "v[3-4]",
                     "regex": true
                 },
                 {
-                    "key": "task",
-                    "value": "reconstruction|analysis", 
+                    "key": "filename",
+                    "value": "reconstruction.*",
                     "regex": true
-                },
-                {
-                    "key": "author",
-                    "value": "student123",
-                    "regex": false  # exact match
                 }
             ]
         }
@@ -144,63 +206,120 @@ class MetadataFilter:
 }
 ```
 
-BUT note: identifiers should respect current default filters, e.g. arganno only applies if vd.dtype == VerificationDType.xml, and logreco, argmap, infreco apply if vd.dtype == VerificationDType.argdown.
+### Filter Semantics
+
+- **Filter matching**: ALL rules within a role must match (AND logic)
+- **Data type constraints**: Filters automatically respect data types:
+  - `arganno` only applies if `dtype == VerificationDType.xml`
+  - `argmap`, `infreco`, `logreco` only apply if `dtype == VerificationDType.argdown`
+- **Block selection**: Verifiers use the most recent block matching each filter
+
+### Default Filters
+
+Coherence verifiers apply default filters if none are specified:
 
 ```python
-            # Default filters for argmap and infreco data
-            def filter_fn1(vd: PrimaryVerificationData) -> bool:
-                metadata: dict = vd.metadata if vd.metadata is not None else {}
-                return vd.dtype == VerificationDType.argdown and metadata.get("filename", "").startswith("map")
-            def filter_fn2(vd: PrimaryVerificationData) -> bool:
-                metadata: dict = vd.metadata if vd.metadata is not None else {}
-                return vd.dtype == VerificationDType.argdown and metadata.get("filename", "").startswith("reconstructions")
+# Default filter for argmap
+{"argmap": [{"key": "filename", "value": "map.*", "regex": true}]}
 
+# Default filter for infreco
+{"infreco": [{"key": "filename", "value": "reconstruction.*", "regex": true}]}
 ```
 
-The current filters are:
+### Multiple Argdown Blocks Example
 
-```python
+```json
 {
+    "inputs": "```argdown
+    <!-- filename: map.ad -->
+    <Argument Map>: The overall argument structure
+    ...
+    ```
+    
+    ```argdown
+    <!-- filename: reconstruction.ad -->
+    <Arg>: Detailed reconstruction
+    (1) Premise
+    -- {from: [\"1\"]} --
+    (2) Conclusion
+    ```",
     "config": {
         "filters": {
             "argmap": {
-                "filename": "map.ad",
+                "filename": "map.ad"
             },
             "infreco": {
-                "filename": "reconstructions.ad", 
+                "filename": "reconstruction.ad"
             }
         }
     }
 }
 ```
 
-## Implementation Implications
+## Virtue Scoring System
 
-* Filter Mapping: The filter identifiers ("argmap", "infreco", "arganno", "logreco") represent semantic roles, not just data types 
-* Multiple Argdown Blocks: We can have multiple argdown blocks in one request, differentiated by metadata
-* Last Block Selection: Code and Coherence verifiers use the most recent block matching each filter
-* Backwards Compatibility: The default filters (like filename.startswith("map")) should remain as fallbacks
+### Overview
 
-This is a much more sophisticated and flexible design than I initially understood. Your configuration approach is exactly right for handling multiple argdown blocks with different semantic purposes!
+Verifiers can optionally score argument analysis artifacts along various normative dimensions (virtues). Each verifier has associated scorer classes that can be enabled via configuration.
 
+### Enabling Scorers
 
-## Threading / Async 
+Scorers are disabled by default to reduce processing time. Enable them using config options:
 
-```python 
-import asyncio
-from concurrent.futures import ThreadPoolExecutor
-from typing import Dict, Any
-import time
+```json
+{
+    "config": {
+        "enable_infreco_subarguments_scorer": true,
+        "enable_infreco_premises_scorer": true,
+        "enable_argmap_size_scorer": true
+    }
+}
+```
 
+### Available Scorers
+
+#### Informal Reconstruction (infreco)
+
+- `infreco_subarguments_scorer`: Evaluates number of sub-arguments (intermediate conclusions)
+- `infreco_premises_scorer`: Evaluates number of premises
+
+#### Argument Maps (argmap, argmap_infreco)
+
+- `argmap_size_scorer` / `argmap_infreco_size_scorer`: Evaluates argument map size (nodes + edges)
+- `argmap_density_scorer` / `argmap_infreco_density_scorer`: Evaluates map density (edges/nodes ratio)
+- `argmap_faithfulness_scorer` / `argmap_infreco_faithfulness_scorer`: Evaluates faithfulness to source text using Levenshtein distance
+
+### Score Response Format
+
+```json
+{
+    "scores": [
+        {
+            "scorer_id": "infreco.infreco_premises_scorer",
+            "scorer_description": "Scores the number of premises in the informal reconstruction.",
+            "scoring_data_references": [],
+            "score": 0.75,
+            "message": "Number of premises found: 3.",
+            "details": {
+                "premises_count": 2
+            }
+        }
+    ]
+}
+```
+
+## Async Processing Architecture
+
+### Thread Pool Executor
+
+The verification service uses `ThreadPoolExecutor` to run CPU-intensive verification tasks in background threads while maintaining FastAPI's async capabilities:
+
+```python
 class VerificationService:
-    def __init__(self, max_workers: int = 4):
+    def __init__(self, max_workers: int = 8):  # Default: 8 workers
         self.executor = ThreadPoolExecutor(max_workers=max_workers)
-        self.verifier_registry = self._build_verifier_registry()
     
-    async def verify_async(self, verifier_name: str, request: VerificationRequest) -> Dict[str, Any]:
-        start_time = time.time()
-        
-        # Run verification in thread pool to avoid blocking
+    async def verify_async(self, verifier_name: str, request: VerificationRequest):
         loop = asyncio.get_event_loop()
         result = await loop.run_in_executor(
             self.executor,
@@ -208,222 +327,324 @@ class VerificationService:
             verifier_name,
             request
         )
-        
-        # Add processing time to response
-        result["processing_time_ms"] = (time.time() - start_time) * 1000
         return result
-    
-    def _verify_sync(self, verifier_name: str, request: VerificationRequest) -> Dict[str, Any]:
-        # Your existing synchronous verification logic
-        handler = self.verifier_registry[verifier_name]
-        verification_request = self._build_verification_request(request)
-        result = handler.process(verification_request)
-        
-        return {
-            "verifier": verifier_name,
-            "is_valid": result.is_valid(),
-            "verification_data": [vd.__dict__ for vd in result.verification_data],
-            "results": [r.__dict__ for r in result.results],
-            "executed_handlers": result.executed_handlers
-        }
-
-# Usage in FastAPI
-verification_service = VerificationService(max_workers=8)
-
-@app.post("/verify/{verifier_name}")
-async def verify_code(verifier_name: str, request: VerificationRequest):
-    return await verification_service.verify_async(verifier_name, request)
 ```
 
-* Use multiple Uvicorn workers: `uvicorn app:app --workers 4`
+### Benefits
 
-E.g.:
+- Non-blocking verification for concurrent requests
+- Efficient resource utilization
+- Automatic processing time tracking
+- Clean separation between async I/O and CPU-bound work
 
-```yml
-# docker-compose.yml
-services:
-  api:
-    build: .
-    command: uvicorn app:app --workers 4 --host 0.0.0.0
-    ports:
-      - "8000:8000"
-  
-  nginx:
-    image: nginx
-    # Load balance across multiple API instances
-```
+## Python Client
 
-## Client
+### Installation
+
+The client is included in the `argdown_feedback.api.client` module.
+
+### Basic Usage
+
+#### Synchronous Client
 
 ```python
-# client.py
-import asyncio
-from typing import Dict, Any, Optional, List, Union
-import httpx
-from dataclasses import dataclass
+from argdown_feedback.api.client import VerifiersClient
+from argdown_feedback.api.shared.models import VerificationRequest
 
-from .models import VerificationRequest, VerificationResponse, VerifierInfo
+# Initialize client
+client = VerifiersClient("http://localhost:8000", async_client=False)
 
-class VerifiersClient:
-    def __init__(self, base_url: str, async_client: bool = True):
-        self.base_url = base_url
-        if async_client:
-            self.client = httpx.AsyncClient(timeout=30.0)
-        else:
-            self.client = httpx.Client(timeout=30.0)
-        self.is_async = async_client
-    
-    async def verify_async(self, verifier_name: str, request: VerificationRequest) -> VerificationResponse:
-        response = await self.client.post(
-            f"{self.base_url}/verify/{verifier_name}",
-            json=request.__dict__
-        )
-        response.raise_for_status()
-        return VerificationResponse(**response.json())
-    
-    def verify_sync(self, verifier_name: str, request: VerificationRequest) -> VerificationResponse:
-        response = self.client.post(
-            f"{self.base_url}/verify/{verifier_name}",
-            json=request.__dict__
-        )
-        response.raise_for_status()
-        return VerificationResponse(**response.json())
-    
-    def verify(self, verifier_name: str, request: VerificationRequest) -> Union[VerificationResponse, asyncio.Task]:
-        if self.is_async:
-            return self.verify_async(verifier_name, request)
-        else:
-            return self.verify_sync(verifier_name, request)
-
-
-# Sync usage
-client = VerifiersClient("https://api.example.com")
-result = client.verify(
-    "infreco",
+# Create request
+request = VerificationRequest(
     inputs="""```argdown
     <Arg>: Test argument.
     (1) Premise
     -- {from: ["1"]} --
     (2) Conclusion
     ```""",
-    from_key="from"
+    config={"from_key": "from"}
 )
 
-# Async usage
-async_client = VerifiersClient("https://api.example.com", async_client=True)
-result = await async_client.verify("infreco", request)
+# Verify
+response = client.verify_sync("infreco", request)
+print(f"Valid: {response.is_valid}")
+print(f"Processing time: {response.processing_time_ms}ms")
 
-
+# Cleanup
+client.close()
 ```
 
-
-Type checking:
+#### Asynchronous Client
 
 ```python
-from typing import Literal, Union, get_args
+import asyncio
+from argdown_feedback.api.client import VerifiersClient
+from argdown_feedback.api.shared.models import VerificationRequest
 
-# Define allowed filter roles for each verifier using Literal types
-InfrecoRoles = Literal["infreco"]
-ArgannoRoles = Literal["arganno"] 
-ArgmapRoles = Literal["argmap"]
-ArgmapInfrecoRoles = Literal["argmap", "infreco"]
-ArgannoArgmapRoles = Literal["arganno", "argmap"]
-
-
-@dataclass
-class FilterRule:
-    key: str
-    value: Any
-    regex: bool = False
-
-class FilterBuilder:
-    def __init__(self):
-        self._filters: Dict[str, List[FilterRule]] = {}
-    
-    def add(self, role: str, key: str, value: Any, regex: bool = False) -> 'FilterBuilder':
-        """Add a filter rule for a role."""
-        if role not in self._filters:
-            self._filters[role] = []
-        self._filters[role].append(FilterRule(key=key, value=value, regex=regex))
-        return self
-    
-    def build(self) -> Dict[str, List[Dict[str, Any]]]:
-        """Build the final filters dictionary."""
-        return {
-            role: [{"key": rule.key, "value": rule.value, "regex": rule.regex} for rule in rules]
-            for role, rules in self._filters.items()
-        }
-
-
-# Verifier-specific request builders
-class InfrecoRequestBuilder:
-    def __init__(self, inputs: str, source: str = None):
-        self.inputs = inputs
-        self.source = source
-        self.config = {}
-        self.filter_builder = TypedFilterBuilder()
-    
-    def config_option(self, key: Literal["from_key", "N"], value: Any) -> 'InfrecoRequestBuilder':
-        """Only allow valid config options for infreco."""
-        self.config[key] = value
-        return self
-    
-    def add_filter(self, role: InfrecoRoles, key: str, value: Any, regex: bool = False) -> 'InfrecoRequestBuilder':
-        """Only allow 'infreco' role filters."""
-        self.filter_builder.add(role, key, value, regex)
-        return self
-    
-    def build(self) -> VerificationRequest:
-        config_dict = self.config.copy()
-        if self.filter_builder._filters:
-            config_dict["filters"] = self.filter_builder.build()
-        
-        return VerificationRequest(
-            inputs=self.inputs,
-            source=self.source,
-            config=config_dict if config_dict else None
+async def main():
+    # Initialize async client
+    async with VerifiersClient("http://localhost:8000", async_client=True) as client:
+        # Create request
+        request = VerificationRequest(
+            inputs="...",
+            config={"from_key": "from"}
         )
-
-class ArgmapInfrecoRequestBuilder:
-    def __init__(self, inputs: str, source: str = None):
-        self.inputs = inputs
-        self.source = source
-        self.config = {}
-        self.filter_builder = TypedFilterBuilder()
-    
-    def config_option(self, key: Literal["from_key"], value: Any) -> 'ArgmapInfrecoRequestBuilder':
-        """Only allow valid config options for argmap_infreco."""
-        self.config[key] = value
-        return self
-    
-    def add_filter(self, role: ArgmapInfrecoRoles, key: str, value: Any, regex: bool = False) -> 'ArgmapInfrecoRequestBuilder':
-        """Allow 'argmap' and 'infreco' role filters."""
-        self.filter_builder.add(role, key, value, regex)
-        return self
-    
-    def build(self) -> VerificationRequest:
-        config_dict = self.config.copy()
-        if self.filter_builder._filters:
-            config_dict["filters"] = self.filter_builder.build()
         
-        return VerificationRequest(
-            inputs=self.inputs,
-            source=self.source,
-            config=config_dict if config_dict else None
-        )
+        # Verify
+        response = await client.verify_async("infreco", request)
+        print(f"Valid: {response.is_valid}")
+        
+        # List available verifiers
+        verifiers = await client.list_verifiers_async()
+        print(f"Available verifiers: {len(verifiers.core)} core, {len(verifiers.coherence)} coherence")
 
-# Factory functions
-def create_infreco_request(inputs: str, source: str = None) -> InfrecoRequestBuilder:
-    return InfrecoRequestBuilder(inputs, source)
+asyncio.run(main())
+```
 
-def create_argmap_infreco_request(inputs: str, source: str = None) -> ArgmapInfrecoRequestBuilder:
-    return ArgmapInfrecoRequestBuilder(inputs, source)
+### Type-Safe Request Builders
 
-# Usage with IDE type checking:
+The client provides type-safe request builders with compile-time validation:
+
+```python
+from argdown_feedback.api.client.builders import (
+    create_infreco_request,
+    create_argmap_infreco_request
+)
+
+# Type-safe builder for infreco verifier
 request = (create_infreco_request(inputs=text)
     .config_option("from_key", "premises")     # ✅ Valid
-    .config_option("invalid_key", "value")     # ❌ Type error
-    .add_filter("infreco", "version", "v3")    # ✅ Valid
-    .add_filter("argmap", "version", "v3")     # ❌ Type error
+    # .config_option("invalid_key", "value")   # ❌ Type error in IDE
+    .add_filter("infreco", "version", "v3")    # ✅ Valid  
+    # .add_filter("argmap", "version", "v3")   # ❌ Type error in IDE
+    .build())
+
+# Type-safe builder for coherence verifier
+request = (create_argmap_infreco_request(inputs=text)
+    .config_option("from_key", "from")
+    .add_filter("argmap", "filename", "map.ad")
+    .add_filter("infreco", "filename", "reconstruction.ad")
     .build())
 ```
+
+### Available Builder Functions
+
+**Core Verifiers:**
+- `create_arganno_request()`
+- `create_argmap_request()`
+- `create_infreco_request()`
+- `create_logreco_request()`
+- `create_has_annotations_request()`
+- `create_has_argdown_request()`
+
+**Coherence Verifiers:**
+- `create_arganno_argmap_request()`
+- `create_arganno_infreco_request()`
+- `create_arganno_logreco_request()`
+- `create_argmap_infreco_request()`
+- `create_argmap_logreco_request()`
+- `create_arganno_argmap_logreco_request()`
+
+## Error Handling
+
+### Error Response Format
+
+```json
+{
+    "detail": {
+        "error": "error_type",
+        "message": "Human-readable error message",
+        "additional_field": "..."
+    }
+}
+```
+
+### HTTP Status Codes
+
+| Code | Error Type | Description |
+|------|------------|-------------|
+| 400 | `verification_failed` | Verification processing failed |
+| 404 | `verifier_not_found` | Invalid verifier name |
+| 422 | `invalid_config` | Invalid configuration options |
+| 422 | `invalid_filter` | Invalid filter roles |
+| 500 | `internal_server_error` | Unexpected server error |
+
+### Example Error Responses
+
+**Verifier Not Found (404)**
+```json
+{
+    "detail": {
+        "error": "verifier_not_found",
+        "message": "Verifier 'invalid_name' not found",
+        "verifier_name": "invalid_name",
+        "available_verifiers": ["arganno", "argmap", "infreco", ...]
+    }
+}
+```
+
+**Invalid Configuration (422)**
+```json
+{
+    "detail": {
+        "error": "invalid_config",
+        "message": "Invalid configuration options: ['bad_option']",
+        "invalid_options": ["bad_option"]
+    }
+}
+```
+
+**Invalid Filters (422)**
+```json
+{
+    "detail": {
+        "error": "invalid_filter",
+        "message": "Invalid filter roles for infreco: ['argmap']",
+        "invalid_roles": ["argmap"]
+    }
+}
+```
+
+## Architecture Overview
+
+### Component Structure
+
+```
+api/
+├── client/                 # HTTP client library
+│   ├── client.py          # Sync/async client implementation
+│   └── builders.py        # Type-safe request builders
+├── server/                 # FastAPI server
+│   ├── app.py             # Main application & middleware
+│   ├── routes/            # API route handlers
+│   │   ├── verification.py
+│   │   └── discovery.py
+│   └── services/          # Business logic
+│       ├── verification_service.py   # Async processing
+│       ├── verifier_registry.py      # Verifier management
+│       └── builders/                 # Verifier builders
+│           ├── base.py
+│           ├── core/                 # Core verifier builders
+│           └── coherence/            # Coherence verifier builders
+└── shared/                 # Shared models & utilities
+    ├── models.py          # Pydantic models
+    ├── filtering.py       # Filter builders
+    └── exceptions.py      # Custom exceptions
+```
+
+### Key Design Patterns
+
+1. **Builder Pattern**: Verifiers are constructed via builder classes that encapsulate configuration and pipeline construction
+2. **Registry Pattern**: `VerifierRegistry` manages available verifiers and validates configurations
+3. **Filter System**: Flexible metadata-based filtering for multi-block code processing
+4. **Scorer Pattern**: Pluggable virtue scorers with enable/disable configuration
+5. **Async Wrapper**: ThreadPoolExecutor wraps synchronous verification for async FastAPI endpoints
+
+### Extending the API
+
+#### Adding a New Verifier
+
+1. Create a builder class in `services/builders/`:
+
+```python
+from .base import VerifierBuilder
+
+class MyVerifierBuilder(VerifierBuilder):
+    name = "my_verifier"
+    description = "Description of what it does"
+    input_types = ["argdown"]
+    allowed_filter_roles = ["my_role"]
+    config_options = [...]
+    
+    def build_handlers_pipeline(self, filters_spec, **kwargs):
+        # Build handler pipeline
+        return [...]
+```
+
+2. Import the builder in `services/builders/__init__.py` or appropriate category module
+
+3. The verifier will be automatically registered and available at `/api/v1/verify/my_verifier`
+
+#### Adding a New Scorer
+
+1. Create a scorer class:
+
+```python
+from argdown_feedback.api.server.services.verifier_registry import BaseScorer
+
+class MyScorer(BaseScorer):
+    scorer_id = "my_scorer"
+    scorer_description = "Description of what this scores"
+    
+    def score(self, result: VerificationRequest) -> ScoringResult:
+        # Implement scoring logic
+        return ScoringResult(...)
+```
+
+2. Add to the verifier builder's `scorer_classes` list
+
+3. Enable via config: `{"enable_my_scorer": true}`
+
+## Development & Testing
+
+### Running Tests
+
+```bash
+# All API tests
+pytest tests/api/
+
+# Integration tests only
+pytest tests/api/integration/
+
+# Unit tests only  
+pytest tests/api/unit/
+
+# Performance tests
+pytest tests/api/performance/
+```
+
+### Interactive API Testing
+
+Use the built-in Swagger UI:
+
+```bash
+uvicorn argdown_feedback.api.server.app:app --reload
+# Visit http://localhost:8000/docs
+```
+
+## Configuration Reference
+
+### Common Config Options
+
+| Option | Type | Default | Description | Verifiers |
+|--------|------|---------|-------------|-----------|
+| `from_key` | string | "from" | Key for inference info | infreco, logreco, coherence |
+| `formalization_key` | string | - | Key for formalization | logreco |
+| `declarations_key` | string | - | Key for declarations | logreco |
+| `enable_<scorer_id>` | bool | false | Enable specific scorer | All with scorers |
+
+### Verifier-Specific Configurations
+
+Each verifier's available options can be discovered via:
+
+```bash
+GET /api/v1/verifiers/{verifier_name}
+```
+
+This returns a `VerifierInfo` object with `config_options` listing all available configuration parameters.
+
+## Performance Considerations
+
+- **Worker Threads**: Default 8 workers handle concurrent CPU-bound verification tasks
+- **Async I/O**: FastAPI handles I/O-bound operations (HTTP requests) asynchronously
+- **Scorer Performance**: Disable scorers if not needed to reduce processing time
+- **Filter Complexity**: Simple filters are faster than regex-based filters
+- **Code Block Extraction**: Large inputs with many code blocks may increase processing time
+
+## License
+
+[Include your license information]
+
+## Contributing
+
+[Include contribution guidelines]
