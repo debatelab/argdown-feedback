@@ -29,6 +29,7 @@ api = [
 
 [dependency-groups]
 dev = [
+    "openenv",
     "pytest>=8.3.4",
     "pytest-asyncio>=0.25.3",
     "requests>=2.32.5",
@@ -48,5 +49,6 @@ path = ".venv"
 
 [tool.uv.sources]
 pyargdown = { git = "https://github.com/debatelab/pyargdown.git" }
+openenv = { git = "https://github.com/meta-pytorch/OpenEnv.git" }
 
 
