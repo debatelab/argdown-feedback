@@ -75,8 +75,6 @@ T10{{argmap_infreco}}
 
 T5((argmap))
 T6((arganno))
-T7((logreco))
-T8((infreco))
 
 
 T2 --> T1 
@@ -86,14 +84,9 @@ T10 --> T4 --> T1
 T5 --> T2 
 T6 --> T2 
 T6 --> T3 
-T7 --> T3 
 T5 --> T4 
-T7 --> T4 
 T6 --> T9 
-T8 --> T9 
-T8 --> T7
 T5 --> T10
-T8 --> T10
 ```
 
 ```yaml
@@ -104,13 +97,6 @@ arganno:
 argmap:
     - arganno_argmap
     - argmap_infreco
-    - argmap_logreco
-infreco:
-    - logreco
-    - arganno_infreco
-    - argmap_infreco
-logreco: 
-    - arganno_logreco
     - argmap_logreco
 arganno_argmap:
     - arganno_argmap_logreco

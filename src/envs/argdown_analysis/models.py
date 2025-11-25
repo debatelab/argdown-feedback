@@ -7,25 +7,46 @@
 """
 Data models for the Argdown Analysis Environment.
 
-The argdown_analysis environment is a simple test environment that echoes back messages.
+The argdown_analysis environment is an environment for analysing arguments with Argdown.
 """
 
 from dataclasses import dataclass
+from enum import Enum
 
-from openenv_core.env_server.types import Action, Observation
+from openenv_core.env_server.types import Action, Observation, State  # type: ignore[import]
+
+from argdown_feedback.api.shared.models import VerificationResponse
+
+
+class ArgdownAnalysisTask(Enum):
+    SingleArgumentAnalysis = "SingleArgumentAnalysis"
+    MultiArgumentAnalysis = "MultiArgumentAnalysis"
 
 
 @dataclass(kw_only=True)
 class ArgdownAnalysisAction(Action):
-    """Action for the Argdown Analysis environment - just a message to echo."""
+    """Action for the Argdown Analysis environment - just a message with Argdown snippets."""
 
     message: str
-
+ 
 
 @dataclass(kw_only=True)
 class ArgdownAnalysisObservation(Observation):
-    """Observation from the Argdown Analysis environment - the echoed message."""
+    """Observation from the Argdown Analysis environment - argdown feedback."""
 
-    echoed_message: str
-    message_length: int = 0
+    prompt: str
+
+
+@dataclass(kw_only=True)
+class ArgdownAnalysisState(State):
+    """State of the Argdown Analysis environment."""
+
+    source_text: str
+    task_id: ArgdownAnalysisTask
+    subtask_id: str | None
+    subtasks_completed: list[str] = []
+    subtask_step_count: int = 0
+    history: list[tuple[str | None, str, str, VerificationResponse | None]] = [] 
+
+
 
