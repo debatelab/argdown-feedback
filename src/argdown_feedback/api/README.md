@@ -343,16 +343,27 @@ class VerificationService:
 
 The client is included in the `argdown_feedback.api.client` module.
 
+### Backend Architecture
+
+The client supports **pluggable backends** for flexible deployment scenarios:
+
+- **HTTPBackend**: Communicates with a remote FastAPI server via HTTP/REST
+- **InProcessBackend**: Executes verification handlers directly without HTTP overhead (ideal for testing, embedded use, or high-performance scenarios)
+
 ### Basic Usage
 
-#### Synchronous Client
+#### HTTP Backend (Remote Server)
+
+**Recommended syntax:**
 
 ```python
 from argdown_feedback.api.client import VerifiersClient
+from argdown_feedback.api.client.backends import HTTPBackend
 from argdown_feedback.api.shared.models import VerificationRequest
 
-# Initialize client
-client = VerifiersClient("http://localhost:8000", async_client=False)
+# Initialize client with explicit HTTP backend
+backend = HTTPBackend(base_url="http://localhost:8000", timeout=60.0)
+client = VerifiersClient(backend=backend, async_client=False)
 
 # Create request
 request = VerificationRequest(
@@ -374,32 +385,100 @@ print(f"Processing time: {response.processing_time_ms}ms")
 client.close()
 ```
 
+**Backwards compatible syntax (deprecated):**
+
+```python
+# Still supported but shows deprecation warning
+client = VerifiersClient(base_url="http://localhost:8000", async_client=False)
+```
+
+#### In-Process Backend (No Server Required)
+
+For local execution, testing, or embedded scenarios where HTTP overhead is undesirable:
+
+```python
+from argdown_feedback.api.client import VerifiersClient
+from argdown_feedback.api.client.backends import InProcessBackend
+from argdown_feedback.api.shared.models import VerificationRequest
+
+# Initialize client with in-process backend (no server needed!)
+backend = InProcessBackend(max_workers=8)
+client = VerifiersClient(backend=backend, async_client=False)
+
+# Create and verify request (identical API)
+request = VerificationRequest(
+    inputs="""```argdown
+    <Arg>: Test argument.
+    (1) Premise
+    -- {from: ["1"]} --
+    (2) Conclusion
+    ```""",
+    config={"from_key": "from"}
+)
+
+response = client.verify_sync("infreco", request)
+print(f"Valid: {response.is_valid}")
+
+client.close()
+```
+
 #### Asynchronous Client
+
+Both backends support async operations:
 
 ```python
 import asyncio
 from argdown_feedback.api.client import VerifiersClient
+from argdown_feedback.api.client.backends import HTTPBackend
 from argdown_feedback.api.shared.models import VerificationRequest
 
 async def main():
-    # Initialize async client
-    async with VerifiersClient("http://localhost:8000", async_client=True) as client:
-        # Create request
+    # HTTP backend with async
+    async with VerifiersClient(
+        backend=HTTPBackend("http://localhost:8000"),
+        async_client=True
+    ) as client:
         request = VerificationRequest(
             inputs="...",
             config={"from_key": "from"}
         )
         
-        # Verify
+        # Verify asynchronously
         response = await client.verify_async("infreco", request)
         print(f"Valid: {response.is_valid}")
         
         # List available verifiers
         verifiers = await client.list_verifiers_async()
-        print(f"Available verifiers: {len(verifiers.core)} core, {len(verifiers.coherence)} coherence")
+        print(f"Available: {len(verifiers.core)} core, {len(verifiers.coherence)} coherence")
 
 asyncio.run(main())
 ```
+
+### Backend Comparison
+
+| Feature | HTTPBackend | InProcessBackend |
+|---------|-------------|------------------|
+| **Server Required** | Yes | No |
+| **Performance** | HTTP overhead | Direct execution |
+| **Use Cases** | Production, remote server | Testing, embedded, local |
+| **Network Dependency** | Yes | No |
+| **Identical API** | ✅ | ✅ |
+| **Code Reuse** | Server via HTTP | Server infrastructure directly |
+
+### When to Use Each Backend
+
+**Use HTTPBackend when:**
+- Deploying as a service with remote clients
+- Need centralized verification server
+- Scaling with multiple instances
+- Client and server are on different machines
+
+**Use InProcessBackend when:**
+- Writing tests (no server setup needed)
+- Embedding verification in another application
+- Local/desktop applications
+- Performance is critical (no HTTP overhead)
+- Offline/air-gapped environments
 
 ### Type-Safe Request Builders
 
@@ -505,15 +584,19 @@ request = (create_argmap_infreco_request(inputs=text)
 }
 ```
 
-## Architecture Overview
+### Architecture Overview
 
 ### Component Structure
 
 ```
 api/
-├── client/                 # HTTP client library
-│   ├── client.py          # Sync/async client implementation
-│   └── builders.py        # Type-safe request builders
+├── client/                 # Client library with pluggable backends
+│   ├── client.py          # Main VerifiersClient (backend-agnostic)
+│   ├── builders.py        # Type-safe request builders
+│   └── backends/          # Backend implementations
+│       ├── base.py        # Abstract VerificationBackend interface
+│       ├── http.py        # HTTPBackend (REST API client)
+│       └── inprocess.py   # InProcessBackend (direct execution)
 ├── server/                 # FastAPI server
 │   ├── app.py             # Main application & middleware
 │   ├── routes/            # API route handlers
@@ -534,13 +617,60 @@ api/
 
 ### Key Design Patterns
 
-1. **Builder Pattern**: Verifiers are constructed via builder classes that encapsulate configuration and pipeline construction
-2. **Registry Pattern**: `VerifierRegistry` manages available verifiers and validates configurations
-3. **Filter System**: Flexible metadata-based filtering for multi-block code processing
-4. **Scorer Pattern**: Pluggable virtue scorers with enable/disable configuration
-5. **Async Wrapper**: ThreadPoolExecutor wraps synchronous verification for async FastAPI endpoints
+1. **Backend Abstraction**: `VerificationBackend` interface allows different execution strategies (HTTP, in-process, etc.)
+2. **Builder Pattern**: Verifiers are constructed via builder classes that encapsulate configuration and pipeline construction
+3. **Registry Pattern**: `VerifierRegistry` manages available verifiers and validates configurations
+4. **Filter System**: Flexible metadata-based filtering for multi-block code processing
+5. **Scorer Pattern**: Pluggable virtue scorers with enable/disable configuration
+6. **Async Wrapper**: ThreadPoolExecutor wraps synchronous verification for async FastAPI endpoints
+7. **Code Reuse**: InProcessBackend directly reuses server's `VerificationService` and registry infrastructure
 
 ### Extending the API
+
+#### Adding a New Backend
+
+To implement a custom backend (e.g., gRPC, message queue):
+
+1. Create a new backend class in `client/backends/`:
+
+```python
+from .base import VerificationBackend
+from ...shared.models import VerificationRequest, VerificationResponse, VerifierInfo, VerifiersList
+
+class MyCustomBackend(VerificationBackend):
+    """Custom backend implementation."""
+    
+    def __init__(self, connection_string: str):
+        self.connection_string = connection_string
+        # Initialize your backend-specific resources
+    
+    async def verify_async(self, verifier_name: str, request: VerificationRequest) -> VerificationResponse:
+        # Implement async verification
+        pass
+    
+    def verify_sync(self, verifier_name: str, request: VerificationRequest) -> VerificationResponse:
+        # Implement sync verification
+        pass
+    
+    # Implement other required methods...
+```
+
+2. Export from `client/backends/__init__.py`:
+
+```python
+from .my_custom import MyCustomBackend
+
+__all__ = ["VerificationBackend", "HTTPBackend", "InProcessBackend", "MyCustomBackend"]
+```
+
+3. Use your backend:
+
+```python
+from argdown_feedback.api.client import VerifiersClient
+from argdown_feedback.api.client.backends import MyCustomBackend
+
+client = VerifiersClient(backend=MyCustomBackend("connection://..."))
+```
 
 #### Adding a New Verifier
 

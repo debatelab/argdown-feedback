@@ -7,7 +7,7 @@ PROMPT_TEMPLATES = {
     "default": dedent("""\
         Please analyse the following argumentative text using Argdown:
         
-        {source_text}
+        {sources}
         """
     ),
     "arganno": dedent("""\
@@ -552,8 +552,8 @@ def get_base_instruction(
     if subtask_id in ["arganno"]:
         word_count = len(source_text.split())
         kwargs["word_count"] = word_count
-    if subtask_id in ["arganno", "argmap", "infreco", "logreco"]:
-        kwargs["source_text"] = source_text
+    if subtask_id in ["arganno", "argmap", "infreco", "logreco", "default"]:
+        kwargs["sources"] = source_text
 
     if subtask_id not in PROMPT_TEMPLATES:
         subtask_id = "default"

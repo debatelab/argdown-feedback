@@ -11,38 +11,50 @@ This module provides the client for connecting to a Argdown Analysis Environment
 over HTTP.
 """
 
-from typing import Any, Dict
+from typing import Dict
 
-from openenv_core.client_types import StepResult
-from openenv_core.env_server.types import State
-from openenv_core.http_env_client import HTTPEnvClient
+from openenv_core.client_types import StepResult  # type: ignore[import]
+from openenv_core.http_env_client import HTTPEnvClient  # type: ignore[import]
 
-from .models import ArgdownAnalysisAction, ArgdownAnalysisObservation
+from .models import (
+    ArgdownAnalysisAction,
+    ArgdownAnalysisObservation,
+    ArgdownAnalysisState,
+    ArgdownAnalysisStep,
+    ArgdownAnalysisTask,
+)
 
 
 class ArgdownAnalysisEnv(HTTPEnvClient[ArgdownAnalysisAction, ArgdownAnalysisObservation]):
     """
     HTTP client for the Argdown Analysis Environment.
 
-    This client connects to a ArgdownAnalysisEnvironment HTTP server and provides
+    This client connects to an ArgdownAnalysisEnvironment HTTP server and provides
     methods to interact with it: reset(), step(), and state access.
+
+    The environment guides users through multi-step argument analysis tasks using
+    Argdown notation, providing verification feedback at each step.
 
     Example:
         >>> # Connect to a running server
         >>> client = ArgdownAnalysisEnv(base_url="http://localhost:8000")
-        >>> result = client.reset()
-        >>> print(result.observation.echoed_message)
+        >>> result = client.reset(source_text="Democracy is good.", task_id="SingleArgumentAnalysis")
+        >>> print(result.observation.prompt)
         >>>
-        >>> # Send a message
-        >>> result = client.step(ArgdownAnalysisAction(message="Hello!"))
-        >>> print(result.observation.echoed_message)
+        >>> # Submit an argument reconstruction
+        >>> action = ArgdownAnalysisAction(
+        ...     message="<think>Analyzing...</think>\n```argdown\n<Arg>: Democracy\n```"
+        ... )
+        >>> result = client.step(action)
+        >>> print(result.observation.prompt)
         >>> print(result.reward)
+        >>> print(result.done)
 
     Example with Docker:
         >>> # Automatically start container and connect
         >>> client = ArgdownAnalysisEnv.from_docker_image("argdown_analysis-env:latest")
-        >>> result = client.reset()
-        >>> result = client.step(ArgdownAnalysisAction(message="Test"))
+        >>> result = client.reset(source_text="...", task_id="MultiArgumentAnalysis")
+        >>> result = client.step(ArgdownAnalysisAction(message="..."))
     """
 
     def _step_payload(self, action: ArgdownAnalysisAction) -> Dict:
@@ -71,8 +83,7 @@ class ArgdownAnalysisEnv(HTTPEnvClient[ArgdownAnalysisAction, ArgdownAnalysisObs
         """
         obs_data = payload.get("observation", {})
         observation = ArgdownAnalysisObservation(
-            echoed_message=obs_data.get("echoed_message", ""),
-            message_length=obs_data.get("message_length", 0),
+            prompt=obs_data.get("prompt", ""),
             done=payload.get("done", False),
             reward=payload.get("reward"),
             metadata=obs_data.get("metadata", {}),
@@ -84,17 +95,35 @@ class ArgdownAnalysisEnv(HTTPEnvClient[ArgdownAnalysisAction, ArgdownAnalysisObs
             done=payload.get("done", False),
         )
 
-    def _parse_state(self, payload: Dict) -> State:
+    def _parse_state(self, payload: Dict) -> ArgdownAnalysisState:
         """
-        Parse server response into State object.
+        Parse server response into ArgdownAnalysisState object.
 
         Args:
             payload: JSON response from /state endpoint
 
         Returns:
-            State object with episode_id and step_count
+            ArgdownAnalysisState object with full environment state
         """
-        return State(
+        # Parse history - convert dict representations back to ArgdownAnalysisStep objects
+        history_data = payload.get("history", [])
+        history = [
+            ArgdownAnalysisStep(
+                subtask_id=step.get("subtask_id"),
+                prompt=step.get("prompt", ""),
+                message=step.get("message", ""),
+                verification_response=step.get("verification_response"),  # Keep as dict
+            )
+            for step in history_data
+        ]
+        
+        return ArgdownAnalysisState(
             episode_id=payload.get("episode_id"),
             step_count=payload.get("step_count", 0),
+            source_text=payload.get("source_text", ""),
+            task_id=ArgdownAnalysisTask(payload.get("task_id", "SingleArgumentAnalysis")),
+            subtask_id=payload.get("subtask_id"),
+            subtasks_completed=payload.get("subtasks_completed", []),
+            subtask_step_count=payload.get("subtask_step_count", 0),
+            history=history,
         )

@@ -1,40 +1,141 @@
 """
-HTTP client for the argdown-feedback API.
+Verification client with pluggable backend support.
 
-Provides sync and async clients for interacting with verification endpoints.
+Provides a unified interface for verification operations with support for multiple
+backends (HTTP, in-process, etc.) while maintaining backwards compatibility.
 """
 
 import asyncio
-from typing import Union
-import httpx
+import warnings
+from typing import Union, Optional
 
+from .backends.base import VerificationBackend
 from ..shared.models import VerificationRequest, VerificationResponse, VerifierInfo, VerifiersList
 
 
 class VerifiersClient:
     """
-    HTTP client for the argdown-feedback verification API.
+    Generic verification client supporting multiple backends.
+    
+    This client provides a unified interface for verification operations while
+    supporting different backend implementations (HTTP, in-process, etc.).
     
     Supports both synchronous and asynchronous operation modes.
+    
+    Examples:
+        # Recommended: Explicit HTTP backend
+        >>> from argdown_feedback.api.client.backends import HTTPBackend
+        >>> client = VerifiersClient(backend=HTTPBackend("http://localhost:8000"))
+        
+        # Recommended: In-process backend (no server needed)
+        >>> from argdown_feedback.api.client.backends import InProcessBackend
+        >>> client = VerifiersClient(backend=InProcessBackend())
+        
+        # Backwards compatible (deprecated)
+        >>> client = VerifiersClient(base_url="http://localhost:8000")
     """
     
-    def __init__(self, base_url: str, async_client: bool = True, timeout: float = 30.0):
+    def __init__(
+        self, 
+        backend_or_url: Optional[Union[VerificationBackend, str]] = None,
+        base_url: Optional[str] = None,
+        *,  # Force keyword-only arguments after base_url for other params
+        async_client: bool = True,
+        timeout: float = 30.0,
+        backend: Optional[VerificationBackend] = None  # New param for explicit backend
+    ):
         """
         Initialize the verifiers client.
         
         Args:
-            base_url: Base URL of the API server
-            async_client: Whether to use async mode
-            timeout: Request timeout in seconds
-        """
-        self.base_url = base_url.rstrip('/')
-        self.timeout = timeout
-        self.is_async = async_client
+            backend_or_url: Either a VerificationBackend instance or a base_url string.
+                           Recommended: Pass VerificationBackend instance.
+                           Deprecated: Pass base_url string (for backwards compatibility).
+            base_url: [DEPRECATED] Explicit base_url (alternative to first positional arg).
+                     Use backend=HTTPBackend(base_url) instead.
+            async_client: Whether to prefer async operations (default: True)
+            timeout: [DEPRECATED] Request timeout - only used with base_url.
+                    Pass to HTTPBackend constructor instead.
+            backend: [DEPRECATED] Explicit backend keyword argument.
+                    Use first positional arg instead.
         
-        if async_client:
-            self.client: Union[httpx.AsyncClient, httpx.Client] = httpx.AsyncClient(timeout=timeout)
-        else:
-            self.client = httpx.Client(timeout=timeout)
+        Raises:
+            ValueError: If neither backend nor base_url is provided
+        
+        Examples:
+            # Explicit backend (recommended)
+            >>> from argdown_feedback.api.client.backends import HTTPBackend
+            >>> client = VerifiersClient(HTTPBackend("http://localhost:8000", timeout=60.0))
+            
+            # In-process backend
+            >>> from argdown_feedback.api.client.backends import InProcessBackend
+            >>> client = VerifiersClient(InProcessBackend(max_workers=8))
+            
+            # Backwards compatible
+            >>> client = VerifiersClient("http://localhost:8000")  # Shows deprecation warning
+        """
+        # Handle backwards compatibility for multiple ways of specifying backend/URL
+        actual_backend: Optional[VerificationBackend] = None
+        
+        # Priority 1: Explicit backend keyword argument (deprecated but supported)
+        if backend is not None:
+            warnings.warn(
+                "Passing 'backend' as keyword argument is deprecated. "
+                "Pass backend as first positional argument instead: VerifiersClient(backend)",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            actual_backend = backend
+        
+        # Priority 2: First positional argument
+        if backend_or_url is not None:
+            if isinstance(backend_or_url, str):
+                # String passed - treat as base_url for backwards compatibility
+                if base_url is not None:
+                    raise ValueError("Cannot specify base_url in both positional and keyword arguments")
+                
+                warnings.warn(
+                    "Passing 'base_url' as positional argument is deprecated. "
+                    "Use VerifiersClient(backend=HTTPBackend(base_url)) instead. "
+                    "This compatibility mode will be removed in a future version.",
+                    DeprecationWarning,
+                    stacklevel=2
+                )
+                from .backends.http import HTTPBackend
+                actual_backend = HTTPBackend(backend_or_url, timeout)
+            else:
+                # VerificationBackend instance passed
+                if actual_backend is not None:
+                    raise ValueError("Cannot specify backend in both positional and keyword arguments")
+                actual_backend = backend_or_url
+        
+        # Priority 3: base_url keyword argument
+        if base_url is not None:
+            if actual_backend is not None:
+                raise ValueError(
+                    "Cannot specify both 'backend' and 'base_url'. "
+                    "Use VerifiersClient(HTTPBackend(base_url)) instead."
+                )
+            
+            warnings.warn(
+                "Passing 'base_url' as keyword argument is deprecated. "
+                "Use VerifiersClient(HTTPBackend(base_url)) instead. "
+                "This compatibility mode will be removed in a future version.",
+                DeprecationWarning,
+                stacklevel=2
+            )
+            from .backends.http import HTTPBackend
+            actual_backend = HTTPBackend(base_url, timeout)
+        
+        # Final check
+        if actual_backend is None:
+            raise ValueError(
+                "Must provide either a backend or base_url. "
+                "Recommended: VerifiersClient(HTTPBackend(base_url)) or VerifiersClient(InProcessBackend())"
+            )
+        
+        self.backend = actual_backend
+        self.is_async = async_client
     
     async def verify_async(self, verifier_name: str, request: VerificationRequest) -> VerificationResponse:
         """
@@ -48,20 +149,13 @@ class VerifiersClient:
             Verification response
             
         Raises:
-            httpx.HTTPStatusError: For HTTP errors
+            RuntimeError: If client was initialized in sync mode
+            Backend-specific exceptions: Depends on backend implementation
         """
         if not self.is_async:
             raise RuntimeError("Client was initialized in sync mode")
         
-        client = self.client
-        assert isinstance(client, httpx.AsyncClient)
-        
-        response = await client.post(
-            f"{self.base_url}/api/v1/verify/{verifier_name}",
-            json=request.dict()
-        )
-        response.raise_for_status()
-        return VerificationResponse(**response.json())
+        return await self.backend.verify_async(verifier_name, request)
     
     def verify_sync(self, verifier_name: str, request: VerificationRequest) -> VerificationResponse:
         """
@@ -75,20 +169,13 @@ class VerifiersClient:
             Verification response
             
         Raises:
-            httpx.HTTPStatusError: For HTTP errors
+            RuntimeError: If client was initialized in async mode
+            Backend-specific exceptions: Depends on backend implementation
         """
         if self.is_async:
             raise RuntimeError("Client was initialized in async mode")
         
-        client = self.client
-        assert isinstance(client, httpx.Client)
-        
-        response = client.post(
-            f"{self.base_url}/api/v1/verify/{verifier_name}",
-            json=request.dict()
-        )
-        response.raise_for_status()
-        return VerificationResponse(**response.json())
+        return self.backend.verify_sync(verifier_name, request)
     
     def verify(self, verifier_name: str, request: VerificationRequest) -> Union[VerificationResponse, asyncio.Task]:
         """
@@ -112,16 +199,14 @@ class VerifiersClient:
         
         Returns:
             List of verifiers grouped by category
+            
+        Raises:
+            RuntimeError: If client was initialized in sync mode
         """
         if not self.is_async:
             raise RuntimeError("Client was initialized in sync mode")
         
-        client = self.client
-        assert isinstance(client, httpx.AsyncClient)
-        
-        response = await client.get(f"{self.base_url}/api/v1/verifiers")
-        response.raise_for_status()
-        return VerifiersList(**response.json())
+        return await self.backend.list_verifiers_async()
     
     def list_verifiers_sync(self) -> VerifiersList:
         """
@@ -129,16 +214,14 @@ class VerifiersClient:
         
         Returns:
             List of verifiers grouped by category
+            
+        Raises:
+            RuntimeError: If client was initialized in async mode
         """
         if self.is_async:
             raise RuntimeError("Client was initialized in async mode")
         
-        client = self.client
-        assert isinstance(client, httpx.Client)
-        
-        response = client.get(f"{self.base_url}/api/v1/verifiers")
-        response.raise_for_status()
-        return VerifiersList(**response.json())
+        return self.backend.list_verifiers_sync()
     
     async def get_verifier_info_async(self, verifier_name: str) -> VerifierInfo:
         """
@@ -149,16 +232,14 @@ class VerifiersClient:
             
         Returns:
             Verifier information
+            
+        Raises:
+            RuntimeError: If client was initialized in sync mode
         """
         if not self.is_async:
             raise RuntimeError("Client was initialized in sync mode")
         
-        client = self.client
-        assert isinstance(client, httpx.AsyncClient)
-        
-        response = await client.get(f"{self.base_url}/api/v1/verifiers/{verifier_name}")
-        response.raise_for_status()
-        return VerifierInfo(**response.json())
+        return await self.backend.get_verifier_info_async(verifier_name)
     
     def get_verifier_info_sync(self, verifier_name: str) -> VerifierInfo:
         """
@@ -169,26 +250,22 @@ class VerifiersClient:
             
         Returns:
             Verifier information
+            
+        Raises:
+            RuntimeError: If client was initialized in async mode
         """
         if self.is_async:
             raise RuntimeError("Client was initialized in async mode")
         
-        client = self.client
-        assert isinstance(client, httpx.Client)
-        
-        response = client.get(f"{self.base_url}/api/v1/verifiers/{verifier_name}")
-        response.raise_for_status()
-        return VerifierInfo(**response.json())
+        return self.backend.get_verifier_info_sync(verifier_name)
     
     def close(self):
-        """Close the HTTP client."""
-        if isinstance(self.client, httpx.Client):
-            self.client.close()
+        """Close the backend and release resources."""
+        self.backend.close()
     
     async def aclose(self):
-        """Close the async HTTP client."""
-        if isinstance(self.client, httpx.AsyncClient):
-            await self.client.aclose()
+        """Asynchronously close the backend and release resources."""
+        await self.backend.aclose()
     
     def __enter__(self):
         """Context manager entry."""

@@ -10,12 +10,11 @@ Data models for the Argdown Analysis Environment.
 The argdown_analysis environment is an environment for analysing arguments with Argdown.
 """
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
+from typing import Any, Dict
 
 from openenv_core.env_server.types import Action, Observation, State  # type: ignore[import]
-
-from argdown_feedback.api.shared.models import VerificationResponse
 
 
 class ArgdownAnalysisTask(Enum):
@@ -38,15 +37,25 @@ class ArgdownAnalysisObservation(Observation):
 
 
 @dataclass(kw_only=True)
+class ArgdownAnalysisStep:
+    """Step record from the Argdown Analysis environment."""
+
+    subtask_id: str | None
+    prompt: str
+    message: str
+    verification_response: Dict[str, Any] | None
+
+
+@dataclass(kw_only=True)
 class ArgdownAnalysisState(State):
     """State of the Argdown Analysis environment."""
 
     source_text: str
     task_id: ArgdownAnalysisTask
     subtask_id: str | None
-    subtasks_completed: list[str] = []
+    subtasks_completed: list[str] = field(default_factory=list)
     subtask_step_count: int = 0
-    history: list[tuple[str | None, str, str, VerificationResponse | None]] = [] 
+    history: list[ArgdownAnalysisStep] = field(default_factory=list) 
 
 
 

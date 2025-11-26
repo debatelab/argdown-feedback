@@ -43,7 +43,7 @@ class TestVerifiersClientSync:
         )
         
         # Mock the HTTP response
-        with patch.object(sync_client.client, 'post') as mock_post:
+        with patch.object(sync_client.backend._sync_client, 'post') as mock_post:
             # Setup mock response
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -97,7 +97,7 @@ class TestVerifiersClientSync:
             config={}
         )
         
-        with patch.object(sync_client.client, 'post') as mock_post:
+        with patch.object(sync_client.backend._sync_client, 'post') as mock_post:
             # Setup mock response
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -140,7 +140,7 @@ class TestVerifiersClientSync:
             }
         )
         
-        with patch.object(sync_client.client, 'post') as mock_post:
+        with patch.object(sync_client.backend._sync_client, 'post') as mock_post:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
@@ -177,7 +177,7 @@ class TestVerifiersClientAsync:
             config={}
         )
         
-        with patch.object(async_client.client, 'post') as mock_post:
+        with patch.object(async_client.backend._async_client, 'post') as mock_post:
             # Setup async mock response
             mock_response = MagicMock()
             mock_response.status_code = 200
@@ -213,7 +213,7 @@ class TestVerifiersClientAsync:
             config={}
         )
         
-        with patch.object(async_client.client, 'post') as mock_post:
+        with patch.object(async_client.backend._async_client, 'post') as mock_post:
             # Setup error response
             mock_response = MagicMock()
             mock_response.status_code = 404
@@ -233,7 +233,7 @@ class TestVerifiersClientDiscovery:
     
     def test_list_verifiers_sync(self, sync_client):
         """Test synchronous verifier listing."""
-        with patch.object(sync_client.client, 'get') as mock_get:
+        with patch.object(sync_client.backend._sync_client, 'get') as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {
@@ -254,7 +254,7 @@ class TestVerifiersClientDiscovery:
     
     def test_get_verifier_info_sync(self, sync_client):
         """Test getting info about a specific verifier."""
-        with patch.object(sync_client.client, 'get') as mock_get:
+        with patch.object(sync_client.backend._sync_client, 'get') as mock_get:
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_response.json.return_value = {

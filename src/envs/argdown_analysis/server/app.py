@@ -19,18 +19,37 @@ Usage:
 
     # Or run directly:
     python -m server.app
+
+Environment variables:
+    ARGDOWN_FEEDBACK_URL: Base URL for the argdown-feedback API (required)
+    MAX_RETRIES: Maximum retry attempts for API calls (default: 3)
+    TIMEOUT: Request timeout in seconds (default: 30.0)
+    BACKOFF_FACTOR: Exponential backoff multiplier (default: 2.0)
 """
 
+import os
+
 try:
-    from openenv_core.env_server.http_server import create_app
+    from openenv_core.env_server.http_server import create_app  # type: ignore[import]
 except Exception as e:  # pragma: no cover
     raise ImportError("openenv_core is required for the web interface. Install dependencies with '\n    uv sync\n'") from e
 
 from .argdown_analysis_environment import ArgdownAnalysisEnvironment
-from models import ArgdownAnalysisAction, ArgdownAnalysisObservation
+from ..models import ArgdownAnalysisAction, ArgdownAnalysisObservation
+
+# Get configuration from environment variables
+argdown_feedback_url = os.getenv("ARGDOWN_FEEDBACK_URL")
+max_retries = int(os.getenv("MAX_RETRIES", "3"))
+timeout = float(os.getenv("TIMEOUT", "30.0"))
+backoff_factor = float(os.getenv("BACKOFF_FACTOR", "2.0"))
 
 # Create the environment instance
-env = ArgdownAnalysisEnvironment()
+env = ArgdownAnalysisEnvironment(
+    argdown_feedback_url=argdown_feedback_url,
+    max_retries=max_retries,
+    timeout=timeout,
+    backoff_factor=backoff_factor,
+)
 
 # Create the app with web interface and README integration
 app = create_app(
