@@ -42,10 +42,14 @@ An OpenEnv environment for training and evaluating agents on multi-step argument
 
 ```bash
 # Build the Docker image
-docker build -f src/envs/argdown_analysis/server/Dockerfile -t openenv-argdown_analysis:latest .
+docker build -f src/envs/argdown_analysis/server/Dockerfile -t openenv-argdown-analysis:latest .
+# or with ghcr:
+# docker pull ghcr.io/debatelab/openenv-argdown-analysis:latest
 
 # Run the container
-docker run -p 8000:8000 openenv-argdown_analysis:latest
+docker run -p 8000:8000 openenv-argdown-analysis:latest
+# or with ghcr.io:
+# docker run -p 8000:8000 ghcr.io/debatelab/openenv-argdown-analysis:latest
 
 # Connect from Python
 python -c "
@@ -80,7 +84,7 @@ EOF
 docker run -p 8000:8000 \
   -v $(pwd)/my-config.yaml:/app/config/custom.yaml \
   -e ARGDOWN_CONFIG_PATH=/app/config/custom.yaml \
-  openenv-argdown_analysis:latest
+  openenv-argdown-analysis:latest
 ```
 
 ### Option 3: Python/uv run (Development)
@@ -184,7 +188,7 @@ mkdir -p /data/huggingface-cache
 docker run -p 8000:8000 \
   -e HF_DATASETS_CACHE=/cache \
   -v /data/huggingface-cache:/cache \
-  openenv-argdown_analysis:latest
+  openenv-argdown-analysis:latest
 ```
 
 **Benefits:**
@@ -199,7 +203,7 @@ docker run -p 8000:8000 \
 # docker-compose.yml
 services:
   argdown-env:
-    image: openenv-argdown_analysis:latest
+    image: ghcr.io/debatelab/openenv-argdown-analysis:latest
     ports:
       - "8000:8000"
     environment:
@@ -386,7 +390,7 @@ Automatically start a Docker container:
 from envs.argdown_analysis import ArgdownAnalysisEnv
 
 # Start container and connect
-env = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+env = ArgdownAnalysisEnv.from_docker_image("ghcr.io/debatelab/openenv-argdown-analysis:latest")
 
 # Use normally
 result = env.reset()
@@ -451,7 +455,7 @@ For production, use multiple workers:
 ```bash
 docker run -p 8000:8000 \
   -e UVICORN_WORKERS=4 \
-  openenv-argdown_analysis:latest
+  ghcr.io/debatelab/openenv-argdown-analysis:latest
 ```
 
 Or modify the CMD in Dockerfile:
@@ -472,7 +476,7 @@ Use in Docker Compose:
 ```yaml
 services:
   argdown-env:
-    image: openenv-argdown_analysis:latest
+    image: ghcr.io/debatelab/openenv-argdown-analysis:latest
     ports:
       - "8000:8000"
     healthcheck:
@@ -593,10 +597,10 @@ export ARGDOWN_CONFIG_PATH=/path/to/config.yaml  # Too late
 docker run -p 8000:8000 \
   -v /absolute/path/to/config.yaml:/app/config/custom.yaml \
   -e ARGDOWN_CONFIG_PATH=/app/config/custom.yaml \
-  openenv-argdown_analysis:latest
+  ghcr.io/debatelab/openenv-argdown-analysis:latest
 
 # Verify mount inside container
-docker run -it openenv-argdown_analysis:latest /bin/bash
+docker run -it ghcr.io/debatelab/openenv-argdown-analysis:latest /bin/bash
 ls -la /app/config/
 ```
 
@@ -664,11 +668,18 @@ openenv build  # Build the environment docker image
 
 ```
 
-To debug docker:
+### Push
 
 ```bash
+# Store your GitHub PAT token in an environment variable (safer than typing directly)
+export CR_PAT=YOUR_TOKEN_HERE
 
+# Login to ghcr.io
+echo $CR_PAT | docker login ghcr.io -u YOUR_GITHUB_USERNAME --password-stdin
 
+# Push the environment image
+openenv push --registry ghcr.io/debatelab
+```
 
 ### Direct Environment Testing
 

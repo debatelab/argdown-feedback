@@ -1,5 +1,5 @@
 spec_version: 1
-name: argdown_analysis
+name: openenv-argdown-analysis
 type: space
 runtime: fastapi
 app: server.app:app

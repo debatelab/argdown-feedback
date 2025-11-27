@@ -52,7 +52,7 @@ class ArgdownAnalysisEnv(HTTPEnvClient[ArgdownAnalysisAction, ArgdownAnalysisObs
 
     Example with Docker (uses baked-in default config):
         >>> # Automatically start container and connect
-        >>> client = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+        >>> client = ArgdownAnalysisEnv.from_docker_image("ghcr.io/debatelab/openenv-argdown-analysis:latest")
         >>> result = client.reset()
         >>> result = client.step(ArgdownAnalysisAction(message="..."))
         

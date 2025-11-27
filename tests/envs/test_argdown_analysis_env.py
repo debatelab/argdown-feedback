@@ -18,7 +18,7 @@ def test_argdown_analysis_env_basic():
     """Test basic reset and step operations with the ArgdownAnalysisEnv."""
     
     # Automatically start container and connect
-    client = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+    client = ArgdownAnalysisEnv.from_docker_image("ghcr.io/debatelab/openenv-argdown-analysis:latest")
     
     try:
         # Reset the environment (no parameters - samples automatically)
@@ -54,7 +54,7 @@ def test_argdown_analysis_env_basic():
         
         # Verify response
         assert result.observation.prompt is not None
-        
+
         print(f"Response prompt: {result.observation.prompt[:100]}...")
         print(f"Reward: {result.reward}")
         print(f"Done: {result.done}")
@@ -80,7 +80,7 @@ def test_argdown_analysis_env_basic():
 def test_argdown_analysis_env_state():
     """Test state retrieval from the ArgdownAnalysisEnv."""
     
-    client = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+    client = ArgdownAnalysisEnv.from_docker_image("ghcr.io/debatelab/openenv-argdown-analysis:latest")
     
     try:
         # Reset the environment (automatic sampling)
@@ -127,7 +127,7 @@ def test_argdown_analysis_env_state():
 def test_argdown_analysis_env_multi_step():
     """Test multiple steps in the ArgdownAnalysisEnv."""
     
-    client = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+    client = ArgdownAnalysisEnv.from_docker_image("ghcr.io/debatelab/openenv-argdown-analysis:latest")
     
     try:
         # Reset (automatic sampling from configured datasets)
@@ -163,7 +163,7 @@ def test_argdown_analysis_env_multi_step():
 def test_argdown_analysis_env_config_based():
     """Test that environment respects configuration and samples from datasets."""
     
-    client = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+    client = ArgdownAnalysisEnv.from_docker_image("ghcr.io/debatelab/openenv-argdown-analysis:latest")
     
     try:
         # Reset multiple times and verify we get valid sampled data
