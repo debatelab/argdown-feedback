@@ -21,15 +21,10 @@ dependencies = [
     "pydantic>=2.0.0",
     "uvicorn>=0.24.0",
     "requests>=2.31.0",
-    # Environment-specific dependencies
-    # Add all dependencies needed for your environment here
-    "argdown-feedback[api] @ git+https://github.com/debatelab/argdown-feedback.git@main",
-    # Examples:
-    # "numpy>=1.19.0",
-    # "torch>=2.0.0",
-    # "gymnasium>=0.29.0",
-    # "openspiel>=1.0.0",
-    # "smolagents>=1.22.0,<2",
+    "argdown-feedback[api]",
+    # Configuration and dataset dependencies
+    "pyyaml>=6.0.0",
+    "datasets>=2.14.0",
 ]
 
 [project.optional-dependencies]
@@ -47,3 +42,12 @@ server = "argdown_analysis.server.app:main"
 include-package-data = true
 packages = ["argdown_analysis", "argdown_analysis.server"]
 package-dir = { "argdown_analysis" = ".", "argdown_analysis.server" = "server" }
+
+[tool.uv.sources]
+openenv = { git = "https://github.com/meta-pytorch/OpenEnv.git" }
+argdown-feedback = { git = "https://github.com/debatelab/argdown-feedback.git", rev = "main" }
+
+[dependency-groups]
+dev = [
+    "openenv",
+]

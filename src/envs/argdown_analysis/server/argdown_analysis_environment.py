@@ -14,10 +14,13 @@ import logging
 import os
 import random
 import time
-from typing import Callable
+from pathlib import Path
+from typing import Any, Callable, Dict
 from uuid import uuid4
 
-import httpx  # For type checking
+import yaml  # type: ignore[import]
+from datasets import load_dataset  # type: ignore[import]
+
 from openenv_core.env_server.interfaces import Environment  # type: ignore[import]
 from openenv_core.env_server.types import Action, State  # type: ignore[import]
 
@@ -35,8 +38,9 @@ from argdown_feedback.api.client import (
     create_argmap_logreco_request,
     create_arganno_argmap_logreco_request,
 )
+from argdown_feedback.api.client.backends import InProcessBackend
 
-from models import (
+from ..models import (
     ArgdownAnalysisStep,
     ArgdownAnalysisTask,
     ArgdownAnalysisAction,
@@ -44,7 +48,7 @@ from models import (
     ArgdownAnalysisState,
 )
 
-from server.instructions import get_base_instruction
+from .instructions import get_base_instruction
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -73,22 +77,51 @@ class ArgdownAnalysisEnvironment(Environment):
     A text environment that guides and verifies logical argument analysis with Argdown.
 
     This environment is designed for verifying Argdown argument reconstructions.
-    It maintains a source text to-be-analysed, breaks down the reconstruction into subtasks,
-    and verifies solutions at each step.
+    At initialization, it loads datasets from HuggingFace Hub based on a YAML configuration.
+    Each reset randomly samples a task (weighted by config) and source text (from configured datasets),
+    breaking down the reconstruction into subtasks and verifying solutions at each step.
 
+    Configuration (YAML):
+        Tasks define weights and datasets for sampling:
+        
+        TaskName:
+          weight: <float>      # Probability of selecting this task
+          datasets:            # List of HF datasets (concatenated)
+            - path: <str>      # HuggingFace Hub path
+              subset: <str|null>
+              split: <str>
+    
     Example:
-        >>> env = ArgdownAnalysisEnvironment()
+        >>> # Initialize with default or custom config
+        >>> env = ArgdownAnalysisEnvironment(config_path="configs/default.yaml")
+        >>> 
+        >>> # Reset samples task and source text automatically
         >>> obs = env.reset()
-        >>> print(obs.echoed_message)  # "Argdown Analysis environment ready!"
+        >>> print(obs.prompt)  # Task-specific instruction
         >>>
-        >>> obs = env.step(ArgdownAnalysisAction(message="Hello"))
-        >>> print(obs.echoed_message)  # "Hello"
-        >>> print(obs.message_length)  # 5
+        >>> # Check what was sampled
+        >>> state = env.state
+        >>> print(state.task_id)  # ArgdownAnalysisTask.SingleArgumentAnalysis
+        >>> print(state.source_text)  # "Democracy is good."
+        >>>
+        >>> # Step through the task
+        >>> obs = env.step(ArgdownAnalysisAction(
+        ...     message="<think>Starting analysis...</think>\\n"
+        ...             "```argdown\\n"
+        ...             "<Arg1>: Democracy is beneficial\\n"
+        ...             "  (1) Democracy promotes freedom.\\n"
+        ...             "  (2) Freedom is valuable.\\n"
+        ...             "  ----\\n"
+        ...             "  (3) Therefore, democracy is beneficial.\\n"
+        ...             "```"
+        ... ))
+        >>> print(obs.reward)
+        >>> print(obs.prompt)
     """
 
     def __init__(
         self,
-        argdown_feedback_url: str | None = None,
+        config_path: str | Path | None = None,
         max_retries: int = 3,
         timeout: float = 30.0,
         backoff_factor: float = 2.0,
@@ -96,50 +129,25 @@ class ArgdownAnalysisEnvironment(Environment):
         """Initialize the argdown_analysis environment.
         
         Args:
-            argdown_feedback_url: Base URL for argdown feedback API.
-                If None, reads from ARGDOWN_FEEDBACK_URL environment variable.
+            config_path: Path to YAML configuration file. If None, uses default config.
             max_retries: Maximum number of retry attempts for API calls (default: 3)
             timeout: Request timeout in seconds (default: 30.0)
             backoff_factor: Exponential backoff multiplier for retries (default: 2.0)
         """
-        # Get URL from parameter or environment variable
-        url = argdown_feedback_url or os.getenv("ARGDOWN_FEEDBACK_URL")
-        if not url:
-            raise ValueError(
-                "argdown_feedback_url must be provided either as parameter or "
-                "via ARGDOWN_FEEDBACK_URL environment variable"
-            )
+        
+        # Load configuration
+        self._task_configs = self._load_config(config_path)
+        
+        # Load datasets for each task
+        self._datasets = self._load_and_concatenate_datasets(self._task_configs)
                 
         # Initialize client in sync mode for simpler synchronous environment
-        self._verifiers_client = VerifiersClient(base_url=url, async_client=False, timeout=timeout)
+        backend = InProcessBackend()
+        self._verifiers_client = VerifiersClient(backend, async_client=False, timeout=timeout)
         self._max_retries = max_retries
         self._timeout = timeout
         self._backoff_factor = backoff_factor
         
-        # Health check - verify Argdown Feedback API is accessible
-        try:
-            # Type assertion: client is httpx.Client in sync mode
-            client = self._verifiers_client.client
-            assert isinstance(client, httpx.Client), "Client should be in sync mode"
-            
-            response = client.get(f"{url}/health")
-            response.raise_for_status()
-            data = response.json()
-            if data.get("status") != "healthy":
-                raise RuntimeError(
-                    f"API health check returned unexpected status: {data.get('status')}"
-                )
-            logger.info(
-                f"Successfully connected to argdown-feedback API at {url} "
-                f"(service: {data.get('service', 'unknown')}, "
-                f"version: {data.get('version', 'unknown')})"
-            )
-        except Exception as e:
-            raise RuntimeError(
-                f"Failed to connect to argdown-feedback API at {url}. "
-                f"Ensure the API server is running and accessible."
-            ) from e
-
         self._state = ArgdownAnalysisState(
             episode_id=str(uuid4()),
             step_count=0,
@@ -150,37 +158,53 @@ class ArgdownAnalysisEnvironment(Environment):
         self._reset_count = 0
         
         logger.info(
-            f"Initialized ArgdownAnalysisEnvironment with URL={url}, "
+            f"Initialized ArgdownAnalysisEnvironment with config from {config_path or 'default'}, "
             f"max_retries={max_retries}, timeout={timeout}"
         )
 
-    def reset(
-        self, source_text: str | None = None, task_id: ArgdownAnalysisTask | None = None
-    ) -> ArgdownAnalysisObservation:
+    def reset(self) -> ArgdownAnalysisObservation:
         """
         Reset the environment.
+        
+        Randomly samples a task based on configured weights, then randomly samples
+        a source text from the corresponding dataset.
 
         Returns:
             ArgdownAnalysisObservation with an initial argument reconstruction prompt
         """
-        if source_text is None:
-            raise ValueError("source_text must be provided for reset()")
-        if task_id is None:
-            task_id = ArgdownAnalysisTask.SingleArgumentAnalysis
-        subtask_id=self._get_next_subtask(task_id=task_id)
+        # Select task based on weights
+        task_id = self._sample_task()
+        
+        # Sample source text from dataset
+        source_text = self._sample_source_text(task_id)
+        
+        # Get initial subtask
+        subtask_id = self._get_next_subtask(task_id=task_id)
 
         self._state = ArgdownAnalysisState(
             episode_id=str(uuid4()),
             step_count=0,
             subtask_step_count=0,
-            source_text=source_text or "",
+            source_text=source_text,
             task_id=task_id,
             subtask_id=subtask_id,
         )
         self._reset_count += 1
 
         prompt = self._get_next_instruction()
-        self._state.history.append(ArgdownAnalysisStep(subtask_id=subtask_id, prompt=prompt, message="", verification_response=None))
+        self._state.history.append(
+            ArgdownAnalysisStep(
+                subtask_id=subtask_id, 
+                prompt=prompt, 
+                message="", 
+                verification_response=None
+            )
+        )
+
+        logger.info(
+            f"Reset environment (episode {self._reset_count}): task={task_id.value}, "
+            f"subtask={subtask_id}, source_text_length={len(source_text)}"
+        )
 
         return ArgdownAnalysisObservation(
             prompt=prompt,
@@ -304,7 +328,7 @@ class ArgdownAnalysisEnvironment(Environment):
             if last_verification_response.is_valid:
                 feedback = "Your last submission was valid. Well done! We will now proceed with a more detailed analysis, referring back to the same source text as analysed before."
             else:
-                error_messages = "\n\n".join([r.message for r in last_verification_response.results if r.message])
+                error_messages = "\n❌ ".join([r.message for r in last_verification_response.results if r.message])
                 feedback = "Your last submission was invalid. Please try again. Errors found:\n\n" + error_messages
                 return feedback
 
@@ -581,6 +605,178 @@ class ArgdownAnalysisEnvironment(Environment):
             reward += self._concise_thinking_reward(message)
 
         return reward, verification_response
+
+    @staticmethod
+    def _load_and_concatenate_datasets(task_configs: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Load and concatenate datasets for each task.
+        
+        Args:
+            task_configs: Dictionary mapping task names to their configurations
+            
+        Returns:
+            Dictionary mapping task names to their concatenated datasets
+        """
+        datasets: Dict[str, Any] = {}
+        
+        # Get cache directory from environment (None = default HF cache)
+        cache_dir = os.environ.get("HF_DATASETS_CACHE")
+        if cache_dir:
+            logger.info(f"Using custom HuggingFace datasets cache: {cache_dir}")
+        else:
+            logger.info("Using default HuggingFace datasets cache")
+        
+        for task_name, config in task_configs.items():
+            if config["weight"] > 0:  # Only load datasets with non-zero weight
+                datasets_configs = config["datasets"]
+                logger.info(f"Loading {len(datasets_configs)} dataset(s) for {task_name}")
+                
+                loaded_datasets = []
+                for i, dataset_config in enumerate(datasets_configs):
+                    logger.info(f"  [{i+1}/{len(datasets_configs)}] Loading {dataset_config['path']}")
+                    try:
+                        ds = load_dataset(
+                            dataset_config["path"],
+                            name=dataset_config.get("subset"),
+                            split=dataset_config["split"],
+                            cache_dir=cache_dir,
+                        )
+                        
+                        # Normalize field name to "text" for schema compatibility
+                        text_field = None
+                        for field in ["text", "source_text", "content", "document", "passage"]:
+                            if field in ds.column_names:
+                                text_field = field
+                                break
+                        
+                        if text_field is None:
+                            raise ValueError(
+                                f"No recognized text field found in dataset {dataset_config['path']}. "
+                                f"Available columns: {ds.column_names}"
+                            )
+                        
+                        # Rename to standard "text" field if needed
+                        if text_field != "text":
+                            logger.info(f"  [{i+1}/{len(datasets_configs)}] Normalizing field '{text_field}' -> 'text'")
+                            ds = ds.rename_column(text_field, "text")
+                        
+                        loaded_datasets.append(ds)
+                        logger.info(f"  [{i+1}/{len(datasets_configs)}] Loaded {len(ds)} samples")
+                    except Exception as e:
+                        logger.error(f"  [{i+1}/{len(datasets_configs)}] Failed to load: {e}")
+                        raise
+                
+                # Concatenate all datasets for this task
+                if len(loaded_datasets) == 1:
+                    datasets[task_name] = loaded_datasets[0]
+                else:
+                    from datasets import concatenate_datasets  # type: ignore[import]
+                    datasets[task_name] = concatenate_datasets(loaded_datasets)
+                
+                total_samples = len(datasets[task_name])
+                logger.info(f"Total {total_samples} samples loaded for {task_name}")
+        
+        return datasets
+
+    @staticmethod
+    def _load_config(config_path: str | Path | None = None) -> Dict[str, Any]:
+        """
+        Load task configuration from YAML file.
+        
+        Args:
+            config_path: Path to YAML config file. If None, uses default config.
+            
+        Returns:
+            Dictionary mapping task names to their configurations
+        """
+        if config_path is None:
+            # Use default config bundled with the package
+            config_path = Path(__file__).parent.parent / "configs" / "default.yaml"
+        else:
+            config_path = Path(config_path)
+            
+        if not config_path.exists():
+            raise FileNotFoundError(f"Configuration file not found: {config_path}")
+            
+        with open(config_path, "r", encoding="utf-8") as f:  # noqa: S113
+            config = yaml.safe_load(f)
+            
+        # Validate configuration
+        required_tasks = {"SingleArgumentAnalysis", "MultiArgumentAnalysis"}
+        missing_tasks = required_tasks - set(config.keys())
+        if missing_tasks:
+            raise ValueError(f"Configuration missing required tasks: {missing_tasks}")
+        
+        # Validate datasets structure
+        for task_name, task_config in config.items():
+            if "datasets" not in task_config:
+                raise ValueError(f"Task {task_name} missing 'datasets' field")
+            if not isinstance(task_config["datasets"], list):
+                raise ValueError(f"Task {task_name} 'datasets' must be a list")
+            if len(task_config["datasets"]) == 0:
+                raise ValueError(f"Task {task_name} must have at least one dataset")
+            
+        # Validate and normalize weights
+        total_weight = sum(task_config["weight"] for task_config in config.values())
+        if total_weight <= 0:
+            raise ValueError("Total task weights must be positive")
+            
+        logger.info(f"Loaded configuration from {config_path}")
+        for task_name, task_config in config.items():
+            dataset_paths = [ds["path"] for ds in task_config["datasets"]]
+            logger.info(
+                f"  {task_name}: weight={task_config['weight']:.2f} "
+                f"({task_config['weight']/total_weight*100:.1f}%), "
+                f"datasets=[{', '.join(dataset_paths)}]"
+            )
+            
+        return config
+    
+    def _sample_task(self) -> ArgdownAnalysisTask:
+        """
+        Sample a task based on configured weights.
+        
+        Returns:
+            Randomly selected ArgdownAnalysisTask
+        """
+        # Extract tasks and weights
+        tasks = []
+        weights = []
+        for task_name, config in self._task_configs.items():
+            if config["weight"] > 0:
+                tasks.append(ArgdownAnalysisTask[task_name])
+                weights.append(config["weight"])
+        
+        if not tasks:
+            raise ValueError("No tasks with positive weight configured")
+            
+        # Random weighted choice
+        return random.choices(tasks, weights=weights, k=1)[0]
+    
+    def _sample_source_text(self, task_id: ArgdownAnalysisTask) -> str:
+        """
+        Sample a source text from the dataset for the given task.
+        
+        Args:
+            task_id: The task to sample a source text for
+            
+        Returns:
+            Randomly sampled source text string
+        """
+        task_name = task_id.value
+        if task_name not in self._datasets:
+            raise ValueError(f"No dataset loaded for task {task_name}")
+            
+        dataset = self._datasets[task_name]
+        if len(dataset) == 0:
+            raise ValueError(f"Dataset for task {task_name} is empty")
+            
+        # Random sample
+        idx = random.randint(0, len(dataset) - 1)
+        sample = dataset[idx]
+        
+        # All datasets have been normalized to use "text" field during loading
+        return sample["text"]
 
     @staticmethod
     def _get_next_subtask(

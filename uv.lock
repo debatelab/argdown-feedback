@@ -32,6 +32,7 @@ dependencies = [
     { name = "beautifulsoup4" },
     { name = "nltk" },
     { name = "openai" },
+    { name = "openenv-core" },
     { name = "pyargdown" },
     { name = "tenacity" },
     { name = "textdistance", extra = ["dameraulevenshtein"] },
@@ -56,6 +57,9 @@ dev = [
     { name = "pytest-asyncio" },
     { name = "requests" },
 ]
+envs = [
+    { name = "openenv-core" },
+]
 
 [package.metadata]
 requires-dist = [
@@ -63,6 +67,7 @@ requires-dist = [
     { name = "fastapi", marker = "extra == 'api'", specifier = ">=0.119.1" },
     { name = "nltk", specifier = ">=3.9.1" },
     { name = "openai", specifier = ">=1.66.3" },
+    { name = "openenv-core", extras = ["envs"], specifier = ">=0.1.1" },
     { name = "pyargdown", git = "https://github.com/debatelab/pyargdown.git" },
     { name = "tenacity", specifier = ">=9.0.0" },
     { name = "textdistance", extras = ["dameraulevenshtein"], specifier = ">=4.6.3" },
@@ -82,6 +87,7 @@ dev = [
     { name = "pytest-asyncio", specifier = ">=0.25.3" },
     { name = "requests", specifier = ">=2.32.5" },
 ]
+envs = [{ name = "openenv-core", specifier = ">=0.1.1" }]
 
 [[package]]
 name = "beautifulsoup4"
@@ -610,6 +616,27 @@ dependencies = [
     { name = "tomli-w" },
     { name = "typer" },
     { name = "uvicorn" },
+]
+
+[[package]]
+name = "openenv-core"
+version = "0.1.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "fastapi" },
+    { name = "huggingface-hub" },
+    { name = "pydantic" },
+    { name = "pyyaml" },
+    { name = "requests" },
+    { name = "rich" },
+    { name = "tomli" },
+    { name = "tomli-w" },
+    { name = "typer" },
+    { name = "uvicorn", extra = ["standard"] },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/37/38/cacf28d5adeb5c24fc9df28da32f5eb7c0e3891b60b6af1d0ef943e3be69/openenv_core-0.1.1.tar.gz", hash = "sha256:43e0aa8ff3cef99bd62a5b4f8f5db707f9bdf42ba3c1eb48465feb78135a91f8", size = 53632 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/8a/3e/408848d10fa3fa02c512baeea93e817c777819f8e43ae2ad0ef47022d0e3/openenv_core-0.1.1-py3-none-any.whl", hash = "sha256:cad04688172e068b5a81e32b4d83cb6886c18a0e3cf5cbc8e8c60430753df182", size = 70148 },
 ]
 
 [[package]]

@@ -15,6 +15,7 @@ dependencies = [
     "beautifulsoup4>=4.13.3",
     "nltk>=3.9.1",
     "openai>=1.66.3",
+    "openenv-core[envs]>=0.1.1",
     "pyargdown @ git+https://github.com/debatelab/pyargdown.git",
     "tenacity>=9.0.0",
     "textdistance[dameraulevenshtein]>=4.6.3",
@@ -38,6 +39,9 @@ api = [
     "fastapi>=0.104.0",
     "uvicorn[standard]>=0.24.0",
     "python-multipart>=0.0.6",
+]
+envs = [
+    "openenv-core>=0.1.1"
 ]
 
 [tool.hatch.metadata]

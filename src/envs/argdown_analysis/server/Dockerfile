@@ -15,9 +15,15 @@ FROM ${BASE_IMAGE} AS builder
 
 WORKDIR /app
 
-# Ensure git is available (required for installing dependencies from VCS)
+# Install build dependencies required for C extensions (e.g., pyxdameraulevenshtein)
+# and git for VCS dependencies
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends git && \
+    apt-get install -y --no-install-recommends \
+        git \
+        gcc \
+        g++ \
+        build-essential \
+        python3-dev && \
     rm -rf /var/lib/apt/lists/*
 
 # Build argument to control whether we're building standalone or in-repo
@@ -71,10 +77,16 @@ ENV PATH="/app/.venv/bin:$PATH"
 # Set PYTHONPATH so imports work correctly
 ENV PYTHONPATH="/app/env:$PYTHONPATH"
 
+# Copy default configuration into image
+COPY --from=builder /app/env/configs /app/config
+
+# Set default configuration path (can be overridden at runtime)
+ENV ARGDOWN_CONFIG_PATH=/app/config/default.yaml
+
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # Run the FastAPI server
-# The module path is constructed to work with the /app/env structure
-CMD ["sh", "-c", "cd /app/env && uvicorn server.app:app --host 0.0.0.0 --port 8000"]
+# The module path uses the package name from pyproject.toml (argdown_analysis)
+CMD ["sh", "-c", "cd /app/env && uvicorn argdown_analysis.server.app:app --host 0.0.0.0 --port 8000"]

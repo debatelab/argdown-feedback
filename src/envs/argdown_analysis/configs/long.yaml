@@ -1,0 +1,56 @@
+# Balanced configuration - equal weights for all tasks
+#
+# Use this configuration for balanced training across task types on long source texts.
+
+SingleArgumentAnalysis:
+  weight: 0.5
+  datasets:
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "arguments-pros-and-cons-1950"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "arguments-pros-and-cons-2010"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "arguments-procon_org"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "arguments-room-for-debate"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-procon_org-handful"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-pros-and-cons-1950-handful"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-pros-and-cons-2010-handful"
+      split: "train"
+
+MultiArgumentAnalysis:
+  weight: 0.5
+  datasets:
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-procon_org-handful"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-pros-and-cons-1950-handful"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-pros-and-cons-2010-handful"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-debatabase-full"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-procon_org-full"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-pros-and-cons-1950-full"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-pros-and-cons-2010-full"
+      split: "train"
+    - path: "DebateLabKIT/arguments-and-debates"
+      subset: "debates-room-for-debate-full"
+      split: "train"

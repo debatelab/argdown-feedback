@@ -21,13 +21,14 @@ Usage:
     python -m server.app
 
 Environment variables:
-    ARGDOWN_FEEDBACK_URL: Base URL for the argdown-feedback API (required)
-    MAX_RETRIES: Maximum retry attempts for API calls (default: 3)
+    ARGDOWN_CONFIG_PATH: Path to YAML configuration file (default: configs/default.yaml)
+    MAX_RETRIES: Maximum retry attempts for verifier calls (default: 3)
     TIMEOUT: Request timeout in seconds (default: 30.0)
     BACKOFF_FACTOR: Exponential backoff multiplier (default: 2.0)
 """
 
 import os
+from pathlib import Path
 
 try:
     from openenv_core.env_server.http_server import create_app  # type: ignore[import]
@@ -38,14 +39,21 @@ from .argdown_analysis_environment import ArgdownAnalysisEnvironment
 from ..models import ArgdownAnalysisAction, ArgdownAnalysisObservation
 
 # Get configuration from environment variables
-argdown_feedback_url = os.getenv("ARGDOWN_FEEDBACK_URL")
+config_path = os.getenv("ARGDOWN_CONFIG_PATH")  # Can be None, will use default
 max_retries = int(os.getenv("MAX_RETRIES", "3"))
 timeout = float(os.getenv("TIMEOUT", "30.0"))
 backoff_factor = float(os.getenv("BACKOFF_FACTOR", "2.0"))
 
+# Log configuration source
+if config_path:
+    print(f"Loading configuration from: {config_path}")
+else:
+    default_config = Path(__file__).parent.parent / "configs" / "default.yaml"
+    print(f"Using default configuration: {default_config}")
+
 # Create the environment instance
 env = ArgdownAnalysisEnvironment(
-    argdown_feedback_url=argdown_feedback_url,
+    config_path=config_path,
     max_retries=max_retries,
     timeout=timeout,
     backoff_factor=backoff_factor,

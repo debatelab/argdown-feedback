@@ -38,7 +38,7 @@ class ArgdownAnalysisEnv(HTTPEnvClient[ArgdownAnalysisAction, ArgdownAnalysisObs
     Example:
         >>> # Connect to a running server
         >>> client = ArgdownAnalysisEnv(base_url="http://localhost:8000")
-        >>> result = client.reset(source_text="Democracy is good.", task_id="SingleArgumentAnalysis")
+        >>> result = client.reset()
         >>> print(result.observation.prompt)
         >>>
         >>> # Submit an argument reconstruction
@@ -50,11 +50,28 @@ class ArgdownAnalysisEnv(HTTPEnvClient[ArgdownAnalysisAction, ArgdownAnalysisObs
         >>> print(result.reward)
         >>> print(result.done)
 
-    Example with Docker:
+    Example with Docker (uses baked-in default config):
         >>> # Automatically start container and connect
-        >>> client = ArgdownAnalysisEnv.from_docker_image("argdown_analysis-env:latest")
-        >>> result = client.reset(source_text="...", task_id="MultiArgumentAnalysis")
+        >>> client = ArgdownAnalysisEnv.from_docker_image("openenv-argdown_analysis:latest")
+        >>> result = client.reset()
         >>> result = client.step(ArgdownAnalysisAction(message="..."))
+        
+    Example with Docker (custom config via volume mount):
+        >>> # Start container with custom config
+        >>> import os
+        >>> from openenv_core.containers.runtime import LocalDockerProvider
+        >>> 
+        >>> provider = LocalDockerProvider()
+        >>> # Note: Volume mounting not yet supported in LocalDockerProvider
+        >>> # Use docker run directly with -v flag for now
+        >>> client = ArgdownAnalysisEnv(base_url="http://localhost:8000")
+        
+    Example with custom config (Python/uv run):
+        >>> import os
+        >>> # Set config path before importing/starting server
+        >>> os.environ["ARGDOWN_CONFIG_PATH"] = "/path/to/custom.yaml"
+        >>> # Then start server with: uv run server/app.py
+        >>> client = ArgdownAnalysisEnv(base_url="http://localhost:8000")
     """
 
     def _step_payload(self, action: ArgdownAnalysisAction) -> Dict:

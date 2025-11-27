@@ -1,6 +1,6 @@
 from textwrap import dedent
 
-from models import ArgdownAnalysisTask
+from ..models import ArgdownAnalysisTask
 
 
 PROMPT_TEMPLATES = {
