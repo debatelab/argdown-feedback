@@ -21,7 +21,8 @@ dependencies = [
     "pydantic>=2.0.0",
     "uvicorn>=0.24.0",
     "requests>=2.31.0",
-    "argdown-feedback[api]",
+    # argdown-feedback package (parent package from same repo)
+    "argdown-feedback @ git+https://github.com/debatelab/argdown-feedback.git@main",
     # Configuration and dataset dependencies
     "pyyaml>=6.0.0",
     "datasets>=2.14.0",
